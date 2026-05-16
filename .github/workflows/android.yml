@@ -22,13 +22,13 @@ jobs:
           cp -r assets /tmp/assets_backup 2>/dev/null || true
           cp pubspec.yaml /tmp/pubspec_backup.yaml
           
-          # Create a fresh Flutter project to get correct Gradle files
+          # Create a fresh Flutter project with correct name and org
           cd /tmp
-          flutter create --org com.lessnet lessnet_temp
+          flutter create --org com.lessnet --project-name lessnet lessnet_fresh
           
           # Replace the entire Android directory with fresh one
           rm -rf "$GITHUB_WORKSPACE/android"
-          cp -r /tmp/lessnet_temp/android "$GITHUB_WORKSPACE/android"
+          cp -r /tmp/lessnet_fresh/android "$GITHUB_WORKSPACE/android"
           
           # Restore our source code
           rm -rf "$GITHUB_WORKSPACE/lib"
@@ -41,6 +41,29 @@ jobs:
           
           # Use our pubspec.yaml with our dependencies
           cp /tmp/pubspec_backup.yaml "$GITHUB_WORKSPACE/pubspec.yaml"
+
+      - name: Add Bluetooth permissions to AndroidManifest
+        run: |
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
+          
+          # Read current manifest
+          CONTENT=$(cat "$MANIFEST")
+          
+          # Bluetooth permissions to inject (before </manifest>)
+          PERMS='
+            <uses-permission android:name="android.permission.BLUETOOTH" />
+            <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+            <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
+            <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+            <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
+            <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+            <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+            <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
+            <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
+          '
+          
+          # Insert permissions before </manifest>
+          echo "$CONTENT" | sed "s|</manifest>|${PERMS}\n</manifest>|" > "$MANIFEST"
 
       - name: Install dependencies
         run: flutter pub get
