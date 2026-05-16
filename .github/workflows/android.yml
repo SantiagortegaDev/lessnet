@@ -16,10 +16,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Instalar uv
-        uses: astral-sh/setup-uv@v5
+      - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: '3.12'
 
       - uses: actions/setup-java@v4
         with:
@@ -31,7 +30,7 @@ jobs:
           channel: stable
 
       - name: Instalar dependencias
-        run: uv pip install flet==0.85.1 flet-permission-handler --system
+        run: pip install flet==0.85.1 flet-permission-handler
 
       - name: Build APK
         run: flet build apk -v
