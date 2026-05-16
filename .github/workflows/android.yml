@@ -34,6 +34,24 @@ jobs:
           # Restore our AndroidManifest with BT permissions
           cp /tmp/AndroidManifest_backup.xml "$GITHUB_WORKSPACE/android/app/src/main/AndroidManifest.xml"
           
+          # Copy our custom native Kotlin files (BLE peripheral plugin)
+          KOTLIN_DIR=$(find "$GITHUB_WORKSPACE/android/app/src/main/kotlin" -type d -name "lessnet" | head -1)
+          if [ -n "$KOTLIN_DIR" ]; then
+            # Get the package name from the generated MainActivity
+            PACKAGE=$(head -1 "$KOTLIN_DIR/MainActivity.kt" | sed 's/package //')
+            echo "Detected package: $PACKAGE"
+            echo "Kotlin dir: $KOTLIN_DIR"
+            
+            # Replace package placeholder in our custom Kotlin files
+            sed "s/PACKAGE_PLACEHOLDER/$PACKAGE/g" "$GITHUB_WORKSPACE/native/BlePeripheralPlugin.kt" > "$KOTLIN_DIR/BlePeripheralPlugin.kt"
+            sed "s/PACKAGE_PLACEHOLDER/$PACKAGE/g" "$GITHUB_WORKSPACE/native/MainActivity.kt" > "$KOTLIN_DIR/MainActivity.kt"
+            
+            echo "Custom Kotlin files installed:"
+            ls -la "$KOTLIN_DIR/"
+          else
+            echo "WARNING: Could not find Kotlin directory!"
+          fi
+          
           # Restore our source code
           rm -rf "$GITHUB_WORKSPACE/lib"
           cp -r /tmp/lib_backup "$GITHUB_WORKSPACE/lib"

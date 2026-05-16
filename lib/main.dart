@@ -42,34 +42,121 @@ class LessNetApp extends StatelessWidget {
 
 // ─────────────────────────────────────────────
 // BLUETOOTH SERVICE GLOBAL (comparte estado entre paginas)
+// Soporta dos modos:
+//   CENTRAL: escanea y se conecta a un peripheral
+//   PERIPHERAL: se anuncia (advertising) y acepta conexiones
 // ─────────────────────────────────────────────
 class BtService {
   static final BtService _instance = BtService._internal();
   factory BtService() => _instance;
-  BtService._internal();
+  BtService._internal() {
+    _setupPeripheralChannel();
+  }
 
+  // ─── Central mode (flutter_blue_plus) ───
   BluetoothDevice? connectedDevice;
-  BluetoothCharacteristic? rxChar; // Escribir mensajes
-  BluetoothCharacteristic? txChar; // Recibir mensajes
+  BluetoothCharacteristic? rxChar;
+  BluetoothCharacteristic? txChar;
   StreamSubscription? _txSub;
   StreamSubscription? _connSub;
+  final List<int> _receiveBuffer = [];
 
+  // ─── Peripheral mode (native MethodChannel) ───
+  static const _peripheralChannel = MethodChannel('com.lessnet.ble_peripheral');
+  bool _isPeripheral = false;
+  bool _isAdvertising = false;
+  bool _peripheralConnected = false;
+  String _peripheralDeviceName = '';
+
+  // ─── Shared state ───
   final List<ChatMessage> messages = [];
   final _msgController = StreamController<ChatMessage>.broadcast();
   Stream<ChatMessage> get onMessage => _msgController.stream;
 
-  final _connectionController = StreamController<BluetoothDevice?>.broadcast();
-  Stream<BluetoothDevice?> get onConnectionChange => _connectionController.stream;
+  final _connectionController = StreamController<bool>.broadcast();
+  Stream<bool> get onConnectionChange => _connectionController.stream;
 
+  final _advertisingController = StreamController<bool>.broadcast();
+  Stream<bool> get onAdvertisingChange => _advertisingController.stream;
 
+  bool get isAdvertising => _isAdvertising;
+  bool get isPeripheralConnected => _peripheralConnected;
+  bool get isConnected => connectedDevice != null || _peripheralConnected;
+  String get connectedName {
+    if (connectedDevice != null) {
+      return connectedDevice!.platformName.isEmpty
+          ? 'Dispositivo'
+          : connectedDevice!.platformName;
+    }
+    if (_peripheralConnected) return _peripheralDeviceName.isEmpty ? 'Dispositivo' : _peripheralDeviceName;
+    return '';
+  }
 
+  // ─── Setup MethodChannel with native BLE peripheral ───
+  void _setupPeripheralChannel() {
+    _peripheralChannel.setMethodCallHandler((call) async {
+      switch (call.method) {
+        case 'onDataReceived':
+          final text = call.arguments as String? ?? '';
+          if (text.isNotEmpty) {
+            final msg = ChatMessage(text: text, mine: false, time: DateTime.now());
+            messages.add(msg);
+            _msgController.add(msg);
+          }
+          break;
+        case 'onDeviceConnected':
+          _peripheralConnected = true;
+          _isAdvertising = false;
+          _peripheralDeviceName = call.arguments as String? ?? '';
+          _advertisingController.add(false);
+          _connectionController.add(true);
+          break;
+        case 'onDeviceDisconnected':
+          _peripheralConnected = false;
+          _peripheralDeviceName = '';
+          _connectionController.add(false);
+          break;
+        case 'onAdvertiseStatus':
+          final success = call.arguments as bool? ?? false;
+          _isAdvertising = success;
+          _advertisingController.add(success);
+          break;
+      }
+    });
+  }
+
+  // ─── Peripheral: start advertising ───
+  Future<void> startAdvertising() async {
+    try {
+      await _peripheralChannel.invokeMethod('startAdvertising');
+      _isPeripheral = true;
+      _isAdvertising = true;
+      _advertisingController.add(true);
+    } catch (e) {
+      _isAdvertising = false;
+      _advertisingController.add(false);
+      rethrow;
+    }
+  }
+
+  // ─── Peripheral: stop advertising ───
+  Future<void> stopAdvertising() async {
+    try {
+      await _peripheralChannel.invokeMethod('stopAdvertising');
+    } catch (_) {}
+    _isAdvertising = false;
+    _isPeripheral = false;
+    _peripheralConnected = false;
+    _advertisingController.add(false);
+  }
+
+  // ─── Central: connect to a peripheral device ───
   Future<void> connectToDevice(BluetoothDevice device) async {
     try {
       await device.connect(timeout: const Duration(seconds: 15));
       connectedDevice = device;
-      _connectionController.add(device);
+      _connectionController.add(true);
 
-      // Descubrir servicios
       final services = await device.discoverServices();
       for (final service in services) {
         if (service.uuid.str128.toLowerCase() == lessnetServiceUuid.toLowerCase()) {
@@ -78,14 +165,11 @@ class BtService {
               rxChar = char;
             } else if (char.uuid.str128.toLowerCase() == lessnetCharTxUuid.toLowerCase()) {
               txChar = char;
-              // Suscribirse a notificaciones
               await char.setNotifyValue(true);
+              _receiveBuffer.clear();
               _txSub = char.lastValueStream.listen((value) {
                 if (value.isNotEmpty) {
-                  final text = utf8.decode(value, allowMalformed: true);
-                  final msg = ChatMessage(text: text, mine: false, time: DateTime.now());
-                  messages.add(msg);
-                  _msgController.add(msg);
+                  _handleReceivedData(value);
                 }
               });
             }
@@ -93,7 +177,6 @@ class BtService {
         }
       }
 
-      // Escuchar desconexión
       _connSub = device.connectionState.listen((state) {
         if (state == BluetoothConnectionState.disconnected) {
           _cleanup();
@@ -105,23 +188,49 @@ class BtService {
     }
   }
 
+  // ─── Handle received BLE data with buffering (null-terminated protocol) ───
+  void _handleReceivedData(List<int> value) {
+    if (value.length == 1 && value[0] == 0x00) {
+      // End of message marker
+      if (_receiveBuffer.isNotEmpty) {
+        final text = utf8.decode(_receiveBuffer, allowMalformed: true);
+        _receiveBuffer.clear();
+        if (text.isNotEmpty) {
+          final msg = ChatMessage(text: text, mine: false, time: DateTime.now());
+          messages.add(msg);
+          _msgController.add(msg);
+        }
+      }
+    } else {
+      _receiveBuffer.addAll(value);
+    }
+  }
+
+  // ─── Send message (works in both central and peripheral mode) ───
   Future<void> sendMessage(String text) async {
-    if (rxChar == null || text.isEmpty) return;
+    if (text.isEmpty) return;
     final msg = ChatMessage(text: text, mine: true, time: DateTime.now());
     messages.add(msg);
     _msgController.add(msg);
 
-    // Enviar por BLE en chunks de 20 bytes (limite BLE)
-    final bytes = utf8.encode(text);
-    for (int i = 0; i < bytes.length; i += 20) {
-      final chunk = bytes.sublist(i, i + 20 > bytes.length ? bytes.length : i + 20);
-      await rxChar!.write(Uint8List.fromList(chunk), withoutResponse: false);
+    if (_isPeripheral && _peripheralConnected) {
+      // Peripheral mode: send via native GATT server
+      try {
+        await _peripheralChannel.invokeMethod('sendData', {'data': text});
+      } catch (e) {
+        rethrow;
+      }
+    } else if (rxChar != null) {
+      // Central mode: send via flutter_blue_plus
+      final bytes = utf8.encode(text);
+      for (int i = 0; i < bytes.length; i += 20) {
+        final end = i + 20 > bytes.length ? bytes.length : i + 20;
+        final chunk = bytes.sublist(i, end);
+        await rxChar!.write(Uint8List.fromList(chunk), withoutResponse: false);
+      }
+      await rxChar!.write(Uint8List.fromList([0x00]), withoutResponse: false);
     }
-    // Enviar marcador de fin de mensaje
-    await rxChar!.write(Uint8List.fromList([0x00]), withoutResponse: false);
   }
-
-
 
   void _cleanup() {
     _txSub?.cancel();
@@ -129,12 +238,17 @@ class BtService {
     connectedDevice = null;
     rxChar = null;
     txChar = null;
-    _connectionController.add(null);
-
+    _receiveBuffer.clear();
+    _connectionController.add(false);
   }
 
   Future<void> disconnect() async {
-    await connectedDevice?.disconnect();
+    if (connectedDevice != null) {
+      await connectedDevice!.disconnect();
+    }
+    if (_isPeripheral) {
+      await stopAdvertising();
+    }
     _cleanup();
   }
 
@@ -143,7 +257,7 @@ class BtService {
     _connSub?.cancel();
     _msgController.close();
     _connectionController.close();
-
+    _advertisingController.close();
   }
 }
 
@@ -433,7 +547,7 @@ class _PermCard extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────
-// PAGINA 2: SCAN + CONECTAR + ADVERTISING
+// PAGINA 2: SCAN + ADVERTISING + CONECTAR
 // ─────────────────────────────────────────────
 class ScanPage extends StatefulWidget {
   const ScanPage({super.key});
@@ -448,7 +562,10 @@ class _ScanPageState extends State<ScanPage> {
   StreamSubscription? _scanSub;
   StreamSubscription? _scanningSub;
   StreamSubscription? _connSub;
-
+  StreamSubscription? _advSub;
+  StreamSubscription? _periphConnSub;
+  int _advertiseSeconds = 0;
+  Timer? _advertiseTimer;
 
   @override
   void initState() {
@@ -456,10 +573,32 @@ class _ScanPageState extends State<ScanPage> {
     _connSub = bt.onConnectionChange.listen((_) {
       if (mounted) setState(() {});
     });
-
+    _advSub = bt.onAdvertisingChange.listen((isAdv) {
+      if (mounted) {
+        setState(() {});
+        if (isAdv) {
+          _advertiseSeconds = 0;
+          _advertiseTimer?.cancel();
+          _advertiseTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+            if (mounted) setState(() => _advertiseSeconds++);
+          });
+        } else {
+          _advertiseTimer?.cancel();
+          _advertiseTimer = null;
+        }
+      }
+    });
+    _periphConnSub = bt.onConnectionChange.listen((connected) {
+      if (mounted) setState(() {});
+    });
   }
 
   Future<void> _startScan() async {
+    // Stop advertising first if active
+    if (bt.isAdvertising) {
+      await bt.stopAdvertising();
+    }
+
     final statuses = await [
       Permission.locationWhenInUse,
       Permission.bluetoothScan,
@@ -476,7 +615,10 @@ class _ScanPageState extends State<ScanPage> {
     _results.clear();
     setState(() => _scanning = true);
     try {
-      await FlutterBluePlus.startScan(timeout: const Duration(seconds: 10));
+      await FlutterBluePlus.startScan(
+        timeout: const Duration(seconds: 30),
+        withServices: [Guid(lessnetServiceUuid)],
+      );
       _scanSub = FlutterBluePlus.scanResults.listen((results) {
         if (mounted) setState(() { _results..clear()..addAll(results); });
       });
@@ -486,6 +628,56 @@ class _ScanPageState extends State<ScanPage> {
     } catch (e) {
       if (mounted) { setState(() => _scanning = false); }
     }
+  }
+
+  Future<void> _startAdvertising() async {
+    // Stop scan first if active
+    if (_scanning) {
+      await FlutterBluePlus.stopScan();
+      _scanSub?.cancel();
+      _scanningSub?.cancel();
+      _scanning = false;
+    }
+
+    final statuses = await [
+      Permission.bluetoothAdvertise,
+      Permission.bluetoothConnect,
+    ].request();
+    if (!statuses.values.every((s) => s.isGranted)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Concede los permisos de Advertise primero'), backgroundColor: Colors.red),
+        );
+      }
+      return;
+    }
+
+    try {
+      await bt.startAdvertising();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Dispositivo visible! El otro celular debe buscar y conectar.'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 4),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al hacer visible: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _stopAdvertising() async {
+    await bt.stopAdvertising();
+    _advertiseTimer?.cancel();
+    _advertiseTimer = null;
+    _advertiseSeconds = 0;
+    if (mounted) setState(() {});
   }
 
   Future<void> _connect(BluetoothDevice device) async {
@@ -508,31 +700,40 @@ class _ScanPageState extends State<ScanPage> {
     }
   }
 
+  String _fmtDuration(int seconds) {
+    final m = seconds ~/ 60;
+    final s = seconds % 60;
+    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  }
+
   @override
   void dispose() {
     _scanSub?.cancel();
     _scanningSub?.cancel();
     _connSub?.cancel();
-
+    _advSub?.cancel();
+    _periphConnSub?.cancel();
+    _advertiseTimer?.cancel();
     FlutterBluePlus.stopScan();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final connected = bt.connectedDevice;
+    final isConnected = bt.isConnected;
     return SafeArea(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _Header('Dispositivos', Icons.bluetooth_searching,
-              connected != null ? 'Conectado: ${connected.platformName}' : '${_results.length} encontrados'),
+              isConnected ? 'Conectado: ${bt.connectedName}' : bt.isAdvertising ? 'Visible para otros' : 'Sin conexion'),
+
             const SizedBox(height: 16),
 
-            // Dispositivo conectado
-            if (connected != null)
+            // ─── Connected device card ───
+            if (isConnected)
               Container(
                 margin: const EdgeInsets.only(bottom: 12),
                 padding: const EdgeInsets.all(14),
@@ -542,31 +743,70 @@ class _ScanPageState extends State<ScanPage> {
                   const Icon(Icons.bluetooth_connected, color: Colors.greenAccent, size: 22),
                   const SizedBox(width: 12),
                   Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(connected.platformName.isEmpty ? 'Dispositivo' : connected.platformName,
+                    Text(bt.connectedName,
                         style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.w600, fontSize: 14)),
-                    Text(connected.remoteId.toString(), style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11)),
+                    Text(bt.connectedDevice?.remoteId.toString() ?? 'Conectado via BLE',
+                        style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11)),
                   ])),
                   TextButton(onPressed: () => bt.disconnect(),
                     child: const Text('Desconectar', style: TextStyle(color: Colors.redAccent))),
                 ]),
               ),
 
-            // Boton de buscar
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                icon: _scanning
-                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Icon(Icons.search),
-                label: Text(_scanning ? 'Buscando...' : 'Buscar dispositivos'),
-                onPressed: _scanning ? null : _startScan,
+            // ─── Advertising indicator ───
+            if (bt.isAdvertising && !isConnected)
+              Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(color: const Color(0xFF60A5FA).withOpacity(0.1), borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF60A5FA).withOpacity(0.3))),
+                child: Row(children: [
+                  const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF60A5FA))),
+                  const SizedBox(width: 12),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    const Text('Visible para otros dispositivos',
+                        style: TextStyle(color: Color(0xFF60A5FA), fontWeight: FontWeight.w600, fontSize: 14)),
+                    Text('Esperando conexion... ${_fmtDuration(_advertiseSeconds)}',
+                        style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11)),
+                  ])),
+                  TextButton(onPressed: _stopAdvertising,
+                    child: const Text('Detener', style: TextStyle(color: Colors.redAccent))),
+                ]),
               ),
-            ),
-            const SizedBox(height: 12),
 
-            // Info de como funciona
+            // ─── Two mode buttons ───
+            Row(children: [
+              Expanded(
+                child: FilledButton.icon(
+                  icon: _scanning
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Icon(Icons.search),
+                  label: Text(_scanning ? 'Buscando...' : 'Buscar', style: const TextStyle(fontSize: 13)),
+                  onPressed: _scanning || bt.isAdvertising ? null : _startScan,
+                  style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12)),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: FilledButton.icon(
+                  icon: bt.isAdvertising
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Icon(Icons.broadcast_on_personal),
+                  label: Text(bt.isAdvertising ? 'Visible' : 'Hacerme Visible', style: const TextStyle(fontSize: 13)),
+                  onPressed: isConnected ? null : (bt.isAdvertising ? _stopAdvertising : _startAdvertising),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: bt.isAdvertising ? Colors.orange : const Color(0xFF3B82F6),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ),
+            ]),
+
+            const SizedBox(height: 16),
+
+            // ─── How to connect instructions ───
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: const Color(0xFF60A5FA).withOpacity(0.08),
                 borderRadius: BorderRadius.circular(10),
@@ -574,52 +814,86 @@ class _ScanPageState extends State<ScanPage> {
               ),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Row(children: [
-                  const Icon(Icons.info_outline, color: Color(0xFF60A5FA), size: 16),
-                  const SizedBox(width: 6),
-                  const Text('Como conectarse:', style: TextStyle(color: Color(0xFF60A5FA), fontWeight: FontWeight.w700, fontSize: 12)),
+                  const Icon(Icons.info_outline, color: Color(0xFF60A5FA), size: 18),
+                  const SizedBox(width: 8),
+                  const Text('Como conectarse:', style: TextStyle(color: Color(0xFF60A5FA), fontWeight: FontWeight.w700, fontSize: 13)),
                 ]),
-                const SizedBox(height: 6),
-                Text('1. Ambos celulares deben tener Bluetooth activado y LessNet abierto', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 11)),
-                Text('2. Presiona "Buscar dispositivos"', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 11)),
-                Text('3. Toca "Conectar" en el dispositivo encontrado', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 11)),
-                Text('4. Ve a Chat y envia mensajes!', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 11)),
+                const SizedBox(height: 8),
+                Text('1. Un celular presiona "Hacerme Visible"',
+                    style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12, fontWeight: FontWeight.w500)),
+                Text('2. El OTRO celular presiona "Buscar"',
+                    style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12, fontWeight: FontWeight.w500)),
+                Text('3. Toca "Conectar" en el dispositivo encontrado',
+                    style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12, fontWeight: FontWeight.w500)),
+                Text('4. Ve a Chat y envia mensajes!',
+                    style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12, fontWeight: FontWeight.w500)),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: Colors.amber.withOpacity(0.1), borderRadius: BorderRadius.circular(6)),
+                  child: Row(children: [
+                    const Icon(Icons.wifi_tethering, color: Colors.amber, size: 14),
+                    const SizedBox(width: 6),
+                    Expanded(child: Text('Bluetooth es LOCAL (10-30m). No es internet, no es mundial.',
+                        style: TextStyle(color: Colors.amber.withOpacity(0.9), fontSize: 11))),
+                  ]),
+                ),
               ]),
             ),
-            const SizedBox(height: 12),
 
-            // Lista de dispositivos
-            Expanded(
-              child: _results.isEmpty
-                  ? Center(child: Text(_scanning ? 'Buscando dispositivos cercanos...' : 'Presiona Buscar para escanear',
-                      style: TextStyle(color: Colors.white.withOpacity(0.4)), textAlign: TextAlign.center))
-                  : ListView.builder(itemCount: _results.length,
-                      itemBuilder: (_, i) {
-                        final r = _results[i];
-                        final isConn = bt.connectedDevice?.remoteId == r.device.remoteId;
-                        final rssi = r.rssi;
-                        final sig = rssi > -60 ? Colors.greenAccent : rssi > -80 ? Colors.orangeAccent : Colors.redAccent;
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(color: isConn ? Colors.green.withOpacity(0.08) : Colors.white.withOpacity(0.05),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: isConn ? Colors.green.withOpacity(0.3) : Colors.white.withOpacity(0.08))),
-                          child: Row(children: [
-                            Icon(isConn ? Icons.bluetooth_connected : Icons.bluetooth, color: isConn ? Colors.greenAccent : Colors.blue, size: 22),
-                            const SizedBox(width: 12),
-                            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                              Text(r.device.platformName.isEmpty ? 'Desconocido' : r.device.platformName,
-                                  style: TextStyle(color: isConn ? Colors.greenAccent : Colors.white, fontWeight: FontWeight.w600, fontSize: 14)),
-                              Text(r.device.remoteId.toString(), style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11)),
-                            ])),
-                            Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(color: sig.withOpacity(0.15), borderRadius: BorderRadius.circular(6)),
-                              child: Text('$rssi dBm', style: TextStyle(color: sig, fontSize: 12, fontWeight: FontWeight.w600))),
-                            if (!isConn) TextButton(onPressed: () => _connect(r.device),
-                              child: const Text('Conectar', style: TextStyle(fontSize: 12))),
-                          ]),
-                        );
-                      }),
-            ),
+            const SizedBox(height: 16),
+
+            // ─── Scan results list ───
+            if (_scanning || _results.isNotEmpty) ...[
+              Text('Dispositivos encontrados (${_results.length})',
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14)),
+              const SizedBox(height: 8),
+              ..._results.map((r) {
+                final isConn = bt.connectedDevice?.remoteId == r.device.remoteId;
+                final rssi = r.rssi;
+                final sig = rssi > -60 ? Colors.greenAccent : rssi > -80 ? Colors.orangeAccent : Colors.redAccent;
+                final isLessNet = r.advertisementData.serviceUuids
+                    .any((uuid) => uuid.str128.toLowerCase() == lessnetServiceUuid.toLowerCase());
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: isConn ? Colors.green.withOpacity(0.08) : isLessNet ? const Color(0xFF3B82F6).withOpacity(0.1) : Colors.white.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: isConn ? Colors.green.withOpacity(0.3) : isLessNet ? const Color(0xFF3B82F6).withOpacity(0.4) : Colors.white.withOpacity(0.08))),
+                  child: Row(children: [
+                    Icon(isConn ? Icons.bluetooth_connected : isLessNet ? Icons.phone_android : Icons.bluetooth,
+                        color: isConn ? Colors.greenAccent : isLessNet ? const Color(0xFF60A5FA) : Colors.blue, size: 22),
+                    const SizedBox(width: 12),
+                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Row(children: [
+                        Expanded(child: Text(r.device.platformName.isEmpty ? 'Desconocido' : r.device.platformName,
+                            style: TextStyle(color: isConn ? Colors.greenAccent : isLessNet ? const Color(0xFF60A5FA) : Colors.white, fontWeight: FontWeight.w600, fontSize: 14))),
+                        if (isLessNet)
+                          Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(color: const Color(0xFF3B82F6).withOpacity(0.2), borderRadius: BorderRadius.circular(4)),
+                            child: const Text('LessNet', style: TextStyle(color: Color(0xFF60A5FA), fontSize: 9, fontWeight: FontWeight.w700))),
+                      ]),
+                      Text(r.device.remoteId.toString(), style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11)),
+                    ])),
+                    Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(color: sig.withOpacity(0.15), borderRadius: BorderRadius.circular(6)),
+                      child: Text('$rssi dBm', style: TextStyle(color: sig, fontSize: 12, fontWeight: FontWeight.w600))),
+                    if (!isConn) Padding(padding: const EdgeInsets.only(left: 4),
+                      child: TextButton(onPressed: () => _connect(r.device),
+                        child: const Text('Conectar', style: TextStyle(fontSize: 12)))),
+                  ]),
+                );
+              }),
+            ] else if (!_scanning && !bt.isAdvertising && !isConnected)
+              Center(child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 40),
+                child: Column(children: [
+                  Icon(Icons.bluetooth_searching, size: 48, color: Colors.white.withOpacity(0.15)),
+                  const SizedBox(height: 12),
+                  Text('Presiona Buscar o Hacerme Visible\npara empezar',
+                      style: TextStyle(color: Colors.white.withOpacity(0.3)), textAlign: TextAlign.center),
+                ]),
+              )),
           ],
         ),
       ),
@@ -628,7 +902,7 @@ class _ScanPageState extends State<ScanPage> {
 }
 
 // ─────────────────────────────────────────────
-// PAGINA 3: CHAT BLE REAL
+// PAGINA 3: CHAT BLE (funciona en ambos modos)
 // ─────────────────────────────────────────────
 class ChatPage extends StatefulWidget {
   const ChatPage({super.key});
@@ -647,13 +921,13 @@ class _ChatPageState extends State<ChatPage> {
   @override
   void initState() {
     super.initState();
-    _connected = bt.connectedDevice != null;
+    _connected = bt.isConnected;
     _msgSub = bt.onMessage.listen((_) {
       if (mounted) setState(() {});
       _scrollToBottom();
     });
-    _connSub = bt.onConnectionChange.listen((device) {
-      if (mounted) setState(() => _connected = device != null);
+    _connSub = bt.onConnectionChange.listen((connected) {
+      if (mounted) setState(() => _connected = bt.isConnected);
     });
   }
 
@@ -710,7 +984,7 @@ class _ChatPageState extends State<ChatPage> {
             child: Row(children: [
               const Icon(Icons.bluetooth_connected, color: Colors.greenAccent, size: 16),
               const SizedBox(width: 6),
-              Text('Conectado a ${bt.connectedDevice?.platformName ?? "dispositivo"}',
+              Text('Conectado a ${bt.connectedName}',
                   style: const TextStyle(color: Colors.greenAccent, fontSize: 12)),
             ]),
           ),
@@ -984,57 +1258,40 @@ class _GuidesPageState extends State<GuidesPage> {
                   ? Center(child: Text('Sin resultados', style: TextStyle(color: Colors.white.withOpacity(0.4))))
                   : ListView.builder(padding: const EdgeInsets.symmetric(horizontal: 20),
                       itemCount: _filtered.length,
-                      itemBuilder: (_, i) => _GuideCard(_filtered[i])),
+                      itemBuilder: (_, i) {
+                        final g = _filtered[i];
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          child: Card(
+                            color: Colors.white.withOpacity(0.05),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12),
+                              side: BorderSide(color: Colors.orange.withOpacity(0.2))),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(12),
+                              onTap: () => Navigator.push(context, MaterialPageRoute(
+                                builder: (_) => _GuideDetailPage(g))),
+                              child: Padding(padding: const EdgeInsets.all(14),
+                                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                  Row(children: [
+                                    Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(color: Colors.orange.withOpacity(0.15), borderRadius: BorderRadius.circular(6)),
+                                      child: Text(g['categoria']?.toString().toUpperCase() ?? '',
+                                          style: const TextStyle(color: Colors.orangeAccent, fontSize: 10, fontWeight: FontWeight.w700))),
+                                    const SizedBox(width: 8),
+                                    Expanded(child: Text(g['titulo'] ?? '',
+                                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 15))),
+                                  ]),
+                                  const SizedBox(height: 6),
+                                  Text(g['resumen'] ?? '', style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12),
+                                    maxLines: 2, overflow: TextOverflow.ellipsis),
+                                ]),
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
         ),
       ]),
-    );
-  }
-}
-
-class _GuideCard extends StatelessWidget {
-  final Map<String, dynamic> guide;
-  const _GuideCard(this.guide);
-
-  Color _catColor(String? c) {
-    switch (c) {
-      case 'supervivencia': return Colors.orangeAccent;
-      case 'tecnologia': return Colors.blueAccent;
-      default: return Colors.greenAccent;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final color = _catColor(guide['categoria']);
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      child: Card(
-        color: Colors.white.withOpacity(0.05),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: color.withOpacity(0.3))),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: () => Navigator.push(context, MaterialPageRoute(
-            builder: (_) => _GuideDetailPage(guide))),
-          child: Padding(padding: const EdgeInsets.all(14),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(guide['titulo'] ?? '', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 15)),
-              const SizedBox(height: 4),
-              Text(guide['resumen'] ?? '', style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12),
-                maxLines: 2, overflow: TextOverflow.ellipsis),
-              const SizedBox(height: 6),
-              Row(children: [
-                Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(color: color.withOpacity(0.15), borderRadius: BorderRadius.circular(6)),
-                  child: Text(guide['categoria'] ?? '', style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w600))),
-                const SizedBox(width: 8),
-                Text('${(guide['pasos'] as List?)?.length ?? 0} pasos',
-                    style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11)),
-              ]),
-            ]),
-          ),
-        ),
-      ),
     );
   }
 }
