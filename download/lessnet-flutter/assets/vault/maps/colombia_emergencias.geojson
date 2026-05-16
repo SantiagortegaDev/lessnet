@@ -1,0 +1,1226 @@
+{
+  "type": "FeatureCollection",
+  "metadata": {
+    "version": "1.0",
+    "fecha": "2026-05-16",
+    "descripcion": "Ciudades principales y rutas de Colombia para navegación offline",
+    "fuente": "Datos geográficos combinados - versión simplificada para acceso offline",
+    "total_ciudades": 55
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-74.0721, 4.7110]
+      },
+      "properties": {
+        "nombre": "Bogotá",
+        "tipo": "capital_nacional",
+        "departamento": "Cundinamarca",
+        "poblacion": 7181000,
+        "altitud": 2640,
+        "descripcion": "Capital de Colombia y de Cundinamarca. Centro político, económico y cultural del país.",
+        "aeropuerto": true,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-75.5616, 6.2442]
+      },
+      "properties": {
+        "nombre": "Medellín",
+        "tipo": "capital_departamento",
+        "departamento": "Antioquia",
+        "poblacion": 2508000,
+        "altitud": 1520,
+        "descripcion": "Capital de Antioquia. Conocida como Ciudad de la Eterna Primavera.",
+        "aeropuerto": true,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-76.5225, 3.4516]
+      },
+      "properties": {
+        "nombre": "Cali",
+        "tipo": "capital_departamento",
+        "departamento": "Valle del Cauca",
+        "poblacion": 2200000,
+        "altitud": 985,
+        "descripcion": "Capital del Valle del Cauca. Conocida como la Sucursal del Cielo.",
+        "aeropuerto": true,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-74.8302, 11.0041]
+      },
+      "properties": {
+        "nombre": "Barranquilla",
+        "tipo": "capital_departamento",
+        "departamento": "Atlántico",
+        "poblacion": 1200000,
+        "altitud": 18,
+        "descripcion": "Capital del Atlántico. Importante puerto fluvial y urbano.",
+        "aeropuerto": true,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-73.2539, 5.5385]
+      },
+      "properties": {
+        "nombre": "Bucaramanga",
+        "tipo": "capital_departamento",
+        "departamento": "Santander",
+        "poblacion": 581000,
+        "altitud": 959,
+        "descripcion": "Capital de Santander. Ciudadela próspera de la región nororiental.",
+        "aeropuerto": true,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-75.6972, 4.4389]
+      },
+      "properties": {
+        "nombre": "Cartagena de Indias",
+        "tipo": "municipio",
+        "departamento": "Bolívar",
+        "poblacion": 876000,
+        "altitud": 2,
+        "descripcion": "Ciudad colonial y patrimonio de la humanidad. Principal puerto turístico.",
+        "aeropuerto": true,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-75.2508, 4.6097]
+      },
+      "properties": {
+        "nombre": "Santa Marta",
+        "tipo": "capital_departamento",
+        "departamento": "Magdalena",
+        "poblacion": 499000,
+        "altitud": 6,
+        "descripcion": "Capital del Magdalena. Ciudad más antigua de Colombia.",
+        "aeropuerto": true,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-72.9279, 6.1774]
+      },
+      "properties": {
+        "nombre": "Cúcuta",
+        "tipo": "capital_departamento",
+        "departamento": "Norte de Santander",
+        "poblacion": 711000,
+        "altitud": 320,
+        "descripcion": "Capital de Norte de Santander. Ciudad fronteriza con Venezuela.",
+        "aeropuerto": true,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-75.2818, 5.0735]
+      },
+      "properties": {
+        "nombre": "Bello",
+        "tipo": "municipio",
+        "departamento": "Antioquia",
+        "poblacion": 465000,
+        "altitud": 1500,
+        "descripcion": "Segundo municipio más poblado de Antioquia.",
+        "aeropuerto": false,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-74.1461, 5.3361]
+      },
+      "properties": {
+        "nombre": "Soacha",
+        "tipo": "municipio",
+        "departamento": "Cundinamarca",
+        "poblacion": 522000,
+        "altitud": 2565,
+        "descripcion": "Municipio dormitorio de Bogotá.",
+        "aeropuerto": false,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-76.6138, 2.9276]
+      },
+      "properties": {
+        "nombre": "Pasto",
+        "tipo": "capital_departamento",
+        "departamento": "Nariño",
+        "poblacion": 392000,
+        "altitud": 2529,
+        "descripcion": "Capital de Nariño. Ciudad universitaria y comercial del sur.",
+        "aeropuerto": true,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-75.5906, 5.0662]
+      },
+      "properties": {
+        "nombre": "Itagüí",
+        "tipo": "municipio",
+        "departamento": "Antioquia",
+        "poblacion": 304000,
+        "altitud": 1550,
+        "descripcion": "Municipio del área metropolitana de Medellín.",
+        "aeropuerto": false,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-75.7071, 4.8139]
+      },
+      "properties": {
+        "nombre": "Neiva",
+        "tipo": "capital_departamento",
+        "departamento": "Huila",
+        "poblacion": 357000,
+        "altitud": 442,
+        "descripcion": "Capital del Huila. Centro comercial del sur andino.",
+        "aeropuerto": true,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-73.9893, 4.1543]
+      },
+      "properties": {
+        "nombre": "Ibagué",
+        "tipo": "capital_departamento",
+        "departamento": "Tolima",
+        "poblacion": 529000,
+        "altitud": 1285,
+        "descripcion": "Capital del Tolima. Ciudad musical de Colombia.",
+        "aeropuerto": true,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-75.6964, 5.1985]
+      },
+      "properties": {
+        "nombre": "Envigado",
+        "tipo": "municipio",
+        "departamento": "Antioquia",
+        "poblacion": 229000,
+        "altitud": 1575,
+        "descripcion": "Municipio del área metropolitana de Medellín.",
+        "aeropuerto": false,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-77.2807, 1.2136]
+      },
+      "properties": {
+        "nombre": "San Andrés",
+        "tipo": "capital_departamento",
+        "departamento": "San Andrés y Providencia",
+        "poblacion": 55000,
+        "altitud": 0,
+        "descripcion": "Capital del archipiélago. Destino turístico del Caribe.",
+        "aeropuerto": true,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-73.6341, 4.1426]
+      },
+      "properties": {
+        "nombre": "Villavicencio",
+        "tipo": "capital_departamento",
+        "departamento": "Meta",
+        "poblacion": 531000,
+        "altitud": 467,
+        "descripcion": "Capital del Meta. Puerta de entrada a los Llanos.",
+        "aeropuerto": true,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-75.5155, 4.4374]
+      },
+      "properties": {
+        "nombre": "Armenia",
+        "tipo": "capital_departamento",
+        "departamento": "Quindío",
+        "poblacion": 298000,
+        "altitud": 1480,
+        "descripcion": "Capital del Quindío. Centro del Eje Cafetero.",
+        "aeropuerto": true,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-76.6461, 4.8106]
+      },
+      "properties": {
+        "nombre": "Pereira",
+        "tipo": "capital_departamento",
+        "departamento": "Risaralda",
+        "poblacion": 472000,
+        "altitud": 1406,
+        "descripcion": "Capital de Risaralda. Ciudad tecnológica del Eje Cafetero.",
+        "aeropuerto": true,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-74.0774, 5.7828]
+      },
+      "properties": {
+        "nombre": "Manizales",
+        "tipo": "capital_departamento",
+        "departamento": "Caldas",
+        "poblacion": 404000,
+        "altitud": 2150,
+        "descripcion": "Capital de Caldas. Centro educativo y religioso.",
+        "aeropuerto": true,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-74.8033, 6.3475]
+      },
+      "properties": {
+        "nombre": "Floridablanca",
+        "tipo": "municipio",
+        "departamento": "Santander",
+        "poblacion": 308000,
+        "altitud": 870,
+        "descripcion": "Municipio del área metropolitana de Bucaramanga.",
+        "aeropuerto": false,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-74.2190, 4.4236]
+      },
+      "properties": {
+        "nombre": "Palmira",
+        "tipo": "municipio",
+        "departamento": "Valle del Cauca",
+        "poblacion": 306000,
+        "altitud": 1005,
+        "descripcion": "Municipio agrícola del Valle del Cauca.",
+        "aeropuerto": false,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-75.7060, 5.6881]
+      },
+      "properties": {
+        "nombre": "Dosquebradas",
+        "tipo": "municipio",
+        "departamento": "Risaralda",
+        "poblacion": 206000,
+        "altitud": 1380,
+        "descripcion": "Municipio del área metropolitana de Pereira.",
+        "aeropuerto": false,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-73.5265, 4.3080]
+      },
+      "properties": {
+        "nombre": "Barrancabermeja",
+        "tipo": "municipio",
+        "departamento": "Santander",
+        "poblacion": 192000,
+        "altitud": 80,
+        "descripcion": "Centro de la industria petrolera colombiana.",
+        "aeropuerto": false,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-75.5813, 4.8106]
+      },
+      "properties": {
+        "nombre": "La Tebaida",
+        "tipo": "municipio",
+        "departamento": "Quindío",
+        "poblacion": 53000,
+        "altitud": 1200,
+        "descripcion": "Municipio del Eje Cafetero.",
+        "aeropuerto": false,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-74.0603, 6.5544]
+      },
+      "properties": {
+        "nombre": "San José del Guaviare",
+        "tipo": "capital_departamento",
+        "departamento": "Guaviare",
+        "poblacion": 60000,
+        "altitud": 180,
+        "descripcion": "Capital del Guaviare. Centro de la región amazónica.",
+        "aeropuerto": true,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-67.4856, 2.5579]
+      },
+      "properties": {
+        "nombre": "Puerto Inírida",
+        "tipo": "capital_departamento",
+        "departamento": "Guainía",
+        "poblacion": 19000,
+        "altitud": 80,
+        "descripcion": "Capital del Guainía. Puerto fluvial en el río Inírida.",
+        "aeropuerto": true,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-69.7187, 1.3194]
+      },
+      "properties": {
+        "nombre": "Mitú",
+        "tipo": "capital_departamento",
+        "departamento": "Vaupés",
+        "poblacion": 18000,
+        "altitud": 180,
+        "descripcion": "Capital del Vaupés. Ciudadela selvática.",
+        "aeropuerto": true,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-70.0373, 2.5158]
+      },
+      "properties": {
+        "nombre": "Puerto Carreño",
+        "tipo": "capital_departamento",
+        "departamento": "Vichada",
+        "poblacion": 20000,
+        "altitud": 120,
+        "descripcion": "Capital del Vichada. Punto triple con Venezuela y Venezuela.",
+        "aeropuerto": true,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-72.3954, 4.0856]
+      },
+      "properties": {
+        "nombre": "Yopal",
+        "tipo": "capital_departamento",
+        "departamento": "Casanare",
+        "poblacion": 154000,
+        "altitud": 320,
+        "descripcion": "Capital de Casanare. Centro de la actividad petrolera.",
+        "aeropuerto": true,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-75.2828, 6.5554]
+      },
+      "properties": {
+        "nombre": "Apartadó",
+        "tipo": "municipio",
+        "departamento": "Antioquia",
+        "poblacion": 192000,
+        "altitud": 20,
+        "descripcion": "Municipio de la región Urabá.",
+        "aeropuerto": false,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-73.0298, 7.0681]
+      },
+      "properties": {
+        "nombre": "Arauca",
+        "tipo": "capital_departamento",
+        "departamento": "Arauca",
+        "poblacion": 68000,
+        "altitud": 130,
+        "descripcion": "Capital de Arauca. Ciudad fronteriza.",
+        "aeropuerto": true,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-76.2310, 3.8814]
+      },
+      "properties": {
+        "nombre": "Buenaventura",
+        "tipo": "municipio",
+        "departamento": "Valle del Cauca",
+        "poblacion": 415000,
+        "altitud": 2,
+        "descripcion": "Puerto principal del Pacífico colombiano.",
+        "aeropuerto": false,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-74.8511, 4.0907]
+      },
+      "properties": {
+        "nombre": "Girardot",
+        "tipo": "municipio",
+        "departamento": "Cundinamarca",
+        "poblacion": 107000,
+        "altitud": 290,
+        "descripcion": "Municipio turístico del valle del Magdalena.",
+        "aeropuerto": false,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-75.7452, 2.6043]
+      },
+      "properties": {
+        "nombre": "Mocoa",
+        "tipo": "capital_departamento",
+        "departamento": "Putumayo",
+        "poblacion": 47000,
+        "altitud": 594,
+        "descripcion": "Capital de Putumayo. Centro de la Amazonía occidental.",
+        "aeropuerto": true,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-75.5916, 5.8190]
+      },
+      "properties": {
+        "nombre": "Turbo",
+        "tipo": "municipio",
+        "departamento": "Antioquia",
+        "poblacion": 135000,
+        "altitud": 10,
+        "descripcion": "Municipio portuario de la región Urabá.",
+        "aeropuerto": false,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-74.6386, 8.7468]
+      },
+      "properties": {
+        "nombre": "Valledupar",
+        "tipo": "capital_departamento",
+        "departamento": "Cesar",
+        "poblacion": 474000,
+        "altitud": 172,
+        "descripcion": "Capital del Cesar. Cuna del vallenato.",
+        "aeropuerto": true,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-75.8818, 5.5342]
+      },
+      "properties": {
+        "nombre": "Montería",
+        "tipo": "capital_departamento",
+        "departamento": "Córdoba",
+        "poblacion": 505000,
+        "altitud": 20,
+        "descripcion": "Capital de Córdoba. Centro ganadero del Caribe.",
+        "aeropuerto": true,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-75.3975, 5.6875]
+      },
+      "properties": {
+        "nombre": "Sahagún",
+        "tipo": "municipio",
+        "departamento": "Córdoba",
+        "poblacion": 85000,
+        "altitud": 50,
+        "descripcion": "Municipio estratégico en la depression momposina.",
+        "aeropuerto": false,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-74.5014, 6.1851]
+      },
+      "properties": {
+        "nombre": "Ocaña",
+        "tipo": "municipio",
+        "departamento": "Norte de Santander",
+        "poblacion": 92000,
+        "altitud": 1200,
+        "descripcion": "Municipio del catatumbo.",
+        "aeropuerto": false,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-75.2926, 5.0310]
+      },
+      "properties": {
+        "nombre": "Rionegro",
+        "tipo": "municipio",
+        "departamento": "Antioquia",
+        "poblacion": 125000,
+        "altitud": 2125,
+        "descripcion": "Municipio de la subregión orientale de Antioquia.",
+        "aeropuerto": false,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-76.7422, 4.5383]
+      },
+      "properties": {
+        "nombre": "Popayán",
+        "tipo": "capital_departamento",
+        "departamento": "Cauca",
+        "poblacion": 282000,
+        "altitud": 1760,
+        "descripcion": "Capital del Cauca. Ciudad blanca de Colombia.",
+        "aeropuerto": true,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-73.3617, 5.1997]
+      },
+      "properties": {
+        "nombre": "Tunja",
+        "tipo": "capital_departamento",
+        "departamento": "Boyacá",
+        "poblacion": 175000,
+        "altitud": 2820,
+        "descripcion": "Capital de Boyacá. Ciudad colonial andina.",
+        "aeropuerto": false,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-73.5508, 5.5338]
+      },
+      "properties": {
+        "nombre": "Duitama",
+        "tipo": "municipio",
+        "departamento": "Boyacá",
+        "poblacion": 123000,
+        "altitud": 2520,
+        "descripcion": "Municipio boyacense, centro comercial.",
+        "aeropuerto": false,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-73.3664, 5.6916]
+      },
+      "properties": {
+        "nombre": "Sogamoso",
+        "tipo": "municipio",
+        "departamento": "Boyacá",
+        "poblacion": 115000,
+        "altitud": 2569,
+        "descripcion": "Centro industrial y comercial de Boyacá.",
+        "aeropuerto": false,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-73.0292, 6.8252]
+      },
+      "properties": {
+        "nombre": "Pamplona",
+        "tipo": "municipio",
+        "departamento": "Norte de Santander",
+        "poblacion": 54000,
+        "altitud": 2340,
+        "descripcion": "Ciudad universitaria en el nordeste de Santander.",
+        "aeropuerto": false,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-76.6097, 5.6809]
+      },
+      "properties": {
+        "nombre": "Quibdó",
+        "tipo": "capital_departamento",
+        "departamento": "Chocó",
+        "poblacion": 130000,
+        "altitud": 40,
+        "descripcion": "Capital del Chocó. Uno de los lugares más lluviosos del mundo.",
+        "aeropuerto": true,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-75.0326, 8.4541]
+      },
+      "properties": {
+        "nombre": "Sincelejo",
+        "tipo": "capital_departamento",
+        "departamento": "Sucre",
+        "poblacion": 293000,
+        "altitud": 60,
+        "descripcion": "Capital de Sucre. Centro comercial de Sucre y Córdoba.",
+        "aeropuerto": false,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-75.7131, 9.3160]
+      },
+      "properties": {
+        "nombre": "Riohacha",
+        "tipo": "capital_departamento",
+        "departamento": "La Guajira",
+        "poblacion": 175000,
+        "altitud": 5,
+        "descripcion": "Capital de La Guajira. Centro de la cultura wayúu.",
+        "aeropuerto": true,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-72.6467, 4.4263]
+      },
+      "properties": {
+        "nombre": "Sabanalarga",
+        "tipo": "municipio",
+        "departamento": "Atlántico",
+        "poblacion": 92000,
+        "altitud": 140,
+        "descripcion": "Municipio del centro del departamento del Atlántico.",
+        "aeropuerto": false,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-76.5193, 2.9275]
+      },
+      "properties": {
+        "nombre": "Ipiales",
+        "tipo": "municipio",
+        "departamento": "Nariño",
+        "poblacion": 76000,
+        "altitud": 2900,
+        "descripcion": "Municipio nariñense en la frontera con Ecuador.",
+        "aeropuerto": false,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-73.7597, 5.2574]
+      },
+      "properties": {
+        "nombre": "Chiquinquirá",
+        "tipo": "municipio",
+        "departamento": "Boyacá",
+        "poblacion": 62000,
+        "altitud": 2532,
+        "descripcion": "Santuario religioso de Colombia.",
+        "aeropuerto": false,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-75.2325, 6.6379]
+      },
+      "properties": {
+        "nombre": "Sonson",
+        "tipo": "municipio",
+        "departamento": "Antioquia",
+        "poblacion": 28000,
+        "altitud": 1950,
+        "descripcion": "Municipio histórico del oriente antioqueño.",
+        "aeropuerto": false,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [-74.4107, 5.0682]
+      },
+      "properties": {
+        "nombre": "La Paz",
+        "tipo": "municipio",
+        "departamento": "Cesar",
+        "poblacion": 32000,
+        "altitud": 350,
+        "descripcion": "Municipio del Cesar.",
+        "aeropuerto": false,
+        "hospital": true,
+        "emergencia": "123"
+      }
+    }
+  ],
+  "rutas": [
+    {
+      "nombre": "Bogotá - Medellín",
+      "descripcion": "Autopista cones y vía al Magdalena",
+      "distancia_km": 417,
+      "geometria": {
+        "type": "LineString",
+        "coordinates": [
+          [-74.0721, 4.7110],
+          [-75.5616, 6.2442]
+        ]
+      }
+    },
+    {
+      "nombre": "Bogotá - Cali",
+      "descripcion": "Vía panamericana",
+      "distancia_km": 456,
+      "geometria": {
+        "type": "LineString",
+        "coordinates": [
+          [-74.0721, 4.7110],
+          [-76.5225, 3.4516]
+        ]
+      }
+    },
+    {
+      "nombre": "Bogotá - Bucaramanga",
+      "descripcion": "Vía nacional al norte",
+      "distancia_km": 415,
+      "geometria": {
+        "type": "LineString",
+        "coordinates": [
+          [-74.0721, 4.7110],
+          [-73.2539, 5.5385]
+        ]
+      }
+    },
+    {
+      "nombre": "Bogotá - Barranquilla",
+      "descripcion": "Vía al Caribe",
+      "distancia_km": 700,
+      "geometria": {
+        "type": "LineString",
+        "coordinates": [
+          [-74.0721, 4.7110],
+          [-74.8302, 11.0041]
+        ]
+      }
+    },
+    {
+      "nombre": "Medellín - Cali",
+      "descripcion": "Vía al suroccidente",
+      "distancia_km": 420,
+      "geometria": {
+        "type": "LineString",
+        "coordinates": [
+          [-75.5616, 6.2442],
+          [-76.5225, 3.4516]
+        ]
+      }
+    },
+    {
+      "nombre": "Medellín - Pereira",
+      "descripcion": "Eje Cafetero",
+      "distancia_km": 225,
+      "geometria": {
+        "type": "LineString",
+        "coordinates": [
+          [-75.5616, 6.2442],
+          [-76.6461, 4.8106]
+        ]
+      }
+    },
+    {
+      "nombre": "Cali - Pasto",
+      "descripcion": "Vía panamericana al sur",
+      "distancia_km": 430,
+      "geometria": {
+        "type": "LineString",
+        "coordinates": [
+          [-76.5225, 3.4516],
+          [-76.6138, 2.9276]
+        ]
+      }
+    },
+    {
+      "nombre": "Bogotá - Villavicencio",
+      "descripcion": "Vía a los Llanos",
+      "distancia_km": 95,
+      "geometria": {
+        "type": "LineString",
+        "coordinates": [
+          [-74.0721, 4.7110],
+          [-73.9893, 4.1543]
+        ]
+      }
+    },
+    {
+      "nombre": "Bogotá - Ibagué",
+      "descripcion": "Vía al Tolima",
+      "distancia_km": 210,
+      "geometria": {
+        "type": "LineString",
+        "coordinates": [
+          [-74.0721, 4.7110],
+          [-73.9893, 4.1543]
+        ]
+      }
+    },
+    {
+      "nombre": "Bogotá - Tunja",
+      "descripcion": "Vía a Boyacá",
+      "distancia_km": 150,
+      "geometria": {
+        "type": "LineString",
+        "coordinates": [
+          [-74.0721, 4.7110],
+          [-73.3617, 5.1997]
+        ]
+      }
+    },
+    {
+      "nombre": "Barranquilla - Cartagena",
+      "descripcion": "Costa Caribe",
+      "distancia_km": 115,
+      "geometria": {
+        "type": "LineString",
+        "coordinates": [
+          [-74.8302, 11.0041],
+          [-75.6972, 4.4389]
+        ]
+      }
+    },
+    {
+      "nombre": "Barranquilla - Santa Marta",
+      "descripcion": "Costa Caribe norte",
+      "distancia_km": 95,
+      "geometria": {
+        "type": "LineString",
+        "coordinates": [
+          [-74.8302, 11.0041],
+          [-75.2508, 4.6097]
+        ]
+      }
+    },
+    {
+      "nombre": "Bucaramanga - Cúcuta",
+      "descripcion": "Vía a la frontera",
+      "distancia_km": 205,
+      "geometria": {
+        "type": "LineString",
+        "coordinates": [
+          [-73.2539, 5.5385],
+          [-72.9279, 6.1774]
+        ]
+      }
+    },
+    {
+      "nombre": "Popayán - Pasto",
+      "descripcion": "Sierra nariñense",
+      "distancia_km": 230,
+      "geometria": {
+        "type": "LineString",
+        "coordinates": [
+          [-76.7422, 4.5383],
+          [-76.6138, 2.9276]
+        ]
+      }
+    },
+    {
+      "nombre": "Medellín - Apartadó",
+      "descripcion": "Urabá Antioqueño",
+      "distancia_km": 245,
+      "geometria": {
+        "type": "LineString",
+        "coordinates": [
+          [-75.5616, 6.2442],
+          [-75.2828, 6.5554]
+        ]
+      }
+    },
+    {
+      "nombre": "Neiva - Villavicencio",
+      "descripcion": "Serranía de los Yarigüies",
+      "distancia_km": 350,
+      "geometria": {
+        "type": "LineString",
+        "coordinates": [
+          [-75.7071, 4.8139],
+          [-73.9893, 4.1543]
+        ]
+      }
+    },
+    {
+      "nombre": "Santa Marta - Valledupar",
+      "descripcion": "Sierra Nevada",
+      "distancia_km": 85,
+      "geometria": {
+        "type": "LineString",
+        "coordinates": [
+          [-75.2508, 4.6097],
+          [-74.6386, 8.7468]
+        ]
+      }
+    },
+    {
+      "nombre": "Cartagena - Sincelejo",
+      "descripcion": "Montañas de María",
+      "distancia_km": 110,
+      "geometria": {
+        "type": "LineString",
+        "coordinates": [
+          [-75.6972, 4.4389],
+          [-75.0326, 8.4541]
+        ]
+      }
+    },
+    {
+      "nombre": "Montería - Sincelejo",
+      "descripcion": "Depresión momposina",
+      "distancia_km": 85,
+      "geometria": {
+        "type": "LineString",
+        "coordinates": [
+          [-75.8818, 5.5342],
+          [-75.0326, 8.4541]
+        ]
+      }
+    },
+    {
+      "nombre": "Pereira - Armenia",
+      "descripcion": "Eje Cafetero",
+      "distancia_km": 45,
+      "geometria": {
+        "type": "LineString",
+        "coordinates": [
+          [-76.6461, 4.8106],
+          [-75.5155, 4.4374]
+        ]
+      }
+    }
+  ]
+}

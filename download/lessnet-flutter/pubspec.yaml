@@ -20,3 +20,11 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/vault/first_aid/
+    - assets/vault/guides/
+    - assets/vault/dictionary/
+    - assets/vault/maps/
+    - assets/vault/wikipedia/
+    - assets/vault/translator/
+    - assets/vault/translator/lang_packs/
