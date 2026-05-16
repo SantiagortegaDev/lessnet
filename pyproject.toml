@@ -1,10 +1,15 @@
 [project]
 name = "lessnet"
 version = "1.0.0"
+requires-python = ">=3.10"
 dependencies = [
     "flet==0.85.1",
     "flet-permission-handler",
 ]
+
+[tool.flet]
+org = "com.lessnet"
+product = "LessNet"
 
 [tool.flet.android.permission]
 "android.permission.BLUETOOTH" = true
@@ -17,7 +22,6 @@ dependencies = [
 "android.permission.NEARBY_WIFI_DEVICES" = true
 "android.permission.ACCESS_WIFI_STATE" = true
 "android.permission.CHANGE_WIFI_STATE" = true
-"android.permission.INTERNET" = true
 "android.permission.ACCESS_NETWORK_STATE" = true
 
 [tool.flet.android.feature]
