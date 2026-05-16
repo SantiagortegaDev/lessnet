@@ -67,22 +67,22 @@ async def main(page: ft.Page):
         if "unknown" in status_str.lower(): status_str = "Pendiente"
         return status_str
 
-    def check_permission_status(p_type):
+    async def check_permission_status(p_type):
         """Verifica el estado de un permiso de forma segura"""
         if ph is None:
-            return "unknown"
+            return ft.PermissionStatus.UNKNOWN
         try:
-            return ph.check_permission(p_type)
+            return await ph.get_status(p_type)
         except Exception as e:
             print(f"Error checking permission: {e}")
-            return "unknown"
+            return ft.PermissionStatus.UNKNOWN
 
-    def update_permissions_status():
+    async def update_permissions_status():
         """Actualiza la lista de permisos en la UI"""
         permission_items.controls.clear()
         for p in perms_data:
             # Verificamos el estado actual
-            status = check_permission_status(p["type"])
+            status = await check_permission_status(p["type"])
             status_str = get_status_text(status)
             
             permission_items.controls.append(
@@ -140,10 +140,10 @@ async def main(page: ft.Page):
 
         for i, p in enumerate(perms_data):
             try:
-                # Solicitamos el permiso actual
-                await ph.request_permission_async(p["type"])
+                # Solicitamos el permiso actual usando la API correcta
+                await ph.request(p["type"])
                 # Actualizamos la UI inmediatamente después de cada respuesta
-                update_permissions_status()
+                await update_permissions_status()
                 # Pequeña pausa para que el usuario vea el cambio
                 await asyncio.sleep(0.5)
             except Exception as ex:
@@ -173,7 +173,7 @@ async def main(page: ft.Page):
         page.update()
         await asyncio.sleep(0.6)
         
-        update_permissions_status()
+        await update_permissions_status()
         permission_items.opacity = 1
         page.update()
 
@@ -259,7 +259,7 @@ async def main(page: ft.Page):
     )
 
     # Carga inicial de estados
-    update_permissions_status()
+    await update_permissions_status()
 
 # Ejecución de la app
 if __name__ == "__main__":
