@@ -1,5 +1,6 @@
 import flet as ft
 import asyncio
+from flet_permission_handler import PermissionHandler, Permission, PermissionStatus
 
 async def main(page: ft.Page):
     # Configuración de la página para móviles
@@ -36,7 +37,6 @@ async def main(page: ft.Page):
     
     if is_mobile:
         try:
-            from flet_permission_handler import PermissionHandler, Permission
             ph = PermissionHandler()
             # Actualizamos los tipos de permisos para usar el enum de Permission
             perms_data = [
@@ -70,12 +70,13 @@ async def main(page: ft.Page):
     async def check_permission_status(p_type):
         """Verifica el estado de un permiso de forma segura"""
         if ph is None:
-            return ft.PermissionStatus.UNKNOWN
+            return None
         try:
-            return await ph.get_status(p_type)
+            status = await ph.get_status(p_type)
+            return status
         except Exception as e:
             print(f"Error checking permission: {e}")
-            return ft.PermissionStatus.UNKNOWN
+            return None
 
     async def update_permissions_status():
         """Actualiza la lista de permisos en la UI"""
