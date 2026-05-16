@@ -48,11 +48,8 @@ def main(page: ft.Page):
     async def request_permission_with_retry(perm_type, perm_name, max_retries=2):
         """
         Solicita un permiso con reintento automático.
-        Espera un breve momento antes de cada intento para dar tiempo
-        al canal nativo a estar listo.
+        Usa get_status() para verificar antes de solicitar.
         """
-        nonlocal ph_mounted
-
         if not is_mobile:
             show_snack("Solo funciona en el APK Android", ok=False)
             return None
@@ -61,18 +58,14 @@ def main(page: ft.Page):
             show_snack("PermissionHandler no disponible", ok=False)
             return None
 
-        # Si el handler no está montado, esperar brevemente
-        if not ph_mounted:
-            await asyncio.sleep(0.5)
-
         for attempt in range(max_retries):
             try:
-                # Primero verificar el estado actual del permiso
-                check_result = await ph.check(perm_type)
-                check_name = check_result.name if check_result else "unknown"
+                # Verificar el estado actual del permiso con get_status()
+                status = await ph.get_status(perm_type)
+                status_name = status.name if status else "unknown"
 
-                if check_name == "granted":
-                    return check_result
+                if status_name == "GRANTED":
+                    return status
 
                 # Si no está concedido, solicitarlo
                 result = await ph.request(perm_type)
@@ -100,7 +93,7 @@ def main(page: ft.Page):
             try:
                 result = await request_permission_with_retry(pt, pn)
                 name = result.name if result else "unknown"
-                granted = name == "granted"
+                granted = name == "GRANTED"
                 st.value = "✓ Concedido" if granted else "✗ Denegado"
                 st.color = ft.Colors.GREEN_400 if granted else ft.Colors.RED_400
                 page.update()
@@ -166,7 +159,7 @@ def main(page: ft.Page):
             try:
                 result = await request_permission_with_retry(p["type"], p["name"])
                 name = result.name if result else "unknown"
-                granted = name == "granted"
+                granted = name == "GRANTED"
                 st = status_texts.get(p["key"])
                 if st:
                     st.value = "✓ Concedido" if granted else "✗ Denegado"
