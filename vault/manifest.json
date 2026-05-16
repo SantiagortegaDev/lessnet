@@ -1,0 +1,85 @@
+{
+  "version": "1.0.0",
+  "fecha": "2026-05-16",
+  "descripcion": "Vault offline para Red Mesh sin Internet - App de comunicación mesh sin conexión",
+  "tamano_total_estimado": "450 MB",
+  "requisitos": {
+    "version_android_minima": "8.0 (API 26)",
+    "almacenamiento_necesario": "500 MB",
+    "funciona_offline": true,
+    "compatibilidad": ["Kiwix SDK para Wikipedia", "MapLibre para mapas offline"]
+  },
+  "secciones": [
+    {
+      "nombre": "Wikipedia Offline",
+      "ruta": "wikipedia/wikipedia_offline.json",
+      "formato": "JSON (alternativa offline al archivo ZIM)",
+      "tamano": "15 MB",
+      "descripcion": "500 artículos esenciales de Wikipedia en español: ciencia, medicina, historia, geografía, tecnología, supervivencia",
+      "comprimido": true,
+      "archivo_gzip": "wikipedia/wikipedia_offline.json.gz"
+    },
+    {
+      "nombre": "Guías de Supervivencia",
+      "ruta": "guides/supervivencia.json",
+      "formato": "JSON",
+      "tamano": "200 KB",
+      "descripcion": "15 guías detalladas para situaciones de emergencia: agua, refugio, fuego, navegación, desastres, comunicación mesh",
+      "comprimido": true,
+      "archivo_gzip": "guides/supervivencia.json.gz"
+    },
+    {
+      "nombre": "Primeros Auxilios",
+      "ruta": "first_aid/primeros_auxilios.json",
+      "formato": "JSON",
+      "tamano": "150 KB",
+      "descripcion": "12 protocolos médicos de emergencia: RCP, hemorragias, quemaduras, fracturas, mordeduras, envenenamiento",
+      "comprimido": true,
+      "archivo_gzip": "first_aid/primeros_auxilios.json.gz"
+    },
+    {
+      "nombre": "Diccionario Offline",
+      "ruta": "dictionary/diccionario.db",
+      "formato": "SQLite con FTS5",
+      "tamano": "2 MB",
+      "descripcion": "Base de datos SQLite con 200+ términos de emergencia, supervivencia y tecnología mesh. Incluye índice JSON para búsquedas rápidas.",
+      "archivos": [
+        "dictionary/diccionario.db",
+        "dictionary/diccionario_index.json"
+      ]
+    },
+    {
+      "nombre": "Mapas de Colombia",
+      "ruta": "maps/colombia_emergencias.geojson",
+      "formato": "GeoJSON",
+      "tamano": "5 MB",
+      "descripcion": "50 ciudades principales de Colombia con coordenadas, poblaciones, rutas y puntos de emergencia",
+      "comprimido": true,
+      "archivo_gzip": "maps/colombia_emergencias.geojson.gz"
+    },
+    {
+      "nombre": "Índice de Búsqueda",
+      "ruta": "index.json",
+      "formato": "JSON",
+      "tamano": "100 KB",
+      "descripcion": "Índice unificado para búsqueda rápida en todo el vault"
+    },
+    {
+      "nombre": "Documentación",
+      "ruta": "README.md",
+      "formato": "Markdown",
+      "tamano": "10 KB",
+      "descripcion": "Documentación completa de uso del vault"
+    }
+  ],
+  "metadata": {
+    "autor": "Red Mesh sin Internet",
+    "licencia": "Creative Commons Attribution-ShareAlike 4.0",
+    "ultima_actualizacion": "2026-05-16T20:53:53Z",
+    "idioma": "es-CO"
+  },
+  "notas_descarga": [
+    "Para Wikipedia completo (~200MB), descargar desde: https://download.kiwix.org/zim/wikipedia/wikipedia_es_all_mini_*.zim",
+    "Para mapas detallados (~100MB), descargar desde: https://download.geofabrik.de/south-america/colombia-latest.osm.pbf"
+  ]
+}
