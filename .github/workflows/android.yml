@@ -44,11 +44,14 @@ jobs:
           fi
           
           echo "Gradle file: $GRADLE_FILE"
+          echo "Gradle contents (first 30 lines):"
+          head -30 "$GRADLE_FILE" || true
           
-          # Extract package name from namespace or applicationId (first quoted string)
+          # Extract package name: try namespace first, then applicationId
           PACKAGE=""
           if [ -n "$GRADLE_FILE" ]; then
-            PACKAGE=$(grep -E "namespace|applicationId" "$GRADLE_FILE" | head -1 | grep -oE '"[^"]+"' | head -1 | tr -d '"')
+            # Extract the value inside quotes after namespace or applicationId
+            PACKAGE=$(grep -E "namespace|applicationId" "$GRADLE_FILE" | head -1 | sed -E 's/[^"]*"([^"]+)".*/\1/' | tr -d ' ')
           fi
           
           # Fallback: find it from the generated MainActivity.kt
@@ -61,8 +64,7 @@ jobs:
           
           if [ -z "$PACKAGE" ]; then
             echo "ERROR: Could not detect package name!"
-            ls -la "$GITHUB_WORKSPACE/android/app/src/main/kotlin/" 2>/dev/null || true
-            cat "$GRADLE_FILE" 2>/dev/null | head -30 || true
+            find "$GITHUB_WORKSPACE/android/app/src/main/kotlin" -type f 2>/dev/null || true
             exit 1
           fi
           
@@ -82,9 +84,9 @@ jobs:
           
           echo "Installed custom Kotlin files:"
           ls -la "$KOTLIN_DIR/"
-          echo "--- MainActivity.kt ---"
+          echo "--- MainActivity.kt head ---"
           head -3 "$KOTLIN_DIR/MainActivity.kt"
-          echo "--- BlePeripheralPlugin.kt ---"
+          echo "--- BlePeripheralPlugin.kt head ---"
           head -3 "$KOTLIN_DIR/BlePeripheralPlugin.kt"
           
           # Restore our source code
