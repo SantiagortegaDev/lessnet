@@ -1,0 +1,87 @@
+{
+  "version": "2.0",
+  "fecha": "2026-05-17",
+  "descripcion": "Indice unificado de busqueda para Red Mesh Vault. Permite busqueda rapida en todo el contenido offline.",
+  "secciones": [
+    {
+      "nombre": "Guias de Supervivencia",
+      "ruta": "guides/supervivencia.json",
+      "tipo": "guias",
+      "total_items": 15,
+      "categorias": ["supervivencia", "tecnologia"],
+      "prioridades": ["critica", "alta"],
+      "resumen": "15 guias detalladas para situaciones de emergencia"
+    },
+    {
+      "nombre": "Primeros Auxilios",
+      "ruta": "first_aid/primeros_auxilios.json",
+      "tipo": "primeros_auxilios",
+      "total_items": 12,
+      "categorias": ["emergencia_cardiaca", "trauma", "emergencia_respiratoria", "emergencia_ambiental", "envenenamiento", "neurologico"],
+      "prioridades": ["critica", "alta"],
+      "resumen": "12 protocolos medicos de emergencia"
+    },
+    {
+      "nombre": "Diccionario",
+      "ruta": "dictionary/diccionario_index.json",
+      "tipo": "diccionario",
+      "total_items": 298,
+      "categorias": ["medicina", "supervivencia", "tecnologia", "comunicacion", "seguridad", "salud_mental"],
+      "resumen": "298 terminos de emergencia, supervivencia y tecnologia mesh"
+    },
+    {
+      "nombre": "Wikipedia Offline",
+      "ruta": "wikipedia/wikipedia_offline.json",
+      "tipo": "enciclopedia",
+      "total_items": 100,
+      "categorias": ["medicina", "supervivencia", "geografia", "tecnologia", "historia", "ciencia"],
+      "resumen": "100 articulos esenciales de Wikipedia en espanol"
+    },
+    {
+      "nombre": "Mapas de Colombia",
+      "ruta": "maps/colombia_emergencias.geojson",
+      "tipo": "geo",
+      "total_items": 55,
+      "categorias": ["ciudades", "rutas", "emergencia"],
+      "resumen": "55 ciudades principales y 20 rutas principales de Colombia"
+    },
+    {
+      "nombre": "Traductor NLLB-200",
+      "ruta": "translator/",
+      "tipo": "traductor",
+      "total_items": 200,
+      "categorias": ["idiomas", "traduccion", "comunicacion"],
+      "prioridades": ["alta"],
+      "resumen": "200 idiomas con sistema de language packs descargables",
+      "idiomas_builtin": 10,
+      "idiomas_descargables": 190,
+      "modelo": "nllb-200-distilled-600m",
+      "tamano_modelo_mb": 350,
+      "archivos": [
+        "translator/translator_engine.py",
+        "translator/language_packs.py",
+        "translator/translator_config.json",
+        "translator/download_model.sh",
+        "translator/README.md",
+        "translator/models/",
+        "translator/lang_packs/",
+        "translator/cache/"
+      ]
+    }
+  ],
+  "palabras_clave": [
+    "agua", "refugio", "fuego", "navegacion", "primeros auxilios", "RCP", "hemorragia", "quemadura", "fractura",
+    "supervivencia", "emergencia", "desastre", "terremoto", "inundacion", "evacuacion", "comunicacion", "mesh",
+    "red mesh", "cifrado", "privacidad", "nodo", "wifi direct", "bluetooth", "GPS", "coordenadas",
+    "hospital", "bomberos", "refugio", "policia", "emergencia", "Colombia", "Bogota", "Medellin", "Cali",
+    "medicina", "salud", "enfermedad", "tratamiento", "sintomas", "prevencion",
+    "seguridad", "proteccion", "amenaza", "riesgo", "preparacion", "plan",
+    "traductor", "traduccion", "idioma", "NLLB", "ingles", "frances", "portugues", "aleman", "chino", "japones", "coreano", "ruso",
+    "language pack", "offline translate", "200 idiomas",
+    "shelter", "water", "fire", "food", "navigation", "medical", "emergency", "disaster"
+  ],
+  "estructura_busqueda": {
+    "campos": ["titulo", "resumen", "contenido", "categorias", "palabras_clave"],
+    "prioridad_busqueda": ["titulo", "resumen", "categorias"]
+  }
+}

@@ -1,0 +1,1198 @@
+{
+  "version": "1.0",
+  "fecha": "2026-05-16",
+  "total_articulos": 100,
+  "idioma": "es",
+  "descripcion": "Artículos esenciales de Wikipedia en español para acceso offline. Tema: Ciencia, Medicina, Historia, Geografía, Tecnología, Supervivencia.",
+  "categorias": {
+    "medicina": {
+      "descripcion": "Artículos de salud y medicina para situaciones de emergencia",
+      "articulos": [
+        {
+          "titulo": "Reanimación cardiopulmonar",
+          "resumen": "La reanimación cardiopulmonar (RCP) es una técnica de emergencia que combina compresiones torácicas con ventilaciones artificiales para restaurar la respiración y circulación en personas en paro cardíaco. Esta técnica es crucial porque puede duplicar o triplicar las probabilidades de supervivencia cuando se aplica inmediatamente después de un paro cardíaco. El RCP mantiene el flujo de sangre oxigenada hacia el cerebro y otros órganos vitales hasta que llegue la ayuda médica profesional.",
+          "secciones": [
+            {
+              "titulo": "Compresiones torácicas",
+              "contenido": "Las compresiones deben realizarse en el centro del pecho, entre los pezones. La profundidad debe ser de al menos 5 centímetros en adultos, con una velocidad de 100 a 120 compresiones por minuto. Es importante permitir que el pecho se expanda completamente entre compresiones para que el corazón pueda llenarse de sangre."
+            },
+            {
+              "titulo": "Ventilaciones",
+              "contenido": "Después de cada 30 compresiones, se deben administrar 2 ventilaciones de rescate. Para hacerlo, se inclina la cabeza hacia atrás, se levanta el mentón, se pellizca la nariz y se sella la boca sobre la boca de la víctima, soplando hasta que el pecho se eleve."
+            },
+            {
+              "titulo": "Desfibrilador externo automático",
+              "contenido": "Si hay un DEA disponible, debe usarse inmediatamente después de iniciar el RCP. El dispositivo analiza el ritmo cardíaco y, si es necesario, administra una descarga eléctrica para restaurar el ritmo normal del corazón."
+            }
+          ],
+          "categorias": ["medicina", "emergencia", "primeros auxilios"]
+        },
+        {
+          "titulo": "Hemorragia",
+          "resumen": "La hemorragia es la pérdida de sangre significativa que puede ser externa o interna. Las hemorragias arteriales son las más peligrosas, ya que la sangre sale en chorros sincronizados con el latido cardíaco y es de color rojo brillante. La pérdida de más de un litro de sangre puede causar shock hipovolémico, una condición potencialmente mortal que requiere atención médica inmediata.",
+          "secciones": [
+            {
+              "titulo": "Tipos de hemorrhagia",
+              "contenido": "Hemorragia arterial: sangre roja brillante que brota en chorro. Hemorragia venosa: sangre oscura que fluye de manera continua. Hemorragia capilar: sangre que gotea lentamente de heridas superficiales."
+            },
+            {
+              "titulo": "Control de hemorragias",
+              "contenido": "El método principal es la presión directa sobre la herida usando un paño limpio. Si la sangre atraviesa, se añaden más capas sin retirar las primeras. Se debe mantener presión durante al menos 10 minutos para permitir la formación del coágulo."
+            },
+            {
+              "titulo": "Torniquete",
+              "contenido": "El torniquete se usa como último recurso cuando la presión directa no controla la hemorragia. Se coloca 5-7 centímetros por encima de la herida, nunca sobre articulaciones. Una vez aplicado, no debe retirarse y se debe anotar la hora de colocación."
+            }
+          ],
+          "categorias": ["medicina", "emergencia", "trauma"]
+        },
+        {
+          "titulo": "Quemaduras",
+          "resumen": "Las quemaduras son lesiones en los tejidos causadas por calor, productos químicos, electricidad, radiación o fricción. Se clasifican en tres grados según la profundidad: primer grado (solo epidermis), segundo grado (dermis) y tercer grado (tejido subcutáneo). Las quemaduras extensas o profundas pueden ser potencialmente mortales y requieren atención médica urgente.",
+          "secciones": [
+            {
+              "titulo": "Clasificación de quemaduras",
+              "contenido": "Quemaduras de primer grado: enrojecimiento, dolor, sin ampollas. Afectan solo la capa externa de la piel. Quemaduras de segundo grado: ampollas, dolor intenso, piel brillante. Afectan capas más profundas. Quemaduras de tercer grado: piel blanca o carbonizada, sin dolor por daño a nervios."
+            },
+            {
+              "titulo": "Tratamiento inicial",
+              "contenido": "Enfríe la quemadura con agua fría corriente durante 10-20 minutos. No use hielo directo, mantequilla, pasta dental ni otros remedios caseros. Estos atrapan el calor y empeoran la lesión. Cubra con apósito estéril sin presión."
+            },
+            {
+              "titulo": "Cuando buscar atención médica",
+              "contenido": "Se debe buscar atención médica para quemaduras en cara, manos, pies, ingles, articulaciones; quemaduras de más del 10% del cuerpo en adultos; quemaduras de tercer grado; y todas las quemaduras en niños."
+            }
+          ],
+          "categorias": ["medicina", "emergencia", "trauma"]
+        },
+        {
+          "titulo": "Maniobra de Heimlich",
+          "resumen": "La maniobra de Heimlich es un procedimiento de emergencia para desobstruir las vías respiratorias cuando un objeto bloquea la tráquea. Se realiza mediante compresiones abdominales hacia arriba y hacia adentro, creando presión en los pulmones para expulsar el objeto extraño. Esta técnica puede salvar la vida de una persona que se está asfixiando.",
+          "secciones": [
+            {
+              "titulo": "Identificación de asfixia",
+              "contenido": "La persona generalmente hace el signo universal de asfixia: manos en la garganta. Puede tener tos débil o fuerte, incapacidad para hablar o respirar, y color azulado en labios y cara. Si puede toser con fuerza, anímela a seguir tosiendo."
+            },
+            {
+              "titulo": "Técnica para adultos",
+              "contenido": "Párese detrás de la víctima, rodéela con sus brazos alrededor de la cintura. Coloque el puño de una mano ligeramente encima del ombligo y debajo de las costillas. Agarre su puño con la otra mano y realice compresiones abdominales rápidas hacia arriba y hacia adentro."
+            },
+            {
+              "titulo": "Variaciones",
+              "contenido": "En mujeres embarazadas o personas obesas, coloque las manos más arriba, en el centro del esternón. En niños, use menos fuerza. En bebés, use 5 golpes en la espalda seguidos de 5 compresiones torácicas con dos dedos."
+            }
+          ],
+          "categorias": ["medicina", "emergencia", "asfixia"]
+        },
+        {
+          "titulo": "Shock",
+          "resumen": "El shock es una condición potencialmente mortal donde los órganos no reciben suficiente sangre debido a una circulación inadecuada. Puede ser causado por hemorragia severa (shock hipovolémico), falla cardíaca (shock cardiogénico), infección severa (shock séptico) o reacción alérgica grave (shock anafiláctico). Los signos incluyen piel fría y pálida, respiración rápida, pulso débil y confusión mental.",
+          "secciones": [
+            {
+              "titulo": "Signos y síntomas",
+              "contenido": "Piel fría, húmeda y pálida. Respiración rápida y superficial (más de 20 por minuto). Pulso rápido y débil (más de 100 latidos por minuto). Confusión, inquietud o ansiedad. Sed intensa, náuseas, debilidad y mareos."
+            },
+            {
+              "titulo": "Manejo inicial",
+              "contenido": "Acueste a la víctima boca arriba. Eleve las piernas 20-30 centímetros por encima del nivel del corazón (si no hay sospecha de lesión en cabeza, cuello o espalda). Cubra con manta para prevenir hipotermia. Mantenga la vía aérea abierta."
+            },
+            {
+              "titulo": "Hydratación",
+              "contenido": "Si la víctima está consciente y puede tragar, dele pequeños sorbos de agua. No más de medio vaso cada 15 minutos. No dé agua si está inconsciente, hay sospecha de lesión abdominal, o hay vómitos."
+            }
+          ],
+          "categorias": ["medicina", "emergencia", "critical"]
+        },
+        {
+          "titulo": "Fracturas",
+          "resumen": "Una fractura es la ruptura o quebradura de un hueso. Puede ser cerrada (sin abrir la piel) o abierta (con exposición del hueso). Los signos incluyen dolor intenso que empeora con el movimiento, hinchazón, deformidad visible, incapacidad para mover la extremidad y hematoma. El tratamiento incluye inmovilización y evaluación médica con radiografías.",
+          "secciones": [
+            {
+              "titulo": "Tipos de fracturas",
+              "contenido": "Fractura cerrada: la piel permanece intacta. Fractura abierta: hay una herida que expone el hueso. Fractura con desplazamiento: los extremos del hueso están separados. Fractura en tallo verde: incompleta, común en niños. Fractura por estrés: línea fina por uso excesivo."
+            },
+            {
+              "titulo": "Inmovilización",
+              "contenido": "Inmovilice la articulación por encima y por debajo de la fractura. Use férulas rígidas acolchadas con tela. No apretar demasiado: debe caber un dedo entre el vendaje y la piel. Verifique la circulación después de inmovilizar (color, temperatura, sensibilidad)."
+            },
+            {
+              "titulo": "Atención de emergencia",
+              "contenido": "En fracturas abiertas, cubra la herida con tela limpia sin empujar el hueso hacia adentro. No intente corregir la deformidad. Fracturas de cadera, pelvis o columna requieren atención especializada sin mover al paciente."
+            }
+          ],
+          "categorias": ["medicina", "emergencia", "trauma"]
+        },
+        {
+          "titulo": "Hipotermia",
+          "resumen": "La hipotermia ocurre cuando la temperatura corporal central cae por debajo de 35°C. Los síntomas progresivos incluyen escalofríos intensos, piel fría y pálida, torpeza, confusión, habla arrastrada. En casos severos, los escalofríos cesan, la piel se vuelve azulosa, hay confusión severa, somnolencia, pulso lento e irregular. Puede ser fatal si no se trata.",
+          "secciones": [
+            {
+              "titulo": "Reconocimiento",
+              "contenido": "Hipotermia leve (32-35°C): escalofríos, piel fría, torpeza leve. Hipotermia moderada (28-32°C): escalofríos se detienen, piel azulosa, confusión, somnolencia. Hipotermia severa (menos de 28°C): inconsciencia, pulso muy débil, respiración lenta."
+            },
+            {
+              "titulo": "Tratamiento",
+              "contenido": "Retire a la víctima del ambiente frío. Retire ropa mojada y reemplace con ropa seca. Cubra cabeza y cuello. Envuelva en mantas secas. Use el calor de su propio cuerpo: acuéstese junto a la víctima. No frote las extremidades."
+            },
+            {
+              "titulo": "Precauciones",
+              "contenido": "Manipule a la víctima con cuidado. Movimientos bruscos pueden causar arresto cardíaco en hipotermia severa. Las víctimas en hipotermia severa pueden parecer muertas. Nunca asuma muerte. Inicie RCP y continúe hasta que llegue ayuda médica."
+            }
+          ],
+          "categorias": ["medicina", "emergencia", "temperatura"]
+        },
+        {
+          "titulo": "Golpe de calor",
+          "resumen": "El golpe de calor es una emergencia donde el cuerpo no puede regular su temperatura, superando los 40°C. A diferencia del agotamiento por calor, la víctima deja de sudar. Los síntomas incluyen piel roja y caliente, confusión, dolor de cabeza intenso, náuseas, desmayo y convulsiones. Puede ser fatal en minutos sin tratamiento.",
+          "secciones": [
+            {
+              "titulo": "Signos de alerta",
+              "contenido": "Temperatura corporal superior a 40°C. Piel caliente, roja y seca (ausencia de sudor). Confusión y desorientación. Dolor de cabeza intenso. Náuseas y vómitos. Pérdida de consciencia. Convulsiones."
+            },
+            {
+              "titulo": "Enfriamiento urgente",
+              "contenido": "Mueva a la víctima a un lugar fresco. Retire ropa excesiva. Aplique agua fría en todo el cuerpo, especialmente en cuello, axilas e ingles. Abanique vigorosamente. Si es posible, sumerja en agua fría. Continúe hasta que la temperatura baje de 39°C."
+            },
+            {
+              "titulo": "Prevención",
+              "contenido": "Los grupos más vulnerables son ancianos, niños, personas enfermas y trabajadores al aire libre. Manténgase hidratado. Evite exposición prolongada al sol. Use ropa ligera y de colores claros. Tome descansos frecuentes en lugares frescos."
+            }
+          ],
+          "categorias": ["medicina", "emergencia", "temperatura"]
+        },
+        {
+          "titulo": "Mordeduras de serpiente",
+          "resumen": "En Colombia, las serpientes venenosas más comunes son Bothrops (mapaná, terciopelo), Crotalus (cascabel) y Lachesis (busmaster). El veneno puede causar daño tisular, problemas de coagulación y, en casos severos, insuficiencia renal. El tratamiento principal es el suero antiofídico, que debe administrarse en un centro médico.",
+          "secciones": [
+            {
+              "titulo": "Identificación",
+              "contenido": "Bothrops: cabeza triangular, fosetas loreales. Cascabel: cascabel en la cola, triangulo en la cabeza. Busmaster: grande, con Fosetas. Todas requieren atención médica urgente. No intente capturar ni matar la serpiente."
+            },
+            {
+              "titulo": "Primeros auxilios",
+              "contenido": "Mantenga a la víctima calmada y quieta. Inmovilice la extremidad afectada por debajo del nivel del corazón. No use torniquete, no corte la herida, no succione el veneno. Lave suavemente con agua y jabón. Busque atención médica inmediata."
+            },
+            {
+              "titulo": "Síntomas de envenenamiento",
+              "contenido": "Dolor intenso en el sitio de la mordedura. Hinchazón que progresa. Náuseas y vómitos. Sangrado de encías o heridas. Orina oscura. Visión doble o dificultad para respirar."
+            }
+          ],
+          "categorias": ["medicina", "emergencia", "envenenamiento"]
+        },
+        {
+          "titulo": "Intoxicación por monóxido de carbono",
+          "resumen": "El monóxido de carbono (CO) es un gas invisible, inodoro e insípido que puede ser letal. Se produce por combustión incompleta de carbono en vehículos, estufas de gas, braseros y generadores. Los síntomas incluyen dolor de cabeza, mareo, náuseas, confusión y desmayo. múltiples personas sintiendo lo mismo indica envenenamiento por CO.",
+          "secciones": [
+            {
+              "titulo": "Fuentes comunes",
+              "contenido": "Vehículos con motor encendido en garaje cerrado. Estufas de gas sin ventilación adecuada. Braseros en espacios cerrados. Generadores eléctricos en interiores. Calentadores de agua a gas."
+            },
+            {
+              "titulo": "Síntomas",
+              "contenido": "Dolor de cabeza (principal señal). Mareo y náuseas. Vómitos y confusión. Fatiga y debilidad. Dolor de pecho. Pérdida de consciencia. Los síntomas pueden confundirse con gripe."
+            },
+            {
+              "titulo": "Acciones inmediatas",
+              "contenido": "Salga al aire fresco inmediatamente. Abra puertas y ventanas de camino a la salida. Llame a emergencias. No reingrese hasta que los servicios de emergencia confirmen que es seguro. El tratamiento es oxígeno al 100%."
+            }
+          ],
+          "categorias": ["medicina", "emergencia", "envenenamiento"]
+        },
+        {
+          "titulo": "Convulsiones",
+          "resumen": "Una convulsión es una contracción muscular involuntaria causada por actividad eléctrica anormal en el cerebro. Puede ser generalizada (todo el cuerpo) o focal (una parte). Las causas incluyen epilepsia, fiebre alta, trauma craneal, intoxicación y enfermedades metabólicas. La mayoría dura menos de 2 minutos y termina por sí sola.",
+          "secciones": [
+            {
+              "titulo": "Durante la convulsión",
+              "contenido": "Ayude a la víctima a bajar al suelo suavemente. Retire objetos peligrosos cercanos. No sujete a la persona ni intente detener los movimientos. Proteja su cabeza con algo suave. Gire de lado si es posible para facilitar la saliva."
+            },
+            {
+              "titulo": "Lo que NO hacer",
+              "contenido": "No poner nada en la boca de la víctima. No hay riesgo de tragarse la lengua. No meter los dedos en la boca. No subject la víctima. No dar alimentos ni agua hasta que esté completamente alerta."
+            },
+            {
+              "titulo": "Cuándo buscar ayuda",
+              "contenido": "Primera convulsión. Duración mayor de 5 minutos (estatus epiléptico). Otra convulsión inmediatamente después. Lesiones asociadas. La persona no recupera consciencia después de 10 minutos. Embarazo o diabetes."
+            }
+          ],
+          "categorias": ["medicina", "emergencia", "neurologico"]
+        },
+        {
+          "titulo": "Envenenamiento",
+          "resumen": "El envenenamiento ocurre por exposición a sustancias tóxicas a través de ingestion, inhalación, absorción cutánea o inyección. Los síntomas varían según la sustancia e incluyen náuseas, vómitos, dolor abdominal, dificultad respiratoria, confusión y pérdida de consciencia. El tratamiento depende del tipo de toxina.",
+          "secciones": [
+            {
+              "titulo": "Ingestión de toxins",
+              "contenido": "Si la víctima está consciente, puede beber agua para diluir (excepto con sustancias cáusticas o petróleo). No induzca vómito a menos que lo indique poison control. Preserve el envase de la sustancia para mostrar al médico."
+            },
+            {
+              "titulo": "Inhalación de gases",
+              "contenido": "Retire a la víctima del área contaminada a aire fresco inmediatamente. Afloje ropa ajustada. Si no respira, inicie RCP. No realice respiración boca a boca sin máscara de barrera."
+            },
+            {
+              "titulo": "Contacto con la piel",
+              "contenido": "Retire ropa contaminada. Lave con agua abundante durante 15-20 minutos. Use jabón solo si la sustancia es soluble en agua. Para sustancias que reaccionan con agua, verifique la etiqueta antes de lavar."
+            }
+          ],
+          "categorias": ["medicina", "emergencia", "envenenamiento"]
+        },
+        {
+          "titulo": "Deshidratación",
+          "resumen": "La deshidratación ocurre cuando el cuerpo pierde más líquidos de los que ingiere. Puede ser leve, moderada o severa. Los síntomas incluyen sed excesiva, orina oscura, mareo, fatiga, confusión y disminución de la sudoración. La deshidratación severa puede ser mortal, especialmente en niños y ancianos.",
+          "secciones": [
+            {
+              "titulo": "Signos de deshidratación",
+              "contenido": "Leve: sed, orina amarilla oscura, leve dolor de cabeza. Moderada: sequedad de boca, ojos hundidos, disminución de elasticidad de la piel, mareo. Severa: confusión, letargo, pulso rápido, presión arterial baja."
+            },
+            {
+              "titulo": "Tratamiento",
+              "contenido": "En dehydration leve a moderada, beba agua lentamente y soluciones de rehidratación oral. Evite bebidas azucaradas o con cafeína. En casos severos, se requiere atención médica para administración de líquidos IV."
+            },
+            {
+              "titulo": "Prevención",
+              "contenido": "Beba al menos 2 litros de agua al día. Incremente la ingesta en clima caluroso o haciendo ejercicio. Consuma frutas y vegetales con alto contenido de agua. Evite la exposición prolongada al sol."
+            }
+          ],
+          "categorias": ["medicina", "salud", "supervivencia"]
+        },
+        {
+          "titulo": "Infarto de miocardio",
+          "resumen": "El infarto de miocardio (ataque cardíaco) ocurre cuando se bloquea el flujo de sangre a una parte del corazón, generalmente por un coágulo. Los síntomas incluyen dolor torácico opresivo que puede irradiarse al brazo izquierdo, mandíbula o espalda, dificultad para respirar, sudor frío, náuseas y ansiedad.",
+          "secciones": [
+            {
+              "titulo": "Síntomas de alerta",
+              "contenido": "Dolor o presión en el centro del pecho que dura más de unos minutos. Dolor que se extiende a brazo, hombro, mandíbula o espalda. Dificultad para respirar. Sudoración fría. Náuseas o vómitos. Ansiedad intensa."
+            },
+            {
+              "titulo": "Acciones inmediatas",
+              "contenido": "Llame a emergencias inmediatamente. Haga que la víctima se siente o acueste cómodamente. Afloje ropa ajustada. Si tiene aspirina, dé una (si no es alérgico). No deje sola a la víctima. Prepárese para RCP."
+            },
+            {
+              "titulo": "Factores de riesgo",
+              "contenido": "Hipertensión, colesterol alto, diabetes, tabaquismo, obesidad, sedentarismo, historial familiar. La prevención incluye dieta saludable, ejercicio regular, no fumar y control médico."
+            }
+          ],
+          "categorias": ["medicina", "cardiología", "emergencia"]
+        },
+        {
+          "titulo": "Asma",
+          "resumen": "El asma es una enfermedad crónica que causa inflamación y estrechamiento de las vías respiratorias, provocando episodios de dificultad respiratoria, sibilancias, tos y opresión en el pecho. Los desencadenantes incluyen alérgenos, ejercicio, frío, infecciones y estrés.",
+          "secciones": [
+            {
+              "titulo": "Síntomas del ataque",
+              "contenido": "Dificultad para respirar, especialmente al exhalar. Sibilancias (sonido silbante al respirar). Tos persistente. Opresión en el pecho. Ansiedad y sudoración. Los síntomas pueden empeorar por la noche."
+            },
+            {
+              "titulo": "Tratamiento",
+              "contenido": "Use el inhalador de rescate (broncodilatador) según prescripción. Sentarse erguido y respirar lentamente. Si no mejora en 15 minutos, repetir dosis. Si no hay mejora, llamar a emergencias."
+            },
+            {
+              "titulo": "Prevención",
+              "contenido": "Identificar y evitar desencadenantes. Usar medicamentos de control según prescripción. Mantener inhalador de rescate siempre disponible. Realizar controles médicos regulares."
+            }
+          ],
+          "categorias": ["medicina", "respiratorio", "cronico"]
+        },
+        {
+          "titulo": "Diabetes",
+          "resumen": "La diabetes es una enfermedad crónica donde el cuerpo no puede regular adecuadamente los niveles de glucosa en sangre. La diabetes tipo 1 requiere insulina; la tipo 2 puede controlarse con dieta, ejercicio y medicamentos orales. Las complicaciones incluyen enfermedad cardíaca, daño renal y problemas de visión.",
+          "secciones": [
+            {
+              "titulo": "Hipoglucemia",
+              "contenido": "Nivel bajo de glucosa en sangre (menos de 70 mg/dL). Síntomas: temblor, sudoración, confusión, irritabilidad, hambre. Tratamiento: consumir 15-20 gramos de azúcar de acción rápida (jugo, caramelos)."
+            },
+            {
+              "titulo": "Hiperglucemia",
+              "contenido": "Nivel alto de glucosa en sangre. Síntomas: sed excesiva, micción frecuente, visión borrosa, fatiga. Puede llevar a cetoacidosis en diabetes tipo 1. Tratamiento: ajustar insulina según indicación médica."
+            },
+            {
+              "titulo": "Emergencias diabéticas",
+              "contenido": "Si la persona está inconsciente, no dé nada por la boca. Coloque de lado. Llame a emergencias. Si tiene glucagón disponible, adminístrelo. Identifique a la persona como diabética usando brazalete o identificación."
+            }
+          ],
+          "categorias": ["medicina", "metabolico", "cronico"]
+        },
+        {
+          "titulo": "Anafilaxia",
+          "resumen": "La anafilaxia es una reacción alérgica severa y potencialmente mortal que afecta múltiples sistemas del cuerpo. Puede causar hinchazón de la garganta, dificultad para respirar, caída de la presión arterial, urticaria y shock. Los alérgenos comunes incluyen Alimentos, medicamentos, picaduras de insectos y látex.",
+          "secciones": [
+            {
+              "titulo": "Signos de alarma",
+              "contenido": "Hinchazón de cara, labios, lengua o garganta. Dificultad para respirar o sibilancias. Urticaria generalizada. Caída de presión arterial (mareo, desmayo). Náuseas, vómitos, dolor abdominal. Confusión o pérdida de consciencia."
+            },
+            {
+              "titulo": "Tratamiento inmediato",
+              "contenido": "Llame a emergencias inmediatamente. Si tiene epinefrina (adrenalina), adminístrela en el muslo exterior. Mantenga a la víctima recostada con piernas elevadas. Afloje ropa ajustada. Esté preparado para RCP."
+            },
+            {
+              "titulo": "Prevención",
+              "contenido": "Identifique sus alérgenos y evítelos. Lleve siempre epinefrina autoinyectable si tiene alergias severas. Use brazalete de alerta médica. Informe a familiares y colegas sobre sus alergias."
+            }
+          ],
+          "categorias": ["medicina", "alergia", "emergencia"]
+        },
+        {
+          "titulo": "Epilepsia",
+          "resumen": "La epilepsia es un trastorno neurológico caracterizado por convulsiones recurrentes causadas por actividad eléctrica anormal en el cerebro. Puede ser controlada con medicamentos antiepilépticos en la mayoría de los casos. Los factores desencadenantes incluyen falta de sueño, estrés, alcohol y luces brillantes.",
+          "secciones": [
+            {
+              "titulo": "Tipos de convulsiones",
+              "contenido": "Convulsiones tónico-clónicas: rigidez muscular seguida de sacudidas. Ausencias: breve pérdida de consciencia. Convulsiones focales: sacudidas en una parte del cuerpo. Estado epiléptico: convulsiones prolongadas o repetidas."
+            },
+            {
+              "titulo": "Manejo de convulsiones",
+              "contenido": "No poner nada en la boca. Proteger la cabeza de lesiones.计时 duración de la convulsión. Después, mantener a la persona de lado. Hablar con calma hasta que esté alerta."
+            },
+            {
+              "titulo": " Tratamiento",
+              "contenido": "Los medicamentos antiepilépticos son el tratamiento principal. Es importante tomarlos regularmente según prescripción. Algunas personas pueden requerir cirugía. El seguimiento médico regular es esencial."
+            }
+          ],
+          "categorias": ["medicina", "neurologico", "cronico"]
+        },
+        {
+          "titulo": "Apendicitis",
+          "resumen": "La apendicitis es la inflamación del apéndice, un pequeño saco adjunto al intestino grueso. El síntoma principal es dolor abdominal que típicamente comienza alrededor del ombligo y luego se localiza en el cuadrante inferior derecho. Requiere cirugía de emergencia para evitar perforación e infección peritoneal.",
+          "secciones": [
+            {
+              "titulo": "Síntomas",
+              "contenido": "Dolor abdominal que empieza vago y empeora. Dolor que se localiza en cuadrante inferior derecho. Náuseas y vómitos. Fiebre baja. Pérdida de apetito. El dolor empeora con movimiento, tos o estornudos."
+            },
+            {
+              "titulo": "Diagnóstico",
+              "contenido": "El diagnóstico es principalmente clínico basado en síntomas y examen físico. Se puede confirmar con análisis de sangre (leucocitos elevados) y ecografía. No use antidiarreicos ni compresas calientes en el abdomen."
+            },
+            {
+              "titulo": "Tratamiento",
+              "contenido": "El tratamiento es quirúrgico: apendicectomía (extirpación del apéndice), puede ser abierta o laparoscópica. Se usan antibióticos perioperatorios. El diagnóstico temprano reduce complicaciones."
+            }
+          ],
+          "categorias": ["medicina", "quirurgico", "abdomen"]
+        },
+        {
+          "titulo": "Neumonía",
+          "resumen": "La neumonía es una infección pulmonar que inflama los alvéolos, llenándolos de líquido o pus. Los síntomas incluyen tos con flema, fiebre, escalofríos, dificultad para respirar y dolor torácico. Puede ser causada por bacterias, virus u hongos. Es más grave en niños, ancianos y personas con sistemas inmunológicos débiles.",
+          "secciones": [
+            {
+              "titulo": "Tipos de neumonía",
+              "contenido": "Neumonía bacteriana: inicio súbito con fiebre alta y esputo amarillento. Neumonía viral: síntomas másgraduales con tos seca. Neumonía atípica: síntomas leves pero persistentes."
+            },
+            {
+              "titulo": "Síntomas",
+              "contenido": "Tos con flema (puede ser verde, amarillo o con sangre). Fiebre y escalofríos. Dificultad para respirar. Dolor torácico al respirar o toser. Fatiga y confusión (especialmente en ancianos)."
+            },
+            {
+              "titulo": "Tratamiento",
+              "contenido": "Las neumonías bacterianas se tratan con antibióticos. Las virales pueden requerir antivirales. Es importante descansar, hidratarse bien y completar el tratamiento. Las neumonías severas pueden requerir hospitalización."
+            }
+          ],
+          "categorias": ["medicina", "infeccioso", "respiratorio"]
+        }
+      ]
+    },
+    "supervivencia": {
+      "descripcion": "Artículos de supervivencia y preparación para emergencias",
+      "articulos": [
+        {
+          "titulo": "Agua potable",
+          "resumen": "El acceso a agua potable es fundamental para la supervivencia humana. Sin agua, una persona puede sobrevivir solo 3-5 días. El agua contaminada puede causar enfermedades graves como cólera, fiebre tifoidea, disentería y hepatitis A. Aprender a encontrar, purificar y almacenar agua es esencial en situaciones de emergencia.",
+          "secciones": [
+            {
+              "titulo": "Fuentes de agua",
+              "contenido": "Fuentes naturales: ríos, arroyos, lagos y aguas subterráneas. Agua de lluvia recolectada con materiales limpios. Agua condensada en superficies frías (método de solar still). Evite agua estancada con olor o color extraño."
+            },
+            {
+              "titulo": "Purificación del agua",
+              "contenido": "Hervir: hierva durante al menos 1 minuto (3 minutos a más de 2000m de altitud). Cloración: 2 gotas de lejía (5-6% de hipoclorito) por litro, dejar reposar 30 minutos. Filtrado: use capas de arena, gravilla y carbón. Radiación solar: expose al sol directo durante 6 horas en botellas transparentes."
+            },
+            {
+              "titulo": "Almacenamiento",
+              "contenido": "Guarde en recipientes limpios y sellados. Etiquete con fecha. Mantenga en lugar fresco y oscuro. Renueve cada 6 meses. Los recipientes de plástico de alimentos son adecuados; no use envases de químicos o combustibles."
+            }
+          ],
+          "categorias": ["supervivencia", "agua", "esencial"]
+        },
+        {
+          "titulo": "Refugio",
+          "resumen": "Un refugio adecuado protege contra los elementos naturales: lluvia, viento, frío y calor extremo. La elección del refugio depende del clima, materiales disponibles y duración de la situación de emergencia. Los refugios pueden variar desde un simple toldo hasta estructuras más elaboradas.",
+          "secciones": [
+            {
+              "titulo": "Tipos de refugios",
+              "contenido": "Refugio de toldo: rápido de construir, usa lona o plásticos. Cobertizo: estructura con poste y techo inclinado. Debris hut: para clima frío, acumula materiales aislantes. Cueva natural: puede proporcionar protección inmediata."
+            },
+            {
+              "titulo": "Selección del sitio",
+              "contenido": "Busque terreno elevado para evitar inundaciones. Evite cauces de ríos secos, laderas inestables y debajo de árboles muertos. Prefiera lugar plano con buena ventilación pero protegido del viento. Aléjese de líneas eléctricas y estructuras inestables."
+            },
+            {
+              "titulo": "Aislamiento",
+              "contenido": "El suelo frío puede causar hipotermia incluso en climas no extremos. Use ramas, hojas o espuma como aislante entre el suelo y su cuerpo. Cree una couche de material seco entre usted y el exterior."
+            }
+          ],
+          "categorias": ["supervivencia", "refugio", "esencial"]
+        },
+        {
+          "titulo": "Encendido de fuego",
+          "resumen": "El fuego proporciona calor, luz, возможность de cocinar alimentos, purificar agua y señales de emergencia. Encender un fuego sin cerillas requiere conocer técnicas tradicionales como la fricción (bow drill), el uso de lentes o el pedernal y acero.",
+          "secciones": [
+            {
+              "titulo": "Materiales necesarios",
+              "contenido": "Yesca: material que se enciende fácilmente (papel, algodón, musgo seco, corteza de abedul). Astillas: palitos delgados que arden rápidamente. Leña: ramas más gruesas para mantener el fuego. Todo debe estar completamente seco."
+            },
+            {
+              "titulo": "Métodos de encendido",
+              "contenido": "Pedernal y acero: golpee contra piedra para crear chispas. Lente: use lupa o cristal para concentrar rayos solares. Bow drill: fricción rotary para crear brasas. Barra de encendido de magnesio: más confiable y duradero."
+            },
+            {
+              "titulo": "Mantenimiento del fuego",
+              "contenido": "Construya un teepee de astillas sobre la yesca con brasas. Añada astillas gradualmente hasta que arda bien. Agregue leña más gruesa progresivamente. Proteja del viento. Nunca abandone el fuego sin apagar completamente."
+            }
+          ],
+          "categorias": ["supervivencia", "fuego", "esencial"]
+        },
+        {
+          "titulo": "Navegación",
+          "resumen": "La navegación sin tecnología requiere conocer técnicas ancestrales como el uso del sol, las estrellas y elementos naturales para orientarse. El hemisferio norte, la Estrella Polar indica el norte; en el sur, la Cruz del Sur señala el sur.",
+          "secciones": [
+            {
+              "titulo": "Navegación por el sol",
+              "contenido": "El sol sale por el este y se pone por el oeste. Al mediodía, en el hemisferio norte, el sol indica el sur. Clave un palo vertical y marque donde cae la sombra; después de 15-20 minutos, marque la nueva posición. La línea entre ambas marcas indica este-oeste."
+            },
+            {
+              "titulo": "Navegación por estrellas",
+              "contenido": "En el hemisferio norte, localice la Osa Mayor. Extienda una línea imaginaria 5 veces la distancia entre sus dos estrellas inferiores hacia abajo. La estrella brillante al final es Polaris, que indica el norte. En el hemisferio sur, busque la Cruz del Sur."
+            },
+            {
+              "titulo": "Brújula improvisada",
+              "contenido": "Magnetice una aguja de acero frotándola contra cabello, lana o seda. Colóquela flotando sobre agua en un recipiente pequeño. La aguja apuntará aproximadamente al norte magnético. Este método puede ser afectado por metales cercanos o minerales."
+            }
+          ],
+          "categorias": ["supervivencia", "navegacion", "orientacion"]
+        },
+        {
+          "titulo": "Señales de emergencia",
+          "resumen": "Las señales de emergencia comunican su posición y necesidad de ayuda cuando no hay comunicación convencional. Los métodos incluyen fuego, espejo de señales, silbato y señales en el suelo. La combinación de varios métodos maximiza las probabilidades de ser detectado.",
+          "secciones": [
+            {
+              "titulo": "Señales de fuego",
+              "contenido": "Construya tres fuegos en línea o triángulo (señal universal de emergencia). Use madera verde, goma o plástico para generar humo blanco visible. En la noche, el fuego brillante es visible a grandes distancias. Mantenga materiales listos para encender inmediatamente."
+            },
+            {
+              "titulo": "Espejo de señales",
+              "contenido": "Use cualquier superficie reflectante para reflejar luz hacia aeronaves o personas. La técnica: sostenga el espejo frente al ojo, extienda el brazo y apunte con los dedos. Mueva hasta ver un destello brillante en el objetivo. Visible hasta 50 km."
+            },
+            {
+              "titulo": "Silbato y señales en el suelo",
+              "contenido": "Un silbato de emergencia (110+ dB) puede escucharse a 1 km. Tres silbidos cortos significa emergencia. Para señales terrestres, cree 'SOS' con piedras o ramas de al menos 3 metros de largo. Use colores brillantes para mayor visibilidad."
+            }
+          ],
+          "categorias": ["supervivencia", "comunicacion", "rescate"]
+        },
+        {
+          "titulo": "Alimentos de emergencia",
+          "resumen": "En situaciones de emergencia, mantener una nutrición adecuada es crucial. Los alimentos de emergencia deben ser no perecederos, ricos en calorías y requerir poco o ningún procesamiento. El conocimiento de plantas y animales comestibles locales puede ser vital.",
+          "secciones": [
+            {
+              "titulo": "Alimentos no perecederos",
+              "contenido": "Galletas, frutos secos, barras energéticas, arroz, pasta, alimentos enlatados. Almacene mínimo 2000 kcal por persona por día. Un kit de 3 días puede incluir: desayuno (galletas + frutos secos), almuerzo (arroz + atún), cena (pasta + vegetales)."
+            },
+            {
+              "titulo": "Necesidades calóricas",
+              "contenido": "Una persona adulta necesita entre 1500-2000 kcal diarias para actividad moderada. La falta de calorías reduce capacidad física y cognitiva. Priorice carbohidratos para energía inmediata sobre grasas para energía sostenida."
+            },
+            {
+              "titulo": "Alimentos silvestres",
+              "contenido": "En zonas rurales, frutas como mango, banano, guayaba son generalmente seguras. Tubérculos como yuca (hervida 30 min) y papa son comestibles. Nunca coma hongos salvo que conozca la especie. Evite plantas con savia blanca o látex."
+            }
+          ],
+          "categorias": ["supervivencia", "alimentacion", "esencial"]
+        },
+        {
+          "titulo": "Desastres naturales",
+          "resumen": "Los desastres naturales como terremotos, inundaciones, huracanes y deslizamientos pueden ocurrir sin advertencia. La preparación incluye conocer los riesgos de su zona, tener un plan familiar y un kit de emergencia de 72 horas.",
+          "secciones": [
+            {
+              "titulo": "Terremotos",
+              "contenido": "DURANTE: Métase bajo mesa o escritorio resistente. Aléjese de ventanas y objetos que puedan caer. Si está afuera, aléjese de edificios y cables eléctricos. DESPUÉS: Verifique lesiones, busque escapes de gas, no encienda fuego ni interruptores eléctricos."
+            },
+            {
+              "titulo": "Inundaciones",
+              "contenido": "Suba a lugares elevados inmediatamente. No camine ni conduzca por agua en movimiento: 30 cm pueden tumbarlo, 60 cm pueden arrastrar un auto. Si el agua sube, suba al techo y espere rescate. Use ropa brillante para ser visto."
+            },
+            {
+              "titulo": "Huracanes",
+              "contenido": "Refúgiese en habitación interior lejos de ventanas. Ventile un poco para igualar presión. Mantenga suministros de agua y alimentos para varios días. El ojo del huracán puede dar falsa sensación de calma; no salga hasta confirmación oficial."
+            }
+          ],
+          "categorias": ["supervivencia", "desastres", "preparacion"]
+        },
+        {
+          "titulo": "Kit de emergencia",
+          "resumen": "Un kit de emergencia bien equipado permite sobrevivir 72 horas después de un desastre. Debe incluir agua, alimentos, primeros auxilios, iluminación, comunicación y documentos esenciales. Revise y reemplace contenidos cada 6 meses.",
+          "secciones": [
+            {
+              "titulo": "Contenido esencial",
+              "contenido": "Agua: 3 litros por persona por día. Alimentos no perecederos para 3 días. Linterna con baterías de repuesto. Botiquín de primeros auxilios. Radio a pilas con baterías adicionales. Documentos importantes en bolsa impermeable."
+            },
+            {
+              "titulo": "Artículos adicionales",
+              "contenido": "Medicamentos esenciales y recetas. Silbato de emergencia. Mascarillas N95. Herramientas multiuso. Dinero en efectivo. Artículos personales (lentes, baterías para auxiliares auditivos). Artículos para mascotas si aplica."
+            },
+            {
+              "titulo": "Mantenimiento",
+              "contenido": "Revise el kit cada 6 meses. Reemplace alimentos vencidos. Verifique que las baterías funcionen. Actualice documentos. Ajuste según cambios en necesidades familiares (bebés, ancianos, condiciones médicas)."
+            }
+          ],
+          "categorias": ["supervivencia", "preparacion", "emergencia"]
+        },
+        {
+          "titulo": "Primeros auxilios psicológicos",
+          "resumen": "Los primeros auxilios psicológicos proporcionan apoyo emocional a personas en crisis o que han experimentado eventos traumáticos. Incluyen escuchar, validar emociones, proporcionar información práctica y conectar con recursos de ayuda.",
+          "secciones": [
+            {
+              "titulo": "Principios básicos",
+              "contenido": "Escuche sin juzgar. No diga 'ya pasará' o 'no es para tanto'. Ofrezca presencia y apoyo práctico. Valide las emociones: 'es normal sentirse así'. Ayude a la persona a sentirse segura y calmada."
+            },
+            {
+              "titulo": "Señales de estrés traumático",
+              "contenido": "Miedo intenso, culpa, irritabilidad, confusión, entumecimiento emocional. Físicamente: insomnio, fatiga, tensión muscular. Si estos síntomas duran más de 2 semanas o interfieren con funcionamiento diario, busque ayuda profesional."
+            },
+            {
+              "titulo": "Autocuidado",
+              "contenido": "Hable sobre lo que siente con personas de confianza. Establezca rutinas simples: horarios de sueño, comida, actividad física. Evite exposición excesiva a noticias sobre el evento. Practique respiración profunda (4 segundos inhale, 4 segundos hold, 4 segundos exhale)."
+            }
+          ],
+          "categorias": ["supervivencia", "salud_mental", "apoyo"]
+        }
+      ]
+    },
+    "geografia": {
+      "descripcion": "Artículos de geografía y lugares relevantes para Colombia",
+      "articulos": [
+        {
+          "titulo": "Colombia",
+          "resumen": "Colombia es un país ubicado en la esquina noroccidental de América del Sur. Limita al norte con el mar Caribe, al este con Venezuela y Brasil, al sur con Perú y Ecuador, y al oeste con el océano Pacífico. Su capital es Bogotá. El país tiene una población de aproximadamente 50 millones de habitantes y es conocido por su mega-diversidad ecológica.",
+          "secciones": [
+            {
+              "titulo": "Geografía",
+              "contenido": "Colombia tiene tres cadenas de la Cordillera de los Andes que atraviesan el país de norte a sur. El punto más alto es el pico Cristóbal Colón (5.730 m). También incluye la Amazonía al sur, las llanuras del Orinoco al este, y una extensa zona costera en el Caribe y Pacífico."
+            },
+            {
+              "titulo": "Regiones",
+              "contenido": "Región Andina: zona montañosa con las principales ciudades. Región Caribe: llanuras costeras al norte. Región Pacífica: selva costera con alta pluviosidad. Región Orinoquía: llanuras de sabana al este. Región Amazonía: selva tropical al sur. Región Insular: islas en Caribe y Pacífico."
+            },
+            {
+              "titulo": "Clima",
+              "contenido": "El clima varía desde tropical en las costas hasta frío de páramo en las montañas. La temperatura promedio en Bogotá (2.600 m) es de 14°C. Las regiones de valle tienen clima templado (18-24°C). La zona amazónica es cálida y húmeda todo el año."
+            }
+          ],
+          "categorias": ["geografia", "pais", "Colombia"]
+        },
+        {
+          "titulo": "Bogotá",
+          "resumen": "Bogotá es la capital de Colombia y la ciudad más grande del país, con más de 8 millones de habitantes. Está ubicada en el centro del país, en el altiplano cundiboyacense a 2.640 metros sobre el nivel del mar. Es el centro político, económico y cultural de Colombia.",
+          "secciones": [
+            {
+              "titulo": "Geografía",
+              "contenido": "Bogotá se encuentra en el centro de Colombia, atravesada por el río Bogotá. El clima es subtropical de alta montaña con temperatura promedio de 14°C. La ciudad está dividida en 20 localidades y tiene una extensión aproximada de 1.775 km²."
+            },
+            {
+              "titulo": "Historia",
+              "contenido": "Fue fundada por los españoles en 1538 con el nombre de Santa Fe de Bogotá. La ciudad creció como centro administrativo colonial y posteriormente se convirtió en capital de la Gran Colombia y luego de la República de Colombia."
+            },
+            {
+              "titulo": "Cultura",
+              "contenido": "Bogotá es conocida por sus museos, galerías de arte y patrimonio histórico. La Plaza de Bolívar, la Candelaria con arquitectura colonial, Monserrate como icono paisajístico, y el Museo del Oro son puntos de interés principales."
+            }
+          ],
+          "categorias": ["geografia", "ciudad", "Colombia"]
+        },
+        {
+          "titulo": "Medellín",
+          "resumen": "Medellín es la segunda ciudad más grande de Colombia, ubicada en el valle de Aburrá en la cordillera Central. Conocida como la 'Ciudad de la Eterna Primavera' por su clima templado, ha experimentado una transformación notable desde la década de 1990.",
+          "secciones": [
+            {
+              "titulo": "Geografía",
+              "contenido": "Medellín se encuentra a 1.500 metros sobre el nivel del mar, con temperatura promedio de 22°C. El río Medellín atraviesa la ciudad. El área metropolitana incluye 10 municipios con aproximadamente 2,5 millones de habitantes."
+            },
+            {
+              "titulo": "Transformación urbana",
+              "contenido": "La ciudad es reconocida por sus proyectos de urbanismo social, incluyendo el Metro, el Metrocable (teleférico para barrios marginales), las escaleras eléctricas de la Comuna 13, y el desarrollo de espacios públicos como el Parque de los Pies Descalzos."
+            },
+            {
+              "titulo": "Economía",
+              "contenido": "Medellín es un centro industrial importante, particularmente en textiles, confecciones y alimentos. También es líder en innovación y tecnología, con多家 empresas de tecnologías de la información y un ecosistema de startups en crecimiento."
+            }
+          ],
+          "categorias": ["geografia", "ciudad", "Colombia"]
+        },
+        {
+          "titulo": "Cali",
+          "resumen": "Cali es la tercera ciudad más grande de Colombia, capital del departamento del Valle del Cauca. Ubicada a 985 metros sobre el nivel del mar, es conocida como la 'Sucursal del Cielo' y es famosa por su cultura salsa y su gastronomía.",
+          "secciones": [
+            {
+              "titulo": "Geografía",
+              "contenido": "Cali se encuentra en el suroccidente de Colombia, a orillas del río Cauca. El clima es cálido tropical con temperatura promedio de 24°C. La ciudad tiene aproximadamente 2,2 millones de habitantes y es el centro urbano más importante de la región del Pacífico."
+            },
+            {
+              "titulo": "Cultura",
+              "contenido": "Cali es reconocida mundialmente como la capital de la salsa. El Festival de la Salsa atrae a bailarines de todo el mundo. La ciudad también es famosa por su gastronomía, particularmente por frutos como el mango, la papaya y la gulupa."
+            },
+            {
+              "titulo": "Economía",
+              "contenido": "La economía de Cali se basa en la industria (azúcar, alimentos procesados), el comercio, los servicios y el turismo. El puerto de Buenaventura, cercano a Cali, es el más importante del Pacífico suramericano."
+            }
+          ],
+          "categorias": ["geografia", "ciudad", "Colombia"]
+        },
+        {
+          "titulo": "Barranquilla",
+          "resumen": "Barranquilla es una ciudad portuaria ubicada en la desembocadura del río Magdalena al mar Caribe. Es la cuarta ciudad más grande de Colombia y un importante centro industrial y comercial, conocida por su famoso Carnaval.",
+          "secciones": [
+            {
+              "titulo": "Geografía",
+              "contenido": "Barranquilla se encuentra en el norte de Colombia, a orillas del río Magdalena. El clima es tropical cálido con temperatura promedio de 28°C. La ciudad tiene aproximadamente 1,2 millones de habitantes y es accesible por vía marítima y aérea."
+            },
+            {
+              "titulo": "Historia",
+              "contenido": "La ciudad se fundó oficialmente en 1813, aunque existed como asentamiento desde el siglo XVI. Se convirtió en el puerto más importante de Colombia durante la era republicana, siendo punto de entrada para inmigrantes europeos y mercancías."
+            },
+            {
+              "titulo": "Cultura",
+              "contenido": "Barranquilla es famosa por su Carnaval, considerado patrimonio cultural de Colombia. La ciudad tiene una cultura vibrante con influencias del Caribe, Andalucía y comunidades afrocolombianas. Su arquitectura incluye el estilo 'art decó'."
+            }
+          ],
+          "categorias": ["geografia", "ciudad", "Colombia"]
+        },
+        {
+          "titulo": "Andes",
+          "resumen": "La Cordillera de los Andes es la cadena montañosa más larga de América del Sur, extendiéndose por más de 7.000 km a lo largo de la costa occidental del continente. En Colombia, los Andes se dividen en tres ramales: Central, Oriental y Occidental.",
+          "secciones": [
+            {
+              "titulo": "Geografía",
+              "contenido": "Los Andes colombianos se extienden de norte a sur, formando un complejo sistema de montañas, valles y mesetas. Las tres cordilleras dejan entre sí valles interandinos donde se concentran las principales ciudades y tierras agrícolas."
+            },
+            {
+              "titulo": "Clima y ecosistemas",
+              "contenido": "Los Andes albergan una enorme biodiversidad, desde selvas tropicales en las laderas hasta páramos en las zonas más altas. Los páramos son ecosistemas únicos de alta montaña con vegetación adaptada al frío. La zona andina tiene clima templado."
+            },
+            {
+              "titulo": "Importancia",
+              "contenido": "Los Andes son fundamentales para Colombia: regulan el clima, son fuentes de agua dulce, y concentran la mayor parte de la población y la actividad económica. También son zonas de riesgo para deslizamientos y sismos."
+            }
+          ],
+          "categorias": ["geografia", "montaña", "Colombia"]
+        },
+        {
+          "titulo": "Amazonía",
+          "resumen": "La Amazonía colombiana abarca aproximadamente el 35% del territorio nacional, representando una de las regiones más biodiversas del planeta. Esta selva tropical es hogar de comunidades indígenas, flora y fauna únicas, y desempeña un papel crucial en la regulación climática global.",
+          "secciones": [
+            {
+              "titulo": "Geografía",
+              "contenido": "La Amazonía colombiana limita con Brasil, Perú y Ecuador. Incluye departamentos como Amazonas, Caquetá, Guainía, Putumayo, Vaupés y Guaviare. El río Amazonas y sus afluentes forman una red de navegación vital."
+            },
+            {
+              "titulo": "Biodiversidad",
+              "contenido": "La región es hogar de miles de especies de plantas, animales y aves. Se encuentran jaguares, anacondas, delfines rosados, guacamayas y miles de especies de insectos. La destrucción por deforestación es una amenaza creciente."
+            },
+            {
+              "titulo": "Pueblos indígenas",
+              "contenido": "La Amazonía colombiana alberga множество comunidades indígenas, incluyendo losaws, Tikunas, Cofanes y otros. Muchos dependen de la selva para su subsistencia y preservan conocimientos tradicionales sobre plantas medicinales y prácticas de caza."
+            }
+          ],
+          "categorias": ["geografia", "selva", "Colombia"]
+        },
+        {
+          "titulo": "Llanos Orientales",
+          "resumen": "Los Llanos Orientales son una vasta región de sabana ubicada en el este de Colombia, limítrofe con Venezuela. Es una de las regiones menos densamente pobladas del país, conocida por su vegetación de sabana, fauna silvestre y actividad ganadera.",
+          "secciones": [
+            {
+              "titulo": "Geografía",
+              "contenido": "Los Llanos Orientales abarcan los departamentos de Arauca, Casanare, Meta y Vichada. El terreno es mayormente plano con algunas colinas. Los ríos Meta y others drenan hacia el Orinoco. El clima tiene estación seca y húmeda definida."
+            },
+            {
+              "titulo": "Fauna",
+              "contenido": "La región es hogar de diversidad wildlife incluyendo osos perezosos, serpientes anacondas, caimanes, nutrias gigantes, y numerosas aves. Los cocodrilos y reptiles son comunes en los ríos. Laregion es importante para la conservación."
+            },
+            {
+              "titulo": "Actividad económica",
+              "contenido": "La ganadería extensiva es la principal actividad económica. También hay cultivos de arroz y palma de aceite. El petróleo se explota en algunas áreas, particularmente en Casanare y Meta. El ecoturismo está en desarrollo."
+            }
+          ],
+          "categorias": ["geografia", "sabana", "Colombia"]
+        },
+        {
+          "titulo": "Costa Pacífica",
+          "resumen": "La Costa Pacífica colombiana es una de las zonas más húmedas del planeta, con lluvias que superan los 12.000 mm anuales en algunas áreas. Es una región selvática y sparsely poblada, hogar de comunidades afrocolombianas e indígenas.",
+          "secciones": [
+            {
+              "titulo": "Geografía",
+              "contenido": "La Costa Pacífica incluye los departamentos de Chocó, Valle del Cauca, Cauca y Nariño. El terreno es extremadamente accidentado con muchas bahías y ensenadas. Los ríos son cortos y torrentosos. La selva es densa e impenetrable."
+            },
+            {
+              "titulo": "Clima",
+              "contenido": "La región recibe cantidades excepcionales de lluvia, creando un ambiente constantemente húmedo. El calor es constante (~28°C) y la humedad siempre alta. Estas condiciones crean ecosistemas únicos de selva tropical tropical."
+            },
+            {
+              "titulo": "Cultura",
+              "contenido": "Las comunidades afrocolombianas han habitado la región por siglos, manteniendo tradiciones culturales y musicales únicas. El Currulao (baile tradicional) y el bunde son expresiones culturales importantes. La región también tiene comunidades Emberá."
+            }
+          ],
+          "categorias": ["geografia", "costa", "Colombia"]
+        },
+        {
+          "titulo": "Sierra Nevada de Santa Marta",
+          "resumen": "La Sierra Nevada de Santa Marta es una formación montañosa aislada en el norte de Colombia, que alcanza 5.775 metros en el pico Cristóbal Colón. Es uno de los puntos más altos de Colombia y un hotspot de biodiversidad con ecosistemas que van desde selva tropical hasta bosque nublado.",
+          "secciones": [
+            {
+              "titulo": "Geografía",
+              "contenido": "La Sierra Nevada se eleva abruptamente desde la costa Caribe, alcanzando su punto más alto en el Pico Cristóbal Colón (5.775 m). Está separada de los Andes por valles bajos. La nieve perpetua se encuentra en las cumbres más altas."
+            },
+            {
+              "titulo": "Biodiversidad",
+              "contenido": "La Sierra Nevada es reconocida como uno de los puntos calientes de biodiversidad del mundo. Alberga desde bosque seco tropical hasta bosque nublado y páramo. Endémicas species incluyen osos de anteojos, venados, y nombreuses plantas únicas."
+            },
+            {
+              "titulo": "Pueblos indígenas",
+              "contenido": "La Sierra Nevada es sagrada para cuatro pueblos indígenas: Arhuacos, Kogui, Wiwa y Kankuamos. Consideran la montaña como el corazón del mundo y protegen áreas sagradas. Los Tayrona y otros pueblos históricos también habitaron la región."
+            }
+          ],
+          "categorias": ["geografia", "montaña", "Colombia"]
+        }
+      ]
+    },
+    "tecnologia": {
+      "descripcion": "Artículos de tecnología y comunicaciones mesh",
+      "articulos": [
+        {
+          "titulo": "Red mesh",
+          "resumen": "Una red mesh (o red de malla) es una topología de red en la que cada nodo coopera para redirigir datos. A diferencia de las redes tradicionales que dependen de un punto central, las redes mesh son descentralizadas y pueden funcionar incluso cuando algunos nodos fallan o están desconectados.",
+          "secciones": [
+            {
+              "titulo": "Funcionamiento",
+              "contenido": "Cada dispositivo en una red mesh puede recibir, transmitir y repetir mensajes. Cuando un dispositivo envía un mensaje, los nodos intermedios lo reenvían hasta que alcance el destino. Cuantos más nodos haya, mayor será el alcance y la confiabilidad de la red."
+            },
+            {
+              "titulo": "Aplicaciones",
+              "contenido": "Las redes mesh son ideales para comunicación de emergencia, áreas rurales sin infraestructura, eventos temporales, y situaciones donde la infraestructura convencional ha fallado. También se usan en IoT (Internet de las cosas) y redes de sensores."
+            },
+            {
+              "titulo": "Ventajas",
+              "contenido": "No depende de infraestructura central. Se autoreconfigura si un nodo falla. Extiende el alcance al usar nodos intermedios. Funciona sin internet ni celular. Cada dispositivo agregado mejora la red."
+            }
+          ],
+          "categorias": ["tecnologia", "comunicacion", "mesh"]
+        },
+        {
+          "titulo": "WiFi Direct",
+          "resumen": "WiFi Direct es un estándar de comunicación que permite a dispositivos conectarse directamente entre sí sin necesidad de un punto de acceso o router. Es fundamental para la comunicación mesh en dispositivos móviles.",
+          "secciones": [
+            {
+              "titulo": "Características",
+              "contenido": "WiFi Direct permite conexiones punto a punto entre dispositivos. La velocidad puede alcanzar la de WiFi convencional (hasta 250 Mbps). El alcance típico es de 20-200 metros dependiendo del entorno y los dispositivos."
+            },
+            {
+              "titulo": "Uso en mesh",
+              "contenido": "WiFi Direct es usado para crear enlaces directos entre dispositivos mesh. Permite que dispositivos se descubran mutuamente y establezcan conexiones sin intervención del usuario. Es más rápido que Bluetooth para transferencia de datos."
+            },
+            {
+              "titulo": "Limitaciones",
+              "contenido": "El consumo de batería es mayor que Bluetooth. No todos los dispositivos soportan WiFi Direct. La conexión puede ser menos estable que conexiones tradicionales. El rango está limitado comparado con otros métodos."
+            }
+          ],
+          "categorias": ["tecnologia", "comunicacion", "wifi"]
+        },
+        {
+          "titulo": "Bluetooth",
+          "resumen": "Bluetooth es una tecnología de comunicación inalámbrica de corto alcance que permite el intercambio de datos entre dispositivos. En el contexto de redes mesh, se usa principalmente para el descubrimiento inicial y emparejamiento de dispositivos.",
+          "secciones": [
+            {
+              "titulo": "Versiones y alcance",
+              "contenido": "Bluetooth Classic: hasta 100 metros, mayor consumo de batería. Bluetooth Low Energy (BLE): hasta 50 metros, mínimo consumo. BLE es preferido para dispositivos IoT y aplicaciones de bajo consumo. La versión 5.0 mejora significativamente el alcance."
+            },
+            {
+              "titulo": "Uso en mesh",
+              "contenido": "Bluetooth se usa para descubrir dispositivos mesh cercanos y facilitar la conexión inicial. También puede transmitir datos de baja prioridad cuando WiFi Direct no está disponible. El bajo consumo lo hace útil para nodos con batería limitada."
+            },
+            {
+              "titulo": "Consideraciones",
+              "contenido": "La conexión Bluetooth puede ser interferida por otros dispositivos electrónicos. El emparejamiento inicial puede requerir proximidad física. La velocidad es menor que WiFi Direct, pero suficiente para mensajes de texto."
+            }
+          ],
+          "categorias": ["tecnologia", "comunicacion", "bluetooth"]
+        },
+        {
+          "titulo": "Cifrado de extremo a extremo",
+          "resumen": "El cifrado de extremo a extremo (E2EE) es un sistema de comunicación donde solo el emisor y el receptor pueden leer los mensajes. Los mensajes se cifran en el dispositivo del emisor y solo se descifran en el dispositivo del receptor, incluso si son interceptados en el camino.",
+          "secciones": [
+            {
+              "titulo": "Cómo funciona",
+              "contenido": "Cada usuario tiene un par de claves: una pública (para cifrar) y una privada (para descifrar). El emisor usa la clave pública del receptor para cifrar el mensaje. Solo el receptor puede descifrarlo con su clave privada."
+            },
+            {
+              "titulo": "Ventajas",
+              "contenido": "Garantiza privacidad incluso si la red es comprometida. Los nodos intermedios no pueden leer el contenido. Protege contra vigilancia masiva. Es esencial para comunicación sensible."
+            },
+            {
+              "titulo": "Limitaciones",
+              "contenido": "La metadata (quién se comunica con quién, cuándo) puede ser visible. Si la clave privada es comprometida, toda la comunicación pasada puede ser descifrada. La gestión de claves requiere infraestructura."
+            }
+          ],
+          "categorias": ["tecnologia", "seguridad", "privacidad"]
+        },
+        {
+          "titulo": "GPS",
+          "resumen": "El Sistema de Posicionamiento Global (GPS) es una red de satélites que proporciona información de ubicación y tiempo a receptores en cualquier lugar del mundo. Es esencial para navegación, seguimiento y aplicaciones de emergencia.",
+          "secciones": [
+            {
+              "titulo": "Funcionamiento",
+              "contenido": "El GPS usa una constelación de más de 30 satélites que orbitan la Tierra. Un receptor GPS calcula su posición midiendo el tiempo que tarda la señal de al menos 4 satélites en llegar. Con esta información, calcula latitud, longitud y altitud."
+            },
+            {
+              "titulo": "Precisión",
+              "contenido": "La precisión típica de GPS civil es de 3-5 metros. Factores que reducen precisión: edificios altos, selva densa, techos. El GPS diferencial (DGPS) puede mejorar la precisión a menos de 1 metro."
+            },
+            {
+              "titulo": "Consumo de batería",
+              "contenido": "El GPS es uno de los mayores consumidores de batería en dispositivos móviles. Para preservar batería, use GPS solo cuando sea necesario y desactive el seguimiento continuo. El modo de bajo consumo reduce precisión pero extiende batería."
+            }
+          ],
+          "categorias": ["tecnologia", "navegacion", "GPS"]
+        },
+        {
+          "titulo": "SQLite",
+          "resumen": "SQLite es un sistema de gestión de base de datos relacional que no requiere un servidor separado. Los datos se almacenan en un único archivo, lo que lo hace ideal para aplicaciones móviles y sistemas embebidos que necesitan almacenamiento local eficiente.",
+          "secciones": [
+            {
+              "titulo": "Características",
+              "contenido": "SQLite no requiere configuración ni administración. Es extremadamente ligero y rápido. Soporta transacciones ACID. El archivo de base de datos es portable entre plataformas. Es ampliamente utilizado en aplicaciones móviles."
+            },
+            {
+              "titulo": "Búsqueda Full-Text (FTS)",
+              "contenido": "La extensión FTS5 permite búsqueda de texto completo muy eficiente. Permite buscar palabras y frases en grandes volúmenes de texto. Es ideal para diccionarios y bases de conocimiento offline."
+            },
+            {
+              "titulo": "Uso en apps offline",
+              "contenido": "SQLite permite almacenar grandes cantidades de datos estructurados localmente. Con FTS5, las búsquedas son rápidas incluso con miles de registros. Ideal para diccionarios, enciclopedias y bases de datos de emergencia."
+            }
+          ],
+          "categorias": ["tecnologia", "bases_de_datos", "offline"]
+        },
+        {
+          "titulo": "JSON",
+          "resumen": "JSON (JavaScript Object Notation) es un formato de texto ligero para el intercambio de datos. Es fácil de leer para humanos y fácil de parsear para máquinas. Es el formato estándar para datos estructurados en aplicaciones web y móviles.",
+          "secciones": [
+            {
+              "titulo": "Estructura",
+              "contenido": "JSON usa pares clave-valor: {'clave': 'valor'}. Soporta objetos: {'nombre': 'Juan', 'edad': 30}. Soporta arrays: [1, 2, 3]. Los tipos de datos incluyen strings, números, booleanos, nulos, objetos y arrays."
+            },
+            {
+              "titulo": "Ventajas",
+              "contenido": "Es legible y fácil de entender. Se parsea rápidamente en la mayoría de lenguajes. Es más ligero que XML. Es el formato nativo de JavaScript, lo que facilita su uso en web."
+            },
+            {
+              "titulo": "Compresión",
+              "contenido": "Los archivos JSON pueden comprimirse significativamente con gzip (50-80% de reducción). Esto es crucial para almacenamiento offline y transmisión en redes de bajo ancho de banda."
+            }
+          ],
+          "categorias": ["tecnologia", "formato", "datos"]
+        },
+        {
+          "titulo": "GeoJSON",
+          "resumen": "GeoJSON es un formato para codificar estructuras geoespaciales usando JavaScript Object Notation. Permite representar puntos, líneas y polígonos con sus coordenadas y propiedades, siendo ideal para mapas y datos geográficos.",
+          "secciones": [
+            {
+              "titulo": "Tipos de geometría",
+              "contenido": "Point: un par de coordenadas [lng, lat]. LineString: array de puntos que forman una línea. Polygon: array de anillos (exterior e interiores). También soporta MultiPoint, MultiLineString y MultiPolygon."
+            },
+            {
+              "titulo": "Estructura",
+              "contenido": "Un objeto GeoJSON tiene type ('FeatureCollection' o 'Feature'), y features que contienen geometry y properties. Las properties pueden incluir nombre, tipo, dirección, teléfono y otros datos relevantes."
+            },
+            {
+              "titulo": "Uso en mapas offline",
+              "contenido": "GeoJSON es ideal para puntos de interés: hospitales, estaciones de bomberos, refugios. También puede representar rutas y fronteras. MapLibre y otras bibliotecas pueden renderizar GeoJSON directamente."
+            }
+          ],
+          "categorias": ["tecnologia", "geoespacial", "mapas"]
+        },
+        {
+          "titulo": "Baterías de lithium-ion",
+          "resumen": "Las baterías de lithium-ion (Li-ion) son el tipo más común de batería recargable en dispositivos electrónicos modernos. Ofrecen alta densidad de energía, bajo peso y ausencia de efecto memoria, pero requieren manejo cuidadoso para maximizar su vida útil.",
+          "secciones": [
+            {
+              "titulo": "Características",
+              "contenido": "Las baterías Li-ion tienen una densidad de energía alta (150-250 Wh/kg). No sufren de efecto memoria como las antiguas NiMH. Se degradan con el tiempo y uso, incluso sin usar. El voltaje típico es 3.6-3.7V por celda."
+            },
+            {
+              "titulo": "Optimización de vida útil",
+              "contenido": "Evite cargar al 100% si no es necesario (optimal 20-80%). Evite descargar completamente regularmente. Mantenga entre 20-80% para almacenamiento largo. El calor acelera la degradación. Use cargadores originales."
+            },
+            {
+              "titulo": "Seguridad",
+              "contenido": "Las baterías Li-ion pueden incendiarse si se dañan o sobrecalientan. No perfore, aplaste ni exponga al fuego. Use uniquement con dispositivos que tengan protección de circuito. Deséchelas en puntos de recolección especializados."
+            }
+          ],
+          "categorias": ["tecnologia", "baterias", "hardware"]
+        },
+        {
+          "titulo": "Energía solar portátil",
+          "resumen": "Los paneles solares portátiles permiten cargar dispositivos electrónicos usando energía del sol. Son esenciales para comunicación de emergencia cuando no hay acceso a electricidad. La eficiencia y portabilidad varían según el tipo y tamaño.",
+          "secciones": [
+            {
+              "titulo": "Tipos de paneles",
+              "contenido": "Paneles rígidos: más eficientes pero menos portátiles. Paneles flexibles: pueden adaptarse a superficies curve, menos eficientes. Paneles plegables: buen equilibrio entre portabilidad y eficiencia."
+            },
+            {
+              "titulo": "Especificaciones",
+              "contenido": "Potencia: 5W-100W+. Voltaje de salida: USB 5V/9V/12V, o conectores específicos. Eficiencia: 15-23% para paneles de silicio cristalino. El tamaño determina la potencia: 10x10 cm ~ 1-2W."
+            },
+            {
+              "titulo": "Uso efectivo",
+              "contenido": "Oriente el panel perpendicular al sol para máxima producción. Evite sombras parciales. Use controlador de carga para proteger baterías. Combine con banco de energía para almacenar energía."
+            }
+          ],
+          "categorias": ["tecnologia", "energia", "solar"]
+        }
+      ]
+    },
+    "historia": {
+      "descripcion": "Artículos históricos relevantes",
+      "articulos": [
+        {
+          "titulo": "Historia de Colombia",
+          "resumen": "La historia de Colombia abarca desde las culturas indígenas precolombinas hasta la Colombia moderna. El territorio fue habitado por pueblos como los Muisca, Tayrona y Quimbaya antes de la conquista española en 1492. Desde entonces, Colombia ha experimentado colonization, independencia, conflictos civiles y violencia.",
+          "secciones": [
+            {
+              "titulo": "Época precolombina",
+              "contenido": "Los Muisca fueron la civilización más avanzada, conocidos por sus templos de oro y el mito de El Dorado. Los Tayrona construyeron ciudades en la Sierra Nevada. Los Quimbaya crearon cerámica y orfebrería sofisticada."
+            },
+            {
+              "titulo": "Independencia",
+              "contenido": "El movimiento independentista comenzó con el grito de independencia el 20 de julio de 1810 en Bogotá. Simón Bolívar y Francisco de Paula Santander lideraron la lucha. La batalla de Boyacá (1819) selló la independencia."
+            },
+            {
+              "titulo": "Siglo XX y contemporánea",
+              "contenido": "Colombia experimentó violencia política entre liberales y conservadores (La Violencia, 1948-1958). El conflicto con las FARC comenzó en 1964. El acuerdo de paz de 2016 buscó terminar el conflicto. Hoy Colombia enfrenta desafíos de reconstruir la paz."
+            }
+          ],
+          "categorias": ["historia", "Colombia", "pais"]
+        },
+        {
+          "titulo": "Grito de Independencia",
+          "resumen": "El 20 de julio de 1810 es considerado el inicio del movimiento independentista colombiano. Ese día, los bogotanos se resistieron al intentos de cobro de impuestos por parte de las autoridades españolas, lo que desató una revuelta popular que eventualmente llevó a la independencia.",
+          "secciones": [
+            {
+              "titulo": "Contexto",
+              "contenido": "La situación en Europa (ocupación napoleónica de España) debilitó el control colonial. Los criollos querían mayor participación política. Las tensiones comerciales y sociales aumentaban. La influencia de la revolución francesa e ilustración también fue importante."
+            },
+            {
+              "titulo": "Los eventos",
+              "contenido": "El 20 de julio, la/joven)龚潘á scopió el尔 Welik es un incidente dondeAntonio Nariño distribuyó traducciones de derechos humanos. Esto conmemоcrate ahora como el Grito de Independencia, aunque la independence se consolidó 9 años después."
+            },
+            {
+              "titulo": "Legado",
+              "contenido": "El 20 de julio es la fiesta nacional de Colombia. Se celebra con desfiles militares y civismo. La fecha símbolo la unión y el espíritu independentista del pueblo colombiano."
+            }
+          ],
+          "categorias": ["historia", "Colombia", "independencia"]
+        },
+        {
+          "titulo": "Acuerdo de Paz de 2016",
+          "resumen": "El Acuerdo de Paz entre el gobierno colombiano y las FARC-EP (Fuerzas Armadas Revolucionarias de Colombia-Ejército del Pueblo) fue firmado el 24 de noviembre de 2016 en Bogotá, después de cuatro años de negociaciones en La Habana, Cuba.",
+          "secciones": [
+            {
+              "titulo": "Contenido del acuerdo",
+              "contenido": "El acuerdo incluyó: alto el fuego definitivo, dejación de armas por las FARC, reformas rurales, participación política de la guerrilla, lucha contra el narcotráfico, sistema de justicia transicional (JEP), y поиск de personas desaparecidas."
+            },
+            {
+              "titulo": "Implementación",
+              "contenido": "Las FARC se convirtieron en partido político (hoy Fuerza Alternativa Revolucionaria del Común). Se implementó la JEP para juzgar crímenes de guerra. Algunos excombatientes han sido asesinados. La implementación sigue en proceso."
+            },
+            {
+              "titulo": "Controversias",
+              "contenido": "El acuerdo fue rechazado en el plebiscito del 2 de octubre de 2016. El gobierno implementar одобренный измененный acuerdo. Algunos critican que no fue suficientemente severo. El debate sobre la paz y la justicia continúa en Colombia."
+            }
+          ],
+          "categorias": ["historia", "Colombia", "conflicto"]
+        },
+        {
+          "titulo": "Cultura Muisca",
+          "resumen": "Los Muisca fueron una de las civilizaciones precolombinas más avanzadas de Colombia. Habitaron el altiplano cundiboyacense, donde hoy está Bogotá. Eran conocidos por su trabajo en oro, sus avanzados sistemas de comercio y su organización política confederada.",
+          "secciones": [
+            {
+              "titulo": "Sociedad",
+              "contenido": "La sociedad muisca tenía estructura jerárquica: zipas (reyes) en Sugamuxi y Hunza. Los caciques gobernaban territorios menores. Existían diferencias de clase entre nobles, guerreros, comunes y奴婢. El comercio era sofisticado, usando moedas de sal como moneda."
+            },
+            {
+              "titulo": "Creencias",
+              "contenido": "Creían en un ser supremo (Nencatacoa) y en la inmortalidad del alma. Practicaban chamanismo con uso de coca y tabaco. El rito del Dorado era una ceremonia donde el nuevo zipa se cubría de oro y plung into el lago de Guatavita."
+            },
+            {
+              "titulo": "Legado",
+              "contenido": "Los Muisca dejaron avanzados sistemas de irrigación. Su orfebrería es famosa mundialmente (poporoqueno). La cultura muisca influye en la identidad de Colombia. Muchos mitos, como el de El Dorado, provienen de tradiciones muiscas."
+            }
+          ],
+          "categorias": ["historia", "precolombino", "Colombia"]
+        },
+        {
+          "titulo": "Independencia de América Latina",
+          "resumen": "La independencia de América Latina fue un proceso que occurred entre 1810 y 1825, driven por una combinación de factores: el debilitamiento de España por las guerras napoleónicas, el ejemplo de la Revolución Francesa y Americana, y la creciente discontent de los criollos con el dominio español.",
+          "secciones": [
+            {
+              "titulo": "Factores",
+              "contenido": "La ocupación francesa de España (1808) creó un vacío de poder. Las ideas de la Ilustración inspiraron a los revolucionarios. La invasión napoleónica a España hizo que los territorios buscasen autogobierno. El comercio con Inglaterra también fue un factor."
+            },
+            {
+              "titulo": "Líderes principales",
+              "contenido": "Simón Bolívar: libertador de Venezuela, Colombia, Ecuador, Perú y Bolivia. José de San Martín: libertador de Argentina, Chile y Perú. Otros leaders: Bernardo O'Higgins en Chile, José de Sucre en Bolívar's campaigns."
+            },
+            {
+              "titulo": "Consecuencias",
+              "contenido": "Se formaron varias repúblicas independientes. Los ideales de libertad y republicanismo se spread. Sin embargo, soon emergieron conflictos entre unitarios y federalistas. La herencia colonial también dejó challenges para la construcción nacional."
+            }
+          ],
+          "categorias": ["historia", "independencia", "America"]
+        }
+      ]
+    },
+    "ciencia": {
+      "descripcion": "Artículos de ciencia general",
+      "articulos": [
+        {
+          "titulo": "Ciclo del agua",
+          "resumen": "El ciclo del agua (ciclo hidrológico) es el proceso continuo de movimiento del agua sobre, dentro y sobre la superficie terrestre. Este ciclo incluye evaporación, condensación, precipitación, infiltración y escorrentía. Es esencial para la vida y regula el clima del planeta.",
+          "secciones": [
+            {
+              "titulo": "Etapas del ciclo",
+              "contenido": "Evaporación: el agua de océanos, lagos y ríos se convierte en vapor. Transpiración: las plantas liberan agua a la atmósfera. Condensación: el vapor se convierte en nubes. Precipitación: el agua cae como lluvia, nieve o granizo. Escorrentía: el agua fluye hacia ríos y océanos."
+            },
+            {
+              "titulo": "Importancia",
+              "contenido": "El ciclo del agua distribuye agua dulce por todo el planeta. Regula la temperatura global. Permite la vida al proporcionar agua dulce. Los cambios en el ciclo pueden causar sequías o inundaciones."
+            },
+            {
+              "titulo": "Impacto humano",
+              "contenido": "La contaminación afecta la calidad del agua. La deforestation interrumpe el ciclo local. La extracción excesiva agota acuíferos. El cambio climático altera los patrones de precipitación."
+            }
+          ],
+          "categorias": ["ciencia", "medioambiente", "agua"]
+        },
+        {
+          "titulo": "Electricidad básica",
+          "resumen": "La electricidad es el flujo de electrones a través de un conductor. Los conceptos básicos incluyen voltaje (presión eléctrica), corriente (flujo de electrones) y resistencia (oposición al flujo). La comprensión de estos principios es esencial para usar y generar electricidad de manera segura.",
+          "secciones": [
+            {
+              "titulo": "Conceptos fundamentales",
+              "contenido": "Voltaje (V): diferencia de potencial eléctrico que impulsa el flujo. Corriente (A): cantidad de electrones que fluyen por segundo. Resistencia (Ω): oposición al flujo de corriente. Potencia (W): energía por unidad de tiempo, calculada como V × A."
+            },
+            {
+              "titulo": "Corriente alterna vs directa",
+              "contenido": "Corriente alterna (AC): cambia de dirección periódicamente. Es la forma de electricidad en hogares porque puede transmitirse a grandes distancias fácilmente. Corriente directa (DC): fluye en una sola dirección. Es la forma de baterías y electrónica."
+            },
+            {
+              "titulo": "Seguridad eléctrica",
+              "contenido": "El agua es conductora; no use aparatos eléctricos con las manos mojadas. Los circuitos sobrecargados pueden causar incendios. La electricidad puede causar quemaduras, fibrilación cardíaca y paro respiratorio."
+            }
+          ],
+          "categorias": ["ciencia", "tecnologia", "electicidad"]
+        },
+        {
+          "titulo": "Sistema solar",
+          "resumen": "El sistema solar consiste en el Sol y los objetos que orbitan a su alrededor: ocho planetas, sus lunas, asteroides, cometas y polvo cósmico. Los planetas se dividen en interiores rocosos (Mercurio, Venus, Tierra, Marte) y gigantes gasosos (Júpiter, Saturno, Urano, Neptuno).",
+          "secciones": [
+            {
+              "titulo": "Estructura",
+              "contenido": "El Sol contiene el 99.86% de la masa del sistema solar. Los planetas interiores tienen superficies sólidas. Los exteriores son gigantes de gas o hielo. Entre Marte y Júpiter está el cinturón de asteroides."
+            },
+            {
+              "titulo": "La Tierra",
+              "contenido": "La Tierra es el tercer planeta desde el Sol. Tiene un satélite natural: la Luna. Su distancia al Sol (150 millones de km) permite condiciones para la vida. Su atmósfera y campo magnético la protegen de radiación."
+            },
+            {
+              "titulo": "Exploración espacial",
+              "contenido": "El primer humano en el espacio fue Yuri Gagarin (1961). El Apollo 11 llegó a la Luna en 1969. Voyager 1 y 2 son las sondas que más lejos han llegado. Mars rovers exploran el planeta rojo."
+            }
+          ],
+          "categorias": ["ciencia", "astronomia", "espacio"]
+        },
+        {
+          "titulo": "Fotosíntesis",
+          "resumen": "La fotosíntesis es el proceso por el cual las plantas convierten la luz solar en energía química. Usan clorofila para capturar la luz, dióxido de carbono del aire y agua del suelo para producir glucosa y oxígeno. Este proceso es fundamental para la vida en la Tierra.",
+          "secciones": [
+            {
+              "titulo": "El proceso",
+              "contenido": "La fotosíntesis ocurre en los cloroplastos de las células vegetales. La luz proporciona energía para dividir el agua (H2O) en hidrógeno y oxígeno. El hidrógeno se combina con CO2 para formar glucosa (C6H12O6). El oxígeno (O2) se libera como subproducto."
+            },
+            {
+              "titulo": "Importancia",
+              "contenido": "La fotosíntesis produce el oxígeno que respiramos. Es la base de la mayoría de las cadenas alimenticias. Absorbe CO2, ayudando a regular el clima. La energía almacenada en plantas es la fuente de combustibles fósiles."
+            },
+            {
+              "titulo": "Aplicaciones",
+              "contenido": "El conocimiento de la fotosíntesis ayuda a desarrollar cultivos más eficientes. La energía solar artificial busca imitar este proceso. Los incendios liberan el carbono almacenado por las plantas."
+            }
+          ],
+          "categorias": ["ciencia", "biologia", "plantas"]
+        },
+        {
+          "titulo": "Física del sonido",
+          "resumen": "El sonido es una onda mecánica que viaja a través de un medio (aire, agua, sólidos) mediante la vibración de moléculas. Las características del sonido incluyen frecuencia (tono), amplitud (volumen) y timbre (calidad). La velocidad del sonido en aire es aproximadamente 343 m/s.",
+          "secciones": [
+            {
+              "titulo": "Ondas sonoras",
+              "contenido": "El sonido se propaga como ondas de compresión. Necesita un medio para viajar; no puede propagate en el vacío. La frecuencia se mide en Hertz (Hz). Los humanos percibimos frecuencias entre 20 Hz y 20.000 Hz."
+            },
+            {
+              "titulo": "Comunicación",
+              "contenido": "Los silbatos producen tonos agudos que viajan lejos. Las frecuencias bajas atraviesan obstáculos mejor. La lluvia puede reducir la propagación del sonido. El eco ocurre cuando el sonido rebota en superficies."
+            },
+            {
+              "titulo": "Seguridad",
+              "contenido": "La exposición prolongada a sonidos acima de 85 dB puede dañar la audición. Los gritos pueden alcanzar 90 dB. Los silbatos de emergencia están diseñados para ser oído a larga distancia sin dañar la audición."
+            }
+          ],
+          "categorias": ["ciencia", "fisica", "sonido"]
+        },
+        {
+          "titulo": "Ecosistemas",
+          "resumen": "Un ecosistema es una comunidad de organismos vivos que interactúan entre sí y con su entorno físico. Los componentes incluyen productores (plantas), consumidores (animales) y descomponedores (hongos, bacterias). Los ecosistemas pueden ser terrestres, acuáticos o mixtos.",
+          "secciones": [
+            {
+              "titulo": "Estructura",
+              "contenido": "Los productores (plantas) convierten energía solar en materia orgánica. Los consumidores primarios (herbívoros) comen plantas. Los consumidores secundarios (carnívoros) comen herbívoros. Los descomponedores recyclan nutrientes."
+            },
+            {
+              "titulo": "Cadenas alimenticias",
+              "contenido": "La energía fluye de un nivel trópico a otro. Solo ~10% de la energía se transfiere entre niveles. Por esto hay menos depredadores que presas. Los ecosistemas saludables mantienen el balance entre niveles."
+            },
+            {
+              "titulo": "Equilibrio",
+              "contenido": "Los ecosistemas buscan equilibrio dinámico. La removal de una especie afecta a otras. Los humanos somos parte de los ecosistemas y los affectamos significativamente."
+            }
+          ],
+          "categorias": ["ciencia", "ecologia", "biologia"]
+        },
+        {
+          "titulo": "Climatología básica",
+          "resumen": "El clima es el patrón promedio del tiempo atmosférico en una región a lo largo del tiempo. Los factores que influences el clima incluyen latitud, altitud, distancia al mar, corrientes oceánicas y vegetación. El cambio climático es la alteración de estos patrones.",
+          "secciones": [
+            {
+              "titulo": "Factores climáticos",
+              "contenido": "Latitud: más calor en el ecuador, menos en los polos. Altitud: temperatura decreases ~6.5°C por cada 1000m. Oceanidad: las costas tienen climas más templados que el interior. Corrientes oceánicas afectan temperatura y precipitación."
+            },
+            {
+              "titulo": "Fenómenos de El Niño y La Niña",
+              "contenido": "El Niño: calentamiento del Pacífico oriental, causa sequía en Colombia. La Niña: enfriamiento del Pacífico, causa lluvias intensas en Colombia. Ambos phenomena afectan agricultura, infraestructura y vidas."
+            },
+            {
+              "titulo": "Cambio climático",
+              "contenido": "El aumento de CO2 atrapa más calor en la atmósfera. Esto causa derretimiento de hielo, aumento del nivel del mar, y eventos climáticos extremos. Colombia ya experimenta cambios en patrones de lluvia y temperatura."
+            }
+          ],
+          "categorias": ["ciencia", "clima", "medioambiente"]
+        }
+      ]
+    }
+  }
+}
