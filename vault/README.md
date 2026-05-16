@@ -1,4 +1,4 @@
-[README.md](https://github.com/user-attachments/files/27855209/README.md)
+[README.md](https://github.com/user-attachments/files/27855734/README.md)
 # Red Mesh Vault - Contenido Offline
 
 **Versión:** 1.0.0
@@ -88,18 +88,37 @@ El vault es ligero (~45 MB comprimidos) y puede descomprimirse directamente en l
 
 20 rutas principales entre ciudades con distancias.
 
+### 6. Traductor Offline (Opcional) (`translator/`)
+
+Modelo de traducción Hy-MT de Tencent para comunicación multilingüe:
+
+- **Tamaño:** 462 MB (descarga separada)
+- **Idiomas:** 33 idiomas + 5 dialectos
+- **Traducciones:** 1,056 direcciones
+- **Idiomas clave:** Español, Inglés, Francés, Portugués, Chino, Japonés, Coreano, y más
+
+**Descarga:** Ejecutar `translator/download_model.sh` o descargar desde Hugging Face.
+
+Para más información, ver `translator/README.md`.
+
 ---
 
 ## Requisitos de Instalación
 
-### Requisitos del dispositivo:
+### Requisitos del dispositivo (base):
 - **Android 8.0 (API 26)** o superior
 - **500 MB** de almacenamiento libre
 - **2 GB RAM** mínimo recomendado
 
+### Requisitos del dispositivo (con traductor):
+- **Android 8.0 (API 26)** o superior
+- **1 GB** de almacenamiento libre
+- **3 GB RAM** mínimo recomendado
+
 ### Requisitos de la aplicación:
 - Compatible con **Kiwix SDK** para navegación Wikipedia
 - Compatible con **MapLibre** para mapas offline
+- Compatible con **llama.cpp** para traductor offline
 - Funciona **100% offline**
 
 ---
@@ -139,6 +158,12 @@ vault/
 ├── maps/
 │   ├── colombia_emergencias.geojson  # Ciudades y rutas
 │   └── colombia_emergencias.geojson.gz
+├── translator/                # Traductor offline (opcional)
+│   ├── README.md             # Documentación del traductor
+│   ├── download_model.sh     # Script de descarga del modelo
+│   ├── translator_config.json # Configuración
+│   ├── example_usage.py       # Ejemplo de uso en Python
+│   └── Hy-MT1.5-1.8B-1.25bit.gguf  # Modelo (descarga separada)
 └── assets/                    # Para recursos futuros
 ```
 
@@ -154,6 +179,13 @@ Todos los archivos JSON incluyen versiones comprimidas en gzip (.gz). La aplicac
 
 ## Notas sobre Contenido Adicional
 
+### Traductor Offline Hy-MT (462 MB) - RECOMENDADO:
+Descarga el modelo de traducción desde Hugging Face:
+```
+https://huggingface.co/AngelSlim/Hy-MT1.5-1.8B-1.25bit-GGUF/resolve/main/Hy-MT1.5-1.8B-1.25bit.gguf
+```
+O usa el script incluido: `translator/download_model.sh`
+
 ### Para Wikipedia completo (~200 MB):
 Descarga el archivo ZIM más reciente desde:
 ```
@@ -167,6 +199,18 @@ https://download.geofabrik.de/south-america/colombia-latest.osm.pbf
 ```
 
 Estos archivos son opcionales y no están incluidos en el vault base.
+
+---
+
+## Resumen de Tamaños
+
+| Componente | Tamaño | Estado |
+|------------|--------|--------|
+| Vault base | ~1 MB | ✅ Incluido |
+| Traductor Hy-MT | 462 MB | ⬇️ Descarga separada |
+| **Total con todo** | **~463 MB** | ✅ Bajo 1 GB |
+
+El traductor offline es completamente opcional. El vault base (~1 MB) funciona sin él.
 
 ---
 
