@@ -1,13 +1,17 @@
 {
-  "version": "1.0.0",
+  "version": "1.1.0",
   "fecha": "2026-05-16",
   "descripcion": "Vault offline para Red Mesh sin Internet - App de comunicación mesh sin conexión",
-  "tamano_total_estimado": "450 MB",
+  "tamano_total_base": "1 MB",
+  "tamano_con_traductor": "463 MB",
+  "tamano_limite_app": "1 GB",
+  "margen_para_extras": "~537 MB disponible",
   "requisitos": {
     "version_android_minima": "8.0 (API 26)",
-    "almacenamiento_necesario": "500 MB",
+    "almacenamiento_necesario": "500 MB (sin traductor), 1 GB (con traductor)",
+    "ram_recomendada": "2 GB (3 GB si se usa traductor)",
     "funciona_offline": true,
-    "compatibilidad": ["Kiwix SDK para Wikipedia", "MapLibre para mapas offline"]
+    "compatibilidad": ["Kiwix SDK para Wikipedia", "MapLibre para mapas offline", "llama.cpp para traductor"]
   },
   "secciones": [
     {
@@ -70,6 +74,20 @@
       "formato": "Markdown",
       "tamano": "10 KB",
       "descripcion": "Documentación completa de uso del vault"
+    },
+    {
+      "nombre": "Traductor Offline Hy-MT",
+      "ruta": "translator/",
+      "formato": "GGUF (modelo IA)",
+      "tamano": "462 MB",
+      "descripcion": "Modelo de traducción de Tencent: 33 idiomas, 1056 direcciones de traducción. Requiere descarga separada.",
+      "archivos": [
+        "translator/README.md",
+        "translator/download_model.sh",
+        "translator/translator_config.json",
+        "translator/example_usage.py"
+      ],
+      "nota": "El archivo .gguf (462 MB) debe descargarse manualmente. Ver translator/download_model.sh"
     }
   ],
   "metadata": {
