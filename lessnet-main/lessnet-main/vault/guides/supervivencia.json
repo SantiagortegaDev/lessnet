@@ -1,0 +1,742 @@
+{
+  "version": "1.0",
+  "fecha": "2026-05-16",
+  "total_guias": 15,
+  "guias": [
+    {
+      "id": "guia_01",
+      "titulo": "Cómo conseguir agua potable",
+      "categoria": "supervivencia",
+      "prioridad": "critica",
+      "resumen": "Guía completa para encontrar, purificar y almacenar agua potable en situaciones de emergencia sin acceso a servicios básicos.",
+      "pasos": [
+        {
+          "numero": 1,
+          "titulo": "Identificar fuentes de agua",
+          "descripcion": "Busca agua en fuentes naturales como ríos, arroyos, lagos y lagunas. También puedes recolectar agua de lluvia usando materiales plásticos o lonas. Otras fuentes incluyen agua acumulada en huecos de árboles, rocas y contenedores artificiales.",
+          "advertencia": "Nunca bebas agua estancada con olor desagradable o color extraño. Evita agua cerca de zonas industriales o agrícolas."
+        },
+        {
+          "numero": 2,
+          "titulo": "Filtrar el agua",
+          "descripcion": "Antes de purificar, filtra el agua usando un filtro improvisado. Coloca capas de arena gruesa, gravilla, carbón activado (de madera quemada) y tela en un contenedor. Vierte el agua turbia por el filtro para eliminar partículas grandes.",
+          "advertencia": "El filtrado no elimina bacterias ni virus. Solo mejora la claridad del agua."
+        },
+        {
+          "numero": 3,
+          "titulo": "Hervir el agua",
+          "descripcion": "Hierve el agua filtrada durante al menos 1 minuto (3 minutos si estás a más de 2000 metros de altitud). Usa un recipiente limpio y deja que hierva a borbotones activos. Esta técnica elimina bacterias, parásitos y virus.",
+          "advertencia": "Deja enfriar el agua antes de beberla. El agua hervida puede tener sabor plano; puedes mejorarlo agregando una pizca de sal."
+        },
+        {
+          "numero": 4,
+          "titulo": "Métodos alternativos de purificación",
+          "descripcion": "Si no puedes hervir, usa lejía doméstica (hipoclorito de sodio): 2 gotas por litro, mezclar y dejar reposar 30 minutos. Otra opción es usar tabletas de purificación o filtros de agua portátil. También puedes exponer el agua al sol directo durante 6 horas en botellas transparente.",
+          "advertencia": "Nunca uses lejía concentrada ni productos con parfum. Verifica que la lejía sea hipoclorito de sodio al 5-6%."
+        },
+        {
+          "numero": 5,
+          "titulo": "Almacenar agua purificada",
+          "descripcion": "Guarda el agua en recipientes limpios y sellados. Usa botellas de plástico con tapa, contenedores de alimentos o bolsas sellables. Etiqueta con fecha y mantenlos en lugar fresco y oscuro. Cambia el agua almacenada cada 6 meses.",
+          "advertencia": "No almacenes agua en recipientes que hayan contenido sustancias químicas o combustibles."
+        }
+      ],
+      "advertencias": [
+        "El agua contaminada puede causar enfermedades graves como cólera, fiebre tifoidea, disentería y hepatitis A.",
+        "Deshidratación severa puede ocurrir en 24-48 horas sin agua. Una persona necesita mínimo 2 litros diarios.",
+        "En climas cálidos o haciendo esfuerzo físico, necesitarás más agua. Incrementa a 3-4 litros por día."
+      ],
+      "referencias": [
+        "OMS - Guía para agua segura",
+        "Cruz Roja Internacional - Manual de supervivencia",
+        "CDC - Water-related Emergencies"
+      ]
+    },
+    {
+      "id": "guia_02",
+      "titulo": "Construcción de refugios de emergencia",
+      "categoria": "supervivencia",
+      "prioridad": "critica",
+      "resumen": "Técnicas para construir refugios improvisados con materiales naturales y encontrados, protegiéndote de lluvia, viento, frío y calor extremo.",
+      "pasos": [
+        {
+          "numero": 1,
+          "titulo": "Evaluar el terreno",
+          "descripcion": "Busca un lugar elevado para evitar inundaciones. Evita zonas bajas, cauces de ríos secos, laderas inestables y debajo de árboles muertos o ramas grandes. Prefiere terreno plano con buena ventilación pero protegido del viento dominante.",
+          "advertencia": "Nunca construyas debajo de líneas eléctricas o estructuras que puedan caer. afastate de postes, muros y edificios dañados."
+        },
+        {
+          "numero": 2,
+          "titulo": "Refugio de lona o plástico",
+          "descripcion": "El método más rápido: ata una cuerda entre dos árboles o postes a 1.5m de altura. Cuelga la lona o plástico creando un techo inclinado. Fija los bordes con piedras, palos o tierra. Refuerza las uniones para soportar viento.",
+          "advertencia": "Asegura bien todos los puntos de sujeción. Un refugio mal anclado puede convertirse en un peligro durante tormentas."
+        },
+        {
+          "numero": 3,
+          "titulo": "Refugio tipo cobertizo",
+          "descripcion": "Usa ramas largas y resistentes para crear una estructura rectangular de 2x3 metros. Apoya los postes principales en el suelo en ángulo de 45°. Cubre con hojas grandes, tierra, pasto o cualquier material aislante disponible.",
+          "advertencia": "Deja una entrada orientada Opuesta al viento. El interior debe tener espacio suficiente para tumbarse cómodamente."
+        },
+        {
+          "numero": 4,
+          "titulo": "Refugio de emergencia rápido (Debris Hut)",
+          "descripcion": "Para clima frío: coloca una rama gruesa horizontal entre dos soportes a 50cm del suelo. Apila materiales secos (hojas, ramas pequeñas, musgo) hasta formar un montículo de 1m de alto y 2m de largo. Crea un túnel de entrada orientado Opuesto al viento.",
+          "advertencia": "El material interior debe estar completamente seco para evitar hipotermia. Usa hojas muertas secas, no húmedas."
+        },
+        {
+          "numero": 5,
+          "titulo": "Mejorar el aislamiento",
+          "descripcion": "Forra el interior con ramas de pino o abeto para crear una couche isolante. Añade una capa gruesa de hojas secas o hierba alta. Crea un suelo elevado con palos y materiales secos para evitar el frío del suelo.",
+          "advertencia": "No uses materiales sintéticos que no respiran. La condensación puede mojarte y causar hipotermia."
+        }
+      ],
+      "advertencias": [
+        "En zonas de mucho frío, prioriza mantener el calor corporal sobre cualquier otro factor.",
+        "Un refugio puede salvarte de hipotermia, deshidratación por exposición solar o lesiones por objetos cayendo.",
+        "Nunca construyas dentro de cuevas sin verificar que no haya animales, serpientes o gases tóxicos."
+      ],
+      "referencias": [
+        "Manual de supervivencia militar",
+        "Boy Scouts of America - Survival Skills",
+        "FEMA - Shelter in Place"
+      ]
+    },
+    {
+      "id": "guia_03",
+      "titulo": "Cómo encender fuego sin cerillas",
+      "categoria": "supervivencia",
+      "prioridad": "critica",
+      "resumen": "Métodos tradicionales y modernos para encender fuego en cualquier condición climática, usando herramientas improvisadas y materiales secos.",
+      "pasos": [
+        {
+          "numero": 1,
+          "titulo": "Preparar el material",
+          "descripcion": "Reúne tres tipos de material: yesca (material que se enciende fácilmente: papel, algodón, musgo seco, corteza de abedul), astillas (palitos delgados que arden rápidamente) y leña (ramas más gruesas que arderán cuando el fuego esté establecido). Todo debe estar completamente seco.",
+          "advertencia": "La humedad es el enemigo del fuego. Busca material en lugares protegidos de la lluvia, como bajo árboles perennes o en cuevas naturales."
+        },
+        {
+          "numero": 2,
+          "titulo": "Método de fricción (bow drill)",
+          "descripcion": "Corta una ranura en una tabla seca y blanda (sauz, álamo o tilo). Coloca un palo fino vertical con punta redondeada en la ranura. Envuelve una cuerda en el palo y muévelo rápidamente hacia atrás y adelante mientras alguien mantiene presión hacia abajo. Cuando aparezca humo y brasas, transfiérelas a la yesca.",
+          "advertencia": "Requiere práctica y esfuerzo físico considerable. Necesitarás 10-15 minutos de trabajo constante. Es más difícil en condiciones húmedas."
+        },
+        {
+          "numero": 3,
+          "titulo": "Método de lente (luz solar)",
+          "descripcion": "Usa una lupa, cristal de reloj, espejo o cualquier superficie curva y transparente. Concentra los rayos solares en un punto sobre la yesca. Mueve hasta que aparezca un punto brillante y comenzar a arder. Funciona mejor con yesca muy seca y fina.",
+          "advertencia": "No funciona con nubes, sombra o luz filtrada. Solo funciona cuando hay sol directo y fuerte."
+        },
+        {
+          "numero": 4,
+          "titulo": "Pedernal y acero",
+          "descripcion": "Golpea un trozo de acero (cuchillo, multa de bicicleta, barra de incendios) contra una piedra de pedernal o cuarzo creando chispas. Dirige las chispas hacia la yesca. Alternativamente, usa una barra de encendido de magnesio con raspador.",
+          "advertencia": "Las chispas son pequeñas y difíciles de توجيه. Practica golpeando desde arriba hacia abajo, no al revés."
+        },
+        {
+          "numero": 5,
+          "titulo": "Construir y mantener el fuego",
+          "descripcion": "Coloca la yesca con brasas en un pequeño teepee de astillas. Enciende y sopla suavemente hasta que arda. Añade astillas gradualmente, luego leña más gruesa. Mantén el fuego alimentado y protegido del viento.",
+          "advertencia": "Nunca dejes el fuego sin supervisión. Apágalo completamente antes de abandonar el lugar usando agua y tierra."
+        }
+      ],
+      "advertencias": [
+        "El fuego puede provocar quemaduras, propagación de incendios y inhalation de humo. Mantén distancia y ventilación adecuada.",
+        "En zonas con restricción de fuego al aire libre, usa métodos alternativos de calefacción y cocina.",
+        "Nunca enciendas fuego cerca de materiales inflamables, gases o líquidos combustibles."
+      ],
+      "referencias": [
+        "SAS Survival Handbook",
+        "Primitive Technology YouTube Channel",
+        "University of Missouri - Fire Starting"
+      ]
+    },
+    {
+      "id": "guia_04",
+      "titulo": "Señales de emergencia y求救",
+      "categoria": "supervivencia",
+      "prioridad": "critica",
+      "resumen": "Cómo comunicar tu posición y necesidad de ayuda usando señales visuales, auditivas y digitales cuando no hay comunicación celular.",
+      "pasos": [
+        {
+          "numero": 1,
+          "titulo": "Señales de fuego",
+          "descripcion": "Crea tresfires en línea o en triángulo (señal de emergencia universal). Usa madera verde, goma o plástico para generar mucho humo blanco visible. En la noche, el fuego brillante es visible a grandes distancias. Mantén los fuegos listos para encender inmediatamente.",
+          "advertencia": "En zonas boscosas secas, los fuegos pueden provocar incendios. Mantén extintor o agua disponible siempre."
+        },
+        {
+          "numero": 2,
+          "titulo": "Señales en el suelo",
+          "descripcion": "Crea señales grandes en tierra cleared: 'SOS' (tres puntos, tres rayas, tres puntos), 'V' porvictoria, o señales de ayuda. Usa piedras, ramas, ropa de colores brillantes o crea surcos. Las señales deben tener al menos 3 metros de largo.",
+          "advertencia": "Las señales en el suelo funcionan mejor vistas desde el aire. Considera la vegetación y地形 al diseñar."
+        },
+        {
+          "numero": 3,
+          "titulo": "Espejo de señales",
+          "descripcion": "Usa cualquier superficie reflectante (espejo, metal pulido, vidrio) para reflejar luz hacia aeronaves o personas distantes. Inclina el espejo hacia el sol y el objetivo, moviendo hasta que veas un destello brillante. Alternativamente, coloca el espejo frente al ojo y apunta con los dedos.",
+          "advertencia": "El espejo de señales puede ser visible hasta 50 km en condiciones despejadas. Practica el technique antes de necesitarlo."
+        },
+        {
+          "numero": 4,
+          "titulo": "Silbato de emergencia",
+          "descripcion": "Un silbato de 110 dB puede escucharse hasta 1 km. Tres silbidos cortos seguidos significan emergencia. Responde con dos silbidos si escuchas una señal. Es más efectivo que gritar, ya que no agota energía y puede atravesar obstáculos.",
+          "advertencia": "Guarda siempre un silbato de emergencia en tu mochila. Tres toques cortos es la señal internacional de distress."
+        },
+        {
+          "numero": 5,
+          "titulo": "Red mesh y comunicación digital",
+          "descripcion": "En la app Red Mesh, puedes broadcasts tu posición y mensaje de emergencia a toda la red. Usa el protocolo de distress: establece tu mensaje con coordenadas (si las conoces), síntomas, número de personas y urgencia. Los nodos mesh repetirán tu mensaje automáticamente.",
+          "advertencia": "Mantén la batería de tu dispositivo. Desactiva funciones innecesarias para preservar energía. Usa modo de bajo consumo."
+        }
+      ],
+      "advertencias": [
+        "Las señales de emergencia deben usarse solo en situaciones reales de peligro. Falsas alertas comprometen los sistemas de rescue.",
+        "Combina varios métodos de señalización para maximizar las probabilidades de ser detectado.",
+        "Si escuchas o ves un rescate acercándose, haz señales claras con los brazos en V (victoria) o mueve los brazos arriba y abajo."
+      ],
+      "referencias": [
+        "FEMA - Emergency Signaling",
+        "ACR Electronics - Signal for Help",
+        "Red Cross - Distress Signals"
+      ]
+    },
+    {
+      "id": "guia_05",
+      "titulo": "Navegación sin GPS ni brújula",
+      "categoria": "supervivencia",
+      "prioridad": "alta",
+      "resumen": "Técnicas ancestrales y naturales para orientarte, encontrar direcciones y llegar a destino sin dispositivos electrónicos ni mapas.",
+      "pasos": [
+        {
+          "numero": 1,
+          "titulo": "Navegación por el sol",
+          "descripcion": "El sol sale por el este y se pone por el oeste (aproximado). En el hemisferio norte, al mediodía el sol está hacia el sur. Clava un palo vertical en el suelo y marca donde cae la sombra. Espera 15-20 minutos y marca la nueva posición. La línea entre ambas marcas indica aproximadamente este-oeste.",
+          "advertencia": "Este método es menos preciso en latitudes tropicales y durante ciertas épocas del año. Usa como referencia general."
+        },
+        {
+          "numero": 2,
+          "titulo": "Estrellas para orientación",
+          "descripcion": "En el hemisferio norte, la Estrella Polar (Polaris) indica el norte. Localízala encontrando las dos estrellas del Carro (Osa Mayor), extendiendo una línea imaginaria 5 veces la distancia entre ellas hacia abajo. La estrella más brillante al final es Polaris. En el hemisferio sur, busca la Cruz del Sur.",
+          "advertencia": "Las estrellas solo son visibles de noche y con cielo despejado. Aprende a identificar constelaciones antes de necesitarlo."
+        },
+        {
+          "numero": 3,
+          "titulo": "Brújula improvisada",
+          "descripcion": "Magnetiza una aguja de acero frotándola contra tu cabello, lana o seda durante 2 minutos. Colócala flotando sobre agua en un recipiente pequeño (una hoja también funciona). La aguja apuntará aproximadamente al norte magnético. Rastros el Sur aparecerá en la dirección opuesta.",
+          "advertencia": "Este método puede ser afectado por depósitos metálicos cercanos, vetas de mineral en el suelo o tormentas magnéticas."
+        },
+        {
+          "numero": 4,
+          "titulo": "Lectura del terreno",
+          "descripcion": "Los musgos y líquenes suelen crecer más en el lado norte de los árboles (más húmedo y sombreado). Las cortezas de árboles pueden ser más gruesas y oscuras en el lado norte. Los nidos de avispas suelen estar en el lado sur de los edificios. Las pendientes más suaves generalmente dan al sur en el hemisferio norte.",
+          "advertencia": "Estos métodos son aproximados y pueden variar según la ubicación geográfica, clima local y condiciones específicas del terrain."
+        },
+        {
+          "numero": 5,
+          "titulo": "Técnica de seguimiento",
+          "descripcion": "Elige un punto de referencia lejano (árbol, montaña, edificio) y camina hacia él. Cuando llegues, elige otro punto en la misma dirección general. Evita caminar en círculos eligiendo puntos de reference demasiado cercanos. Cuenta tus pasos (aproximadamente 100 pasos = 100 metros).",
+          "advertencia": "Esta técnica requiere atención constante. Evita caminar de noche ya que es fácil desorientarse y perder referencias visuales."
+        }
+      ],
+      "advertencias": [
+        "Nunca confíes en un solo método de navegación. Combina varios para verificar tu posición.",
+        "En zonas desconocidas, es mejor quedarse en un lugar seguro que caminar sin dirección hasta encontrar civilización.",
+        "El uso de mapas descargados offline en la app puede complementar estas técnicas ancestrales."
+      ],
+      "referencias": [
+        "US Army Field Manual - Map Reading",
+        "Orienteering Association - Navigation Basics",
+        "NOLS - Wilderness Navigation"
+      ]
+    },
+    {
+      "id": "guia_06",
+      "titulo": "Preparación para desastres naturales",
+      "categoria": "supervivencia",
+      "prioridad": "critica",
+      "resumen": "Protocolos de actuación antes, durante y después de terremotos, inundaciones, deslizamientos, huracanes y tormentas severas.",
+      "pasos": [
+        {
+          "numero": 1,
+          "titulo": "Preparación antes del desastre",
+          "descripcion": "Identifica los riesgos de tu zona (terremotos, inundaciones, deslizamientos). Prepara kit de emergencia con agua (3 litros por persona por día), alimentos no perecederos, linterna, botiquín, documentos importantes en bolsa impermeable, y medicamentos esenciales. Establece plan de reunión familiar y conoce los albergues cercanos.",
+          "advertencia": "El kit debe durar mínimo 72 horas. Revisa su contenido cada 6 meses y reemplaza productos vencidos."
+        },
+        {
+          "numero": 2,
+          "titulo": "Terremotos",
+          "descripcion": "DURANTE: Si estás adentro, métete bajo mesa o escritorio resistente. Aléjate de ventanas y objetos que puedan caer. Si estás afuera, aléjate de edificios, postes y cables eléctricos. DESPUÉS: Verifica lesiones, salida de gas, daños estructurales. No enciendas fogo ni interruptores eléctricos si hay escapes de gas.",
+          "advertencia": "Las réplicas pueden ocurrir horas o días después. Permanece alerta y preparado para evacuar."
+        },
+        {
+          "numero": 3,
+          "titulo": "Inundaciones",
+          "descripcion": "Si hay alerta de inundación, sube a lugares elevados inmediatamente. No camines ni conduzcas por agua en movimiento: 30 cm pueden tumbarte, 60 cm pueden arrastrar un auto. Si el agua sube, sube al techo y espera rescate. Señaliza tu ubicación con ropa brillante.",
+          "advertencia": "Nunca cruces puentes inundados. El agua puede destruir estructuras sin previo aviso. Evita canales de drenaje."
+        },
+        {
+          "numero": 4,
+          "titulo": "Deslizamientos",
+          "descripcion": "Aléjate de laderas, Ríos de montaña y zonas bajas cerca de pendientes. Si escuchas un rugido类似于 trueno, o ves grietas en el terreno, muévete inmediatamente en dirección perpendicular a la ladera. No te quedes en fondos de valle.",
+          "advertencia": "Los deslizamientos pueden moverse a más de 80 km/h. La velocidad de huida es crítica. evacua inmediatamente."
+        },
+        {
+          "numero": 5,
+          "titulo": "Huracanes y tormentas severas",
+          "descripcion": "Refugiate en habitación interior lejos de ventanas y puertas. Ventila un poco para égal pressure. Mantén suministros de agua y alimentos para varios días. Protege vidrios con cinta en X si no hay persianas. Si el techo está dañado, protege tu cabeza con colchón o manta.",
+          "advertencia": "El ojo del hurricane puede dar falsa sensación de calma. No salgas hasta escuchar confirmación oficial de que pasó el peligro."
+        }
+      ],
+      "advertencias": [
+        "Después de cualquier desastre, mantén calma y prioriza tu seguridad y la de tu familia antes de ayudar a otros.",
+        "Los servicios de emergencia pueden tardar en llegar. Prepárate para autoayuda durante al menos 72 horas.",
+        "Usa la app Red Mesh para mantener comunicación local si las redes celulares están caídas."
+      ],
+      "referencias": [
+        "UNGRD Colombia - Protocolos de emergencia",
+        "FEMA - Natural Disaster Preparedness",
+        "CDC - Emergency Preparedness"
+      ]
+    },
+    {
+      "id": "guia_07",
+      "titulo": "Plan de evacuación de emergencia",
+      "categoria": "supervivencia",
+      "prioridad": "critica",
+      "resumen": "Guía paso a paso para planificar y ejecutar evacuaciones ordenadas desde hogares, lugares de trabajo o espacios públicos.",
+      "pasos": [
+        {
+          "numero": 1,
+          "titulo": "Crear plan de evacuación",
+          "descripcion": "Identifica al menos 2 rutas de evacuación desde tu hogar y lugar de trabajo. Designa punto de reunión lejano a la zona de peligro. Establece contacto de emergencia fuera de la zona (familiar o amigo). Practica las rutas con todos los miembros del hogar. Ten copias de documentos importantes en mochila de emergencia.",
+          "advertencia": "El plan debe incluir personas con necesidades especiales: niños, ancianos, personas con movilidad reducida, mascotas."
+        },
+        {
+          "numero": 2,
+          "titulo": "Cuando sonar la alarma",
+          "descripcion": "Mantén la calma inmediatamente. Desconecta gas, electricidad y agua si hay tiempo. Cierra puertas (no con llave). Toma tu kit de emergencia y documentación. Guía a los demás miembros hacia la ruta asignada. No uses ascensores. Usa escaleras si estás en edificio.",
+          "advertencia": "Si hay humo, agáchate y avanza pegado al piso. Si hay fuego, toca las puertas antes de abrir; si están calientes, busca otra ruta."
+        },
+        {
+          "numero": 3,
+          "titulo": "Evacuación en vehículo",
+          "descripcion": "Llena el tanque de gasolina si hay alerta previa. Carga kit de emergencia y agua. Planifica ruta evitando puentes, túneles y zonas inundables. Conduce con luces encendidas. Si hay tráfico, no bloquees intersecciones. Si te indicas evacuar a zona de refugio oficial, sigue las instrucciones de las autoridades.",
+          "advertencia": "Nunca intentes atravesar zonas inundadas con vehículo. Busca rutas alternativas o espera ayuda. Las inundaciones pueden ser más profundas de lo que parecen."
+        },
+        {
+          "numero": 4,
+          "titulo": "Evacuación a pie",
+          "descripcion": "Si hay que evacuar caminando, mantén la calma y sigue las rutas designadas. Camina rápido pero sin correr (para evitar accidentes). Ayúdense mutuamente, especialmente niños y ancianos. Si hay humo o debris, protege tu cabeza con manos y brazos.",
+          "advertencia": "No cargues demasiado peso. La mochila de emergencia no debe superar el 10-15% de tu peso corporal para poder caminar rápido."
+        },
+        {
+          "numero": 5,
+          "titulo": "Llegada al punto de reunión",
+          "descripcion": "Reúnete con tu grupo en el punto establecido. Haz conteo de personas. Reporta ausencias al líder o coordinador. Espera instrucciones de las autoridades. Mantén comunicación con familiares externos al área de desastre usando la red mesh.",
+          "advertencia": "No te disperses. Si alguien falta, informa inmediatamente pero no vuelvas a buscar hasta que sea seguro. Usa la red mesh para comunicar posiciones."
+        }
+      ],
+      "advertencias": [
+        "Las evacuación espontáneas sin plan pueden causar más bajas que el desastre mismo. Mantén disciplina y orden.",
+        "Si no hay tiempo para evacuar, refúgiate en lugar sólido interior y aléjate de ventanas.",
+        "En disturbios civiles, evita zonas de conflicto. Usa rutas laterales y comunícate por red mesh."
+      ],
+      "referencias": [
+        "FEMA - evacuation Planning",
+        "American Red Cross - evacuation Guide",
+        "OPS - Planificación de Evacuación"
+      ]
+    },
+    {
+      "id": "guia_08",
+      "titulo": "Comunicación sin celular usando mesh",
+      "categoria": "supervivencia",
+      "prioridad": "critica",
+      "resumen": "Cómo usar la tecnología mesh para mantener comunicación cuando las redes celulares y de internet no están disponibles.",
+      "pasos": [
+        {
+          "numero": 1,
+          "titulo": "Principios de la red mesh",
+          "descripcion": "La red mesh permite comunicación directa entre dispositivos sin depender de torres celulares ni internet. Cada dispositivo funciona como repetidor, extendiendo la señal. Mientras más dispositivos haya en la red, más amplio será el alcance.",
+          "advertencia": "La distancia entre nodos depende del terreno y obstáculos. En áreas abiertas puede llegar a 5-10 km; en zonas urbanas, 500m-1km."
+        },
+        {
+          "numero": 2,
+          "titulo": "Activación del modo emergencia",
+          "descripcion": "Abre la app Red Mesh. Activa el modo mesh en ajustes. Verifica que el Bluetooth y WiFi Direct estén activados. Tu dispositivo se conectará automáticamente a nodos cercanos. El icono de señal mesh Indica conexión activa.",
+          "advertencia": "El modo mesh consume más batería. Reduce brillo de pantalla y desactiva funciones innecesarias."
+        },
+        {
+          "numero": 3,
+          "titulo": "Envío de mensajes",
+          "descripcion": "Para enviar mensaje a toda la red, usa el canal de broadcast de emergencia. Escribe tu mensaje máximo 200 caracteres. Incluye: tu ubicación aproximada, número de personas, tipo de emergencia, nivel de urgencia. Presiona enviar. Tu mensaje se propagará automáticamente.",
+          "advertencia": "Respeta el canal de emergencia. No envíes mensajes no urgentes ya que pueden congestionar la red."
+        },
+        {
+          "numero": 4,
+          "titulo": "Comunicación punto a punto",
+          "descripcion": "Para mensaje directo a una persona, abre la conversación. Escribe y envíe. El mensaje viajará a través de todos los nodos hasta alcanzar al destinatario. Los mensajes tienen confirmación de entrega. Los mensajes de emergencia tienen prioridad.",
+          "advertencia": "Si el destinatario está muy lejos, el mensaje puede tardar en llegar. Sé paciente y no reenvíes repetidamente."
+        },
+        {
+          "numero": 5,
+          "titulo": "Compartir ubicación",
+          "descripcion": "Usa la función de compartir ubicación de la app. Puedes enviar coordenadas GPS exactas o ubicación aproximada basada en referencias (barrio, calle principal). Esto facilita que equipos de rescue te encuentren.",
+          "advertencia": "Los GPS consumen batería. Comparte ubicación solo cuando sea necesario y actualiza cada 30 minutos si estás en movimiento."
+        }
+      ],
+      "advertencias": [
+        "La red mesh tiene límites de ancho de banda. Evita enviar imágenes grandes o videos que puedan bloquear la red.",
+        "Si no hay dispositivos mesh cercanos, conecta solo no significa que estás aislado. Busca lugares elevados y abiertos.",
+        "En situaciones de censura, la red mesh puede ser la única forma de comunicación libre. Protégela y úsala responsablemente."
+      ],
+      "referencias": [
+        "Red Mesh sin Internet - Documentación técnica",
+        "Meshtastic Project - User Guide",
+        "Commotion Open Wireless - Mesh Networking"
+      ]
+    },
+    {
+      "id": "guia_09",
+      "titulo": "Alimentación de emergencia",
+      "categoria": "supervivencia",
+      "prioridad": "alta",
+      "resumen": "Guía para mantener una nutrición adecuada durante crisis alimentarias, incluyendo raciones de emergencia y búsqueda de alimentos silvestres.",
+      "pasos": [
+        {
+          "numero": 1,
+          "titulo": "Raciones de emergencia",
+          "descripcion": "Prepara raciones que no requieran cocción ni refrigeración: galletas, frutos secos, barras energéticas, arroz, pasta, alimentos enlatados. Almacena mínimo 2000 kcal por persona por día para actividad moderada. Una dieta de crisis de 3 días puede consistir en: desayuno (galletas + frutos secos), almuerzo (arroz + atún), cena (pasta + vegetales).",
+          "advertencia": "Los alimentos enlatados deben reemplazarse cada 2 años. Verifica fechas de vencimiento periódicamente."
+        },
+        {
+          "numero": 2,
+          "titulo": "Calcular necesidades calóricas",
+          "descripcion": "En emergencia, una persona adulta necesita entre 1500-2000 kcal diarias. La falta de calorías reduce capacidad física y cognitiva. Prioriza carbohidratos (energía inmediata) sobre grasas (energía sostenida). Las proteínas son necesarias si la situación dura más de 3 días.",
+          "advertencia": "La restricción calórica severa puede causar mareos, debilidad y desorientación. Nunca te quedes sin comer más de 48 horas."
+        },
+        {
+          "numero": 3,
+          "titulo": "Alimentos silvestres seguros",
+          "descripcion": "En zonas rurales, frutas como mango, banano, guayaba, papaya son generalmente seguras. Tubérculos como yuca (hervida 30 min), papa (hervida), batatas son comestibles. Evita hongos silvestres salvo que conozcas la especie. No comas ninguna planta con savia blanca o látex.",
+          "advertencia": "Nunca comas hongos silvestres sin conocimiento experto. La mayoría de las setas venenosas pueden ser fatales."
+        },
+        {
+          "numero": 4,
+          "titulo": "Conservación de alimentos sin electricidad",
+          "descripcion": "En climas cálidos, los alimentos se dañan rápido. Prioriza alimentos secos y enlatados. Si tienes acceso a hielo, colócalo en cooler con alimentos. En climas fríos, aprovecha la temperatura ambiente para conservar alimentos (no dejar expuestos a 0°C).",
+          "advertencia": "Si un alimento tiene mal olor, textura viscosa o color extraño, deséchalo. Mejor prevenir que intoxicarse."
+        },
+        {
+          "numero": 5,
+          "titulo": "Hidratación y nutrition",
+          "descripcion": "El agua es más importante que la comida. Nunca reduzcas consumo de agua para comer menos. Con alimentos limitados, prioriza frutas y vegetales con alto contenido de agua (sandía, pepino, naranja). Los frutos secos proporcionan grasas saludables y satisfacción.",
+          "advertencia": "El ayuno voluntario es tolerable; la deshidratación no lo es. Mantén al menos 2 litros de agua diarios."
+        }
+      ],
+      "advertencias": [
+        "En situaciones prolongadas, la malnutrición debilita el sistema inmunológico y aumenta riesgo de infecciones.",
+        "No comas plantas o animales que no puedas identificar con certeza. Cuando hay duda, mejor no comer.",
+        "La caza y pesca requieren permisos en muchas zonas. Verifica regulaciones locales o busca alternativas."
+      ],
+      "referencias": [
+        "FAO - Alimentación de emergencia",
+        "USDA - Emergency Food Supply",
+        "Wilderness Survival - Edible Plants Guide"
+      ]
+    },
+    {
+      "id": "guia_10",
+      "titulo": "Seguridad en protestas y disturbios civiles",
+      "categoria": "supervivencia",
+      "prioridad": "alta",
+      "resumen": "Protocolos de seguridad para participar en manifestaciones civiles, protegiendo tu integridad física y sabendo cómo actuar si hay violencia.",
+      "pasos": [
+        {
+          "numero": 1,
+          "titulo": "Preparación antes de salir",
+          "descripcion": "Notifica a familiar o amigo sobre tu participación, ruta y hora estimada de regreso. Carga celular al 100%. Ten batería externa. Lleva identificación mínima. No lleves objetos que puedan ser malinterpretados (cuchillos, objetos metálicos grandes). Usa ropa que te permita moverte rápido y que no te identifique.",
+          "advertencia": "Tu teléfono puede ser confiscado. Ten números de emergencia memorizados. Considera usar celular secundario barato."
+        },
+        {
+          "numero": 2,
+          "titulo": "Durante la manifestación",
+          "descripcion": "Mantente en los bordes, no en el centro. Evita grupos densos donde puedas quedar atrapado. Conoce las salidas y rutas de escape. Si hay rumores de violencia, élojate inmediatamente. No grabes a oficiales ni participantes de forma confrontacional.",
+          "advertencia": "Las grabaciones pueden ser evidencia tanto a tu favor como en tu contra. Sé consciente de lo que filmas."
+        },
+        {
+          "numero": 3,
+          "titulo": "Si hay gases lacrimógenos",
+          "descripcion": "No corras ni te agites (el movimiento aumenta la irritación). Cúbrete nariz y boca con tela húmeda. Eleva la mirada (los gases ascienden). Muévete en dirección perpendicular al viento. Aléjate del área. No te frotés los ojos ni la cara. Enjuaga con agua limpia.",
+          "advertencia": "El gas lacrimógeno puede causar dificultad respiratoria severa en personas con asma. Ten inhalador disponible."
+        },
+        {
+          "numero": 4,
+          "titulo": "Si hay disparos o violencia",
+          "descripcion": "立即就地躲避。寻找掩体（墙壁、柱子、车辆）。不要趴下，保持低姿态移动。远离窗户、玻璃和易掉落物品。确定安全后再移动。",
+          "advertencia": "La respuesta inicial es crucial. Evalúa rápido tu entorno y toma la decisión más segura, incluso si implica disobecer instrucciones de autoridades."
+        },
+        {
+          "numero": 5,
+          "titulo": "Después del evento",
+          "descripcion": "Comunícate con tu contacto de seguridad confirmando que estás bien. Si fuiste detenido, proporciona solo información básica de identificación. Busca atención médica si tienes lesiones. Documenta cualquier abuso de autoridad con fotografías si es seguro.",
+          "advertencia": "Si fuiste herido, busca atención médica antes de hacer declaraciones a nadie, incluyendo autoridades."
+        }
+      ],
+      "advertencias": [
+        "Tu seguridad es prioritaria. No te expongas innecesariamente por presión social o ideológica.",
+        "Los disturbios civiles pueden escalar rápidamente. La decisión de huir o quedarse debe ser rápida e individual.",
+        "La información en redes sociales puede ser usada en tu contra. Ten cuidado con lo que公开as."
+      ],
+      "referencias": [
+        "Amnesty International - Protest Safety",
+        "Electronic Frontier Foundation - Protest Rights",
+        "ICRC - Civil Unrest Protection"
+      ]
+    },
+    {
+      "id": "guia_11",
+      "titulo": "Sobrevivir apagones prolongados",
+      "categoria": "supervivencia",
+      "prioridad": "critica",
+      "resumen": "Estrategias para mantener seguridad, comunicación y necesidades básicas durante cortes de electricidad que pueden durar días o semanas.",
+      "pasos": [
+        {
+          "numero": 1,
+          "titulo": "Conservación de alimentos",
+          "descripcion": "Abre la nevera lo menos posible. Mantén la puerta cerrada. Si la electricidad lleva más de 4 horas, transfiere alimentos perecederos a un cooler con hielo. Los alimentos en la nevera duran ~4 horas; en el congelador, 48 horas (si no lo abres). Congeladores llenos mantienen temperatura hasta 48 horas.",
+          "advertencia": "Alimentos que han estado a más de 5°C por más de 2 horas deben desecharse. Si tienes duda, deséchalo."
+        },
+        {
+          "numero": 2,
+          "titulo": "Iluminación de emergencia",
+          "descripcion": "Ten linternas en cada habitación, accesible desde la cama. Baterías de repuesto organizadas por tamaño. Velas de emergencia con soporte estable. El uso de velas requiere supervisión constante para evitar incendios. Considera faroles de gas propano para iluminación sostenida.",
+          "advertencia": "Nunca uses estufas de gas, carbón o propano en espacios cerrados sin ventilación. Riesgo de intoxicación por monóxido de carbono."
+        },
+        {
+          "numero": 3,
+          "titulo": "Carga de dispositivos",
+          "descripcion": "Usa bancos de energía para mantener comunicación. Carga dispositivos cuando haya electricidad temporal. Desactiva funciones innecesarias (Bluetooth, WiFi, ubicación). Reduce brillo al mínimo. En la app Red Mesh, activa modo de bajo consumo. Si tienes generador o panel solar, prioriza cargar equipos de comunicación.",
+          "advertencia": "No cargues dispositivos usando fuentes inseguras o húmedas. Riesgo de electrocución e incendios."
+        },
+        {
+          "numero": 4,
+          "titulo": "Climatización sin electricidad",
+          "descripcion": "En calor: cierra cortinas y persianas durante el día para mantener fresco. Abre ventanas en la noche si hay corriente de aire. Usa ropa ligera de colores claros. Coloca trapos húmedos en puntos de pulseo. Bebe agua frecuentemente. En frío: abriga múltiples capas. Usa edredones y mantas. Cierra habitaciones no usadas.",
+          "advertencia": "En temperaturas extremas (más de 40°C o menos de 0°C), el riesgo para salud aumenta significativamente. Busca refugio climatizado si es posible."
+        },
+        {
+          "numero": 5,
+          "titulo": "Seguridad durante apagón",
+          "descripcion": "Desconecta equipos sensibles de sobretensiones antes de que vuelva la electricidad. No uses ascensores. Ten precaución al caminar en zonas oscuras. Si hay personas vulnerables (ancianos, enfermos), verifica su estado personalmente. Reporta a vecinos solos o vulnerables.",
+          "advertencia": "Apagones pueden ser causados por incidentes intencionales o sabotage. Mantén alerta ante actividades sospechosas."
+        }
+      ],
+      "advertencias": [
+        "Los apagones pueden ser aprovechados por criminales. Refuerza seguridad física de tu hogar.",
+        "Personas con equipos médicos dependientes de electricidad deben tener plan alternativo (generador, batería de respaldo).",
+        "Mantén la calma y contribuye a la tranquilidad de tu comunidad. El pánico agrava las situaciones."
+      ],
+      "referencias": [
+        "Ready.gov - Power Outage",
+        "Red Cross - Power Outage Safety",
+        "FEMA - Blackout Response"
+      ]
+    },
+    {
+      "id": "guia_12",
+      "titulo": "Primeros auxilios psicológicos",
+      "categoria": "supervivencia",
+      "prioridad": "alta",
+      "resumen": "Técnicas para apoyar la salud mental propia y de otros durante y después de emergencias, reconociendo señales de distress psicológico.",
+      "pasos": [
+        {
+          "numero": 1,
+          "titulo": "Reconocer señales de estrés traumático",
+          "descripcion": "Después de eventos traumáticos, es normal experimentar: miedo intenso, culpa, vergüenza, irritabilidad, confusión, entumecimiento emocional. Físicamente: insomnio, fatiga, tensión muscular, problemas digestivos. Si estos síntomas duran más de 2 semanas o interfieren con funcionamiento diario, busca ayuda profesional.",
+          "advertencia": "El consumo de alcohol o drogas para 'aguantar' empeora las cosas a largo plazo. Evita automedicación."
+        },
+        {
+          "numero": 2,
+          "titulo": "Autocuidado psicológico",
+          "descripcion": "Habla sobre lo que sientes con personas de confianza. Establece rutinas simples: horarios de sueño, comida, actividad física moderada. Evita exposición excesiva a noticias sobre el evento. Practica respiración profunda (inhala 4 segundos, retén 4, exhala 4). Haz actividades que te den sensación de control.",
+          "advertencia": "No forces a otros a hablar si no quieren. Respeta los tiempos individuales de procesamiento."
+        },
+        {
+          "numero": 3,
+          "titulo": "Cómo ayudar a otros",
+          "descripcion": "Escucha sin juzgar. No digas 'ya pasará' o 'no es para tanto'. Ofrece presencia y apoyo práctico (agua, comida, un lugar seguro). Valida sus emociones: 'es normal sentirse así después de lo que viviste'. Ayúdales a conectar con recursos de ayuda si es necesario.",
+          "advertencia": "Si alguien expresa deseo de hacerse daño o a otros, toma en serio. Busca ayuda profesional inmediatamente."
+        },
+        {
+          "numero": 4,
+          "titulo": "Manejo de niños en emergencias",
+          "descripcion": "Los niños necesitan información honesta adaptada a su edad. Responde sus preguntas sin detalles innecesarios. Mantén rutinas lo más normal posible. Permite que expresen emociones a través del juego o dibujo. Reafirma constantemente su seguridad. Evita exponerlos a imágenes traumáticas.",
+          "advertencia": "Los niños pueden regressar a comportamientos más infantiles (mouverse, miedos nocturnos). Es normal y temporal. Ten paciencia."
+        },
+        {
+          "numero": 5,
+          "titulo": "Grupos y comunidad",
+          "descripcion": "La conexión social es protectora. Organiza reuniones comunitarias si es seguro. Comparte tareas y responsabilidades. Establece turnos para vigilancia y apoyo mutuo. Habla sobre la experiencia colectiva y cómo recuperación como comunidad.",
+          "advertencia": "Conflictos pueden surgir bajo estrés. Practica comunicación no violenta y resolución de conflictos."
+        }
+      ],
+      "advertencias": [
+        "El apoyo psicológico no reemplaza atención médica profesional cuando hay condiciones de salud mental preexistentes.",
+        "Fatiga por compasión afecta a quienes ayudan mucho. Los cuidadores también necesitan cuidarse a sí mismos.",
+        "Después de 1 mes del evento, si los síntomas persisten o empeoran, considera buscar terapia profesional."
+      ],
+      "referencias": [
+        "OMS - Primeros Auxilios Psicológicos",
+        "EMDR Institute - Trauma Response",
+        "SAMHSA - Disaster Recovery"
+      ]
+    },
+    {
+      "id": "guia_13",
+      "titulo": "Optimizar y mantener la red mesh",
+      "categoria": "tecnologia",
+      "prioridad": "alta",
+      "resumen": "Técnicas avanzadas para maximizar el rendimiento de la red mesh, extendiendo cobertura y mejorando calidad de comunicación.",
+      "pasos": [
+        {
+          "numero": 1,
+          "titulo": "Posicionamiento estratégico de nodos",
+          "descripcion": "Los nodos en lugares elevados tienen mayor cobertura. Antenas externas pueden quadruplicar el alcance. Evita obstáculos metálicos entre nodos. Las ventanas y balcones son mejores que interiores. Para espacios grandes, múltiples nodos en línea crean 'cadena' que extiende cobertura.",
+          "advertencia": "Instalar equipos en techos requiere precauciones de seguridad. Si no estás seguro, busca ayuda profesional."
+        },
+        {
+          "numero": 2,
+          "titulo": "Maximizar batería",
+          "descripcion": "Activa modo de ahorro de energía cuando no necesites comunicación activa. Desactiva sincronización en segundo plano de apps no esenciales. Reduce potencia de transmisión si no necesitas máximo alcance (el modo bajo consume 70% menos). Apaga WiFi y Bluetooth cuando no los uses.",
+          "advertencia": "En emergencia real, no reduzcas potencia de transmisión ya que puede afectar la red completa."
+        },
+        {
+          "numero": 3,
+          "titulo": "Optimizar mensajes",
+          "descripcion": "Mensajes cortos transmiten más rápido y usan menos ancho de banda. Usa códigos preestablecidos cuando sea posible: 'OK' (estoy bien), 'AUX' (necesito ayuda), 'INFO' (tengo información). Agrupa información importante en un solo mensaje en lugar de múltiples mensajes fragmentados.",
+          "advertencia": "Los mensajes demasiado largos (>200 caracteres) pueden tardar más en propagarse o incluso no transmitirse."
+        },
+        {
+          "numero": 4,
+          "titulo": "Mantenimiento preventivo",
+          "descripcion": "Limpia contactos de batería periódicamente. Actualiza firmware cuando haya versiones disponibles (mejora seguridad y rendimiento). Verifica que antenas estén firmemente conectadas. Reemplaza baterías degradadas (pierden capacidad con el tiempo).",
+          "advertencia": "Las actualizaciones de firmware pueden requerir conexión temporal a internet. Planifica actualizaciones cuando haya conectividad."
+        },
+        {
+          "numero": 5,
+          "titulo": "Diagnóstico de problemas",
+          "descripcion": "Si no puedes conectar, verifica que Bluetooth y WiFi Direct estén activos. Acércate a otro dispositivo mesh. Reinicia la app. Si la señal es débil, cambia de posición (mínimo 1 metro de distancia entre dispositivos). Consulta el mapa de nodos activos en la app para identificar zonas sin cobertura.",
+          "advertencia": "Interferencia electromagnética de otros dispositivos puede afectar la conexión. Aleja otros equipos electrónicos."
+        }
+      ],
+      "advertencias": [
+        "La red mesh tiene límites físicos. No puedes esperar cobertura completa en zonas rurales dispersas sin suficientes nodos.",
+        "El ancho de banda compartido significa que si muchos usuarios transmiten simultáneamente, todos van más lento.",
+        "Mantén siempre al menos un método de comunicación alternativo por si la app falla."
+      ],
+      "referencias": [
+        "Meshtastic Documentation - Optimization",
+        "Red Mesh Wiki - Best Practices",
+        "Ham Radio Mesh Networks - Setup Guide"
+      ]
+    },
+    {
+      "id": "guia_14",
+      "titulo": "Cifrado y privacidad en comunicaciones mesh",
+      "categoria": "tecnologia",
+      "prioridad": "alta",
+      "resumen": "Cómo proteger tus comunicaciones mesh de interceptación no autorizada, usando cifrado y prácticas de seguridad digital.",
+      "pasos": [
+        {
+          "numero": 1,
+          "titulo": "Principios básicos de seguridad",
+          "descripcion": "En red mesh, los mensajes pueden ser vistos por nodos intermedios. Usa la app Red Mesh que implementa cifrado de extremo a extremo. Cada usuario tiene claves de cifrado únicas. Los mensajes solo pueden ser descifrados por el destinatario intended. Nunca compartas tus claves privadas.",
+          "advertencia": "La seguridad absoluta no existe. Cuanto más robusto sea el cifrado, más difícil será la interceptación, pero nunca imposible."
+        },
+        {
+          "numero": 2,
+          "titulo": "Configurar cifrado en la app",
+          "descripcion": "La app Red Mesh tiene cifrado habilitado por defecto. Verifica en ajustes que 'Cifrado E2E' esté activo. No desactives esta función salvo que sea absolutamente necesario. Genera nuevas claves de cifrado periódicamente si sospechas compromiso.",
+          "advertencia": "Si generas nuevas claves, perderás comunicación con contactos que tengan tus claves antiguas. Coordina el cambio."
+        },
+        {
+          "numero": 3,
+          "titulo": "Comunicación segura",
+          "descripcion": "Para información altamente sensible, usa códigos o lenguaje cifrado además del cifrado técnico. Números de teléfono, direcciones, identificaciones personales no deberían transmitirse en texto claro. Divide información sensible en partes y envía por canales diferentes.",
+          "advertencia": "No confíes en 'mensajes eliminados'. Los mensajes en redes mesh pueden quedar grabados en logs de nodos intermedios."
+        },
+        {
+          "numero": 4,
+          "titulo": "Protección física del dispositivo",
+          "descripcion": "Usa PIN o patrón de desbloqueo en tu dispositivo. Configura borrado automático después de 10 intentos fallidos. No dejes el dispositivo desbloqueado y sin supervisión. Si el dispositivo es conmemado, las claves pueden ser extraídas; ten plan para reportar y cambiar claves.",
+          "advertencia": "En situaciones de alta amenaza, considera destruir el dispositivo si hay riesgo de captura por actores hostiles."
+        },
+        {
+          "numero": 5,
+          "titulo": "OPSEC (Seguridad de operaciones)",
+          "descripcion": "No reveles tu ubicación exacta en mensajes públicos. Varía tus horarios de conexión para evitar patrones. Usa nombres de usuario anónimos si es posible. Evita vincular tu identidad real con tu usuario mesh. Habla sobre seguridad solo en canales cifrados.",
+          "advertencia": "La metadata (quién se comunica con quién, cuándo, cuánto) también es información sensible. Minimiza exposición."
+        }
+      ],
+      "advertencias": [
+        "En países con censura, tener software de cifrado puede ser ilegal. Conoce las leyes de tu jurisdicción.",
+        "El cifrado protege tus mensajes pero no oculta que estás usando la red mesh. El hecho de comunicarte puede ser detectado.",
+        "Tu seguridad digital es tan débil como el eslabón más débil. No uses la misma contraseña en múltiples servicios."
+      ],
+      "referencias": [
+        "EFF - Surveillance Self-Defense",
+        "Security in a Box - Digital Security Tools",
+        "Reset - Privacy for Human Rights Defenders"
+      ]
+    },
+    {
+      "id": "guia_15",
+      "titulo": "Guía general de supervivencia urbana",
+      "categoria": "supervivencia",
+      "prioridad": "critica",
+      "resumen": "Compilación de habilidades esenciales para sobrevivir en entornos urbanos durante crisis prolongadas: seguridad, recursos, organización comunitaria.",
+      "pasos": [
+        {
+          "numero": 1,
+          "titulo": "Evaluación rápida del entorno",
+          "descripcion": "Al llegar a una nueva zona urbana, evalúa: ¿Hay servicios básicos funcionando (agua, electricidad)? ¿Hay presencia de autoridades? ¿Hay signos de saqueo o violencia reciente? ¿Cuál es el estado de las tiendas y mercados? ¿Hay otros civiles organizados? Responde estas preguntas antes de tomar decisiones.",
+          "advertencia": "No asumas que zonas aparentemente normales están seguras. Verifica antes de bajar la guardia."
+        },
+        {
+          "numero": 2,
+          "titulo": "Seguridad personal básica",
+          "descripcion": "Mantén bajo perfil y evita llamar atención. No muestres riqueza ni recursos (comida, agua, electrónica). Camina con propósito y confianza. Evita zonas desolate o con poca gente. Viaja en grupo cuando sea posible. Establece horarios para estar siempre visible en tu ubicación fija.",
+          "advertencia": "En crisis, la solidaridad existe pero también la oportunidad para quienes buscan aprovechar. Mantén equilibrio entre confianza y precaución."
+        },
+        {
+          "numero": 3,
+          "titulo": "Obtención de recursos",
+          "descripcion": "Los primeros recursos a asegurar: agua potable, alimentos no perecederos, medicamentos esenciales. Tiendas de conveniencia y supermercados suelen ser saqueados primero. Busca tiendas especializadas o de barrio (tiendas de ropa, ferreterías). Jardines comunitarios y techos pueden proporcionar alimentos vegetales.",
+          "advertencia": "No sobrevivas a la crisis para morir en confrontación por recursos. Establece intercambios justos y cooperativos."
+        },
+        {
+          "numero": 4,
+          "titulo": "Organización comunitaria",
+          "descripcion": "La comunidad es tu recurso más valioso. Organiza reuniones vecinales para compartir información y recursos. Establece roles: vigilancia, provisión de agua, primeros auxilios, comunicación. Crea-red mesh local para mantener comunicación. Distribuye tareas según habilidades de cada persona.",
+          "advertencia": "Evita conflictos por liderazgo. Los mejores líderes son los que sirven, no los que dominan. Mantén decisión colectiva."
+        },
+        {
+          "numero": 5,
+          "titulo": "Recuperación a largo plazo",
+          "descripcion": "Si la crisis dura semanas o meses, necesitarás establecer sistemas sostenibles: huertos urbanos, recolectores de agua lluvia, energía renovable si disponible, aprendizaje de habilidades locales. Prioriza educación y formación de habilidades por encima de acumulación de recursos.",
+          "advertencia": "La recuperación más exitosa viene de comunidades organizadas, no de individuos aislados. Invierte en tu comunidad."
+        }
+      ],
+      "advertencias": [
+        "La supervivencia urbana no es una competencia. Los que más sobreviven son los que cooperan, no los que acumulan.",
+        "El estrés prolongado afecta la salud mental. Cuida tu bienestar emocional tanto como el físico.",
+        "Cada crisis es diferente. Sé flexible y adaptable. Las guías son puntos de partida, no instrucciones rígidas."
+      ],
+      "referencias": [
+        "Urban Survival Guide - Practical Skills",
+        "FEMA - Urban Preparedness",
+        "Community Resilience - Building Networks"
+      ]
+    }
+  ]
+}

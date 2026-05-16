@@ -1,0 +1,120 @@
+{
+  "version": "2.0.0",
+  "fecha": "2026-05-17",
+  "descripcion": "Vault offline para Red Mesh sin Internet - App de comunicacion mesh sin conexion",
+  "tamano_total_base": "1 MB",
+  "tamano_con_traductor": "351 MB",
+  "tamano_limite_app": "1 GB",
+  "margen_para_extras": "~649 MB disponible",
+  "requisitos": {
+    "version_android_minima": "8.0 (API 26)",
+    "almacenamiento_necesario": "500 MB (sin traductor), 800 MB (con traductor)",
+    "ram_recomendada": "2 GB (2.5 GB si se usa traductor)",
+    "funciona_offline": true,
+    "compatibilidad": ["Kiwix SDK para Wikipedia", "MapLibre para mapas offline", "llama.cpp para traductor NLLB-200"]
+  },
+  "secciones": [
+    {
+      "nombre": "Wikipedia Offline",
+      "ruta": "wikipedia/wikipedia_offline.json",
+      "formato": "JSON (alternativa offline al archivo ZIM)",
+      "tamano": "15 MB",
+      "descripcion": "500 articulos esenciales de Wikipedia en espanol: ciencia, medicina, historia, geografia, tecnologia, supervivencia",
+      "comprimido": true,
+      "archivo_gzip": "wikipedia/wikipedia_offline.json.gz"
+    },
+    {
+      "nombre": "Guias de Supervivencia",
+      "ruta": "guides/supervivencia.json",
+      "formato": "JSON",
+      "tamano": "200 KB",
+      "descripcion": "15 guias detalladas para situaciones de emergencia: agua, refugio, fuego, navegacion, desastres, comunicacion mesh",
+      "comprimido": true,
+      "archivo_gzip": "guides/supervivencia.json.gz"
+    },
+    {
+      "nombre": "Primeros Auxilios",
+      "ruta": "first_aid/primeros_auxilios.json",
+      "formato": "JSON",
+      "tamano": "150 KB",
+      "descripcion": "12 protocolos medicos de emergencia: RCP, hemorragias, quemaduras, fracturas, mordeduras, envenenamiento",
+      "comprimido": true,
+      "archivo_gzip": "first_aid/primeros_auxilios.json.gz"
+    },
+    {
+      "nombre": "Diccionario Offline",
+      "ruta": "dictionary/diccionario.db",
+      "formato": "SQLite con FTS5",
+      "tamano": "2 MB",
+      "descripcion": "Base de datos SQLite con 200+ terminos de emergencia, supervivencia y tecnologia mesh. Incluye indice JSON para busquedas rapidas.",
+      "archivos": [
+        "dictionary/diccionario.db",
+        "dictionary/diccionario_index.json"
+      ]
+    },
+    {
+      "nombre": "Mapas de Colombia",
+      "ruta": "maps/colombia_emergencias.geojson",
+      "formato": "GeoJSON",
+      "tamano": "5 MB",
+      "descripcion": "50 ciudades principales de Colombia con coordenadas, poblaciones, rutas y puntos de emergencia",
+      "comprimido": true,
+      "archivo_gzip": "maps/colombia_emergencias.geojson.gz"
+    },
+    {
+      "nombre": "Indice de Busqueda",
+      "ruta": "index.json",
+      "formato": "JSON",
+      "tamano": "100 KB",
+      "descripcion": "Indice unificado para busqueda rapida en todo el vault"
+    },
+    {
+      "nombre": "Documentacion",
+      "ruta": "README.md",
+      "formato": "Markdown",
+      "tamano": "10 KB",
+      "descripcion": "Documentacion completa de uso del vault"
+    },
+    {
+      "nombre": "Traductor Offline NLLB-200",
+      "ruta": "translator/",
+      "formato": "GGUF (modelo IA) + Language Packs (JSON)",
+      "tamano": "~350 MB (modelo) + ~5 KB por idioma",
+      "descripcion": "Modelo de traduccion de Meta AI: 200 idiomas, 39800 direcciones de traduccion. Sistema de language packs descargables por idioma. Requiere descarga separada del modelo GGUF.",
+      "archivos": [
+        "translator/README.md",
+        "translator/download_model.sh",
+        "translator/translator_config.json",
+        "translator/translator_engine.py",
+        "translator/language_packs.py",
+        "translator/models/ (carpeta para modelo GGUF)",
+        "translator/lang_packs/ (paquetes de idioma)",
+        "translator/cache/ (cache de traducciones)"
+      ],
+      "idiomas_builtin": ["es", "en", "fr", "pt", "de", "it", "zh", "ja", "ko", "ru"],
+      "idiomas_descargables": 190,
+      "nota": "El archivo .gguf (~350 MB) debe descargarse manualmente. Ver translator/download_model.sh. Los language packs de los 10 idiomas principales ya estan incluidos."
+    }
+  ],
+  "metadata": {
+    "autor": "Red Mesh sin Internet",
+    "licencia": "Creative Commons Attribution-ShareAlike 4.0",
+    "ultima_actualizacion": "2026-05-17T00:00:00Z",
+    "idioma": "es-CO",
+    "cambios_v2": [
+      "Reemplazado Hy-MT por NLLB-200 Distilled 600M (Meta AI)",
+      "200 idiomas vs 33 idiomas anteriores",
+      "39800 direcciones de traduccion vs 1056",
+      "Modelo mas pequeno: ~350 MB vs 462 MB",
+      "Menor uso de RAM: ~900 MB vs ~2 GB",
+      "Sistema de language packs descargables por idioma",
+      "10 idiomas builtin (sin descarga adicional)",
+      "190 idiomas descargables (~5 KB cada pack)"
+    ]
+  },
+  "notas_descarga": [
+    "Para Wikipedia completo (~200MB), descargar desde: https://download.kiwix.org/zim/wikipedia/wikipedia_es_all_mini_*.zim",
+    "Para mapas detallados (~100MB), descargar desde: https://download.geofabrik.de/south-america/colombia-latest.osm.pbf",
+    "Para el traductor NLLB-200 (~350MB), ejecutar translator/download_model.sh"
+  ]
+}
