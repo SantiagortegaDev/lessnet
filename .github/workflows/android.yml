@@ -34,23 +34,36 @@ jobs:
           # Restore our AndroidManifest with BT permissions
           cp /tmp/AndroidManifest_backup.xml "$GITHUB_WORKSPACE/android/app/src/main/AndroidManifest.xml"
           
-          # Copy our custom native Kotlin files (BLE peripheral plugin)
-          KOTLIN_DIR=$(find "$GITHUB_WORKSPACE/android/app/src/main/kotlin" -type d -name "lessnet" | head -1)
-          if [ -n "$KOTLIN_DIR" ]; then
-            # Get the package name from the generated MainActivity
-            PACKAGE=$(head -1 "$KOTLIN_DIR/MainActivity.kt" | sed 's/package //')
-            echo "Detected package: $PACKAGE"
-            echo "Kotlin dir: $KOTLIN_DIR"
-            
-            # Replace package placeholder in our custom Kotlin files
-            sed "s/PACKAGE_PLACEHOLDER/$PACKAGE/g" "$GITHUB_WORKSPACE/native/BlePeripheralPlugin.kt" > "$KOTLIN_DIR/BlePeripheralPlugin.kt"
-            sed "s/PACKAGE_PLACEHOLDER/$PACKAGE/g" "$GITHUB_WORKSPACE/native/MainActivity.kt" > "$KOTLIN_DIR/MainActivity.kt"
-            
-            echo "Custom Kotlin files installed:"
-            ls -la "$KOTLIN_DIR/"
-          else
-            echo "WARNING: Could not find Kotlin directory!"
+          # ── Install our custom native BLE peripheral Kotlin files ──
+          # Detect the application ID from the generated build.gradle
+          PACKAGE=$(grep -E "namespace|applicationId" "$GITHUB_WORKSPACE/android/app/build.gradle" | head -1 | sed -E "s/.*(namespace|applicationId) *[= ] *['\"]//;s/['\"].*//" | tr -d ' ')
+          
+          if [ -z "$PACKAGE" ]; then
+            echo "ERROR: Could not detect package name from build.gradle"
+            cat "$GITHUB_WORKSPACE/android/app/build.gradle" | head -40
+            exit 1
           fi
+          
+          echo "Detected package: $PACKAGE"
+          
+          # Compute the Kotlin directory from the package name
+          KOTLIN_DIR="$GITHUB_WORKSPACE/android/app/src/main/kotlin/$(echo $PACKAGE | tr '.' '/')"
+          echo "Kotlin dir: $KOTLIN_DIR"
+          
+          # Remove any existing files and ensure directory exists
+          rm -rf "$KOTLIN_DIR"
+          mkdir -p "$KOTLIN_DIR"
+          
+          # Replace package placeholder and copy our custom Kotlin files
+          sed "s/PACKAGE_PLACEHOLDER/$PACKAGE/g" "$GITHUB_WORKSPACE/native/BlePeripheralPlugin.kt" > "$KOTLIN_DIR/BlePeripheralPlugin.kt"
+          sed "s/PACKAGE_PLACEHOLDER/$PACKAGE/g" "$GITHUB_WORKSPACE/native/MainActivity.kt" > "$KOTLIN_DIR/MainActivity.kt"
+          
+          echo "Installed custom Kotlin files:"
+          ls -la "$KOTLIN_DIR/"
+          echo "--- MainActivity.kt ---"
+          head -3 "$KOTLIN_DIR/MainActivity.kt"
+          echo "--- BlePeripheralPlugin.kt ---"
+          head -3 "$KOTLIN_DIR/BlePeripheralPlugin.kt"
           
           # Restore our source code
           rm -rf "$GITHUB_WORKSPACE/lib"
