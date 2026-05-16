@@ -30,7 +30,7 @@ async def main(page: ft.Page):
     permission_items = ft.Column(spacing=12, animate_opacity=300)
 
     # Permission Handler - Solo lo inicializamos si estamos en móvil
-    # Usamos lazy import para evitar problemas
+    # El PermissionHandler NO es un control visual, por eso NO debe añadirse al overlay
     ph = None
     is_mobile = page.platform in [ft.PagePlatform.IOS, ft.PagePlatform.ANDROID]
     
@@ -38,8 +38,6 @@ async def main(page: ft.Page):
         try:
             from flet_permission_handler import PermissionHandler, Permission
             ph = PermissionHandler()
-            # En móviles, el PermissionHandler se añade al overlay para manejar diálogos del sistema
-            page.overlay.append(ph)
             # Actualizamos los tipos de permisos para usar el enum de Permission
             perms_data = [
                 {"id": "camera", "name": "Cámara", "icon": ft.Icons.CAMERA_ALT_ROUNDED, "type": Permission.CAMERA},
