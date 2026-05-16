@@ -4,18 +4,50 @@ on:
     branches:
       - main
   workflow_dispatch:
+
 jobs:
   build-apk:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
-      - name: Instalar dependencias
+
+      - name: Regenerate Android project files
+        run: |
+          # Save our custom source files
+          cp -r lib /tmp/lib_backup
+          cp -r assets /tmp/assets_backup 2>/dev/null || true
+          cp pubspec.yaml /tmp/pubspec_backup.yaml
+          
+          # Create a fresh Flutter project to get correct Gradle files
+          cd /tmp
+          flutter create --org com.lessnet lessnet_temp
+          
+          # Replace the entire Android directory with fresh one
+          rm -rf "$GITHUB_WORKSPACE/android"
+          cp -r /tmp/lessnet_temp/android "$GITHUB_WORKSPACE/android"
+          
+          # Restore our source code
+          rm -rf "$GITHUB_WORKSPACE/lib"
+          cp -r /tmp/lib_backup "$GITHUB_WORKSPACE/lib"
+          
+          if [ -d "/tmp/assets_backup" ]; then
+            rm -rf "$GITHUB_WORKSPACE/assets"
+            cp -r /tmp/assets_backup "$GITHUB_WORKSPACE/assets"
+          fi
+          
+          # Use our pubspec.yaml with our dependencies
+          cp /tmp/pubspec_backup.yaml "$GITHUB_WORKSPACE/pubspec.yaml"
+
+      - name: Install dependencies
         run: flutter pub get
+
       - name: Build APK
         run: flutter build apk --release
+
       - uses: actions/upload-artifact@v4
         with:
           name: app-release
