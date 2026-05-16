@@ -44,26 +44,25 @@ jobs:
 
       - name: Add Bluetooth permissions to AndroidManifest
         run: |
-          MANIFEST="android/app/src/main/AndroidManifest.xml"
-          
-          # Read current manifest
-          CONTENT=$(cat "$MANIFEST")
-          
-          # Bluetooth permissions to inject (before </manifest>)
-          PERMS='
-            <uses-permission android:name="android.permission.BLUETOOTH" />
-            <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
-            <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
-            <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-            <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
-            <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-            <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-            <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
-            <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
-          '
-          
-          # Insert permissions before </manifest>
-          echo "$CONTENT" | sed "s|</manifest>|${PERMS}\n</manifest>|" > "$MANIFEST"
+          python3 -c "
+          path = 'android/app/src/main/AndroidManifest.xml'
+          with open(path, 'r') as f:
+              content = f.read()
+          perms = '''    <uses-permission android:name="android.permission.BLUETOOTH" />
+              <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+              <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
+              <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+              <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
+              <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+              <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+              <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
+              <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
+          '''
+          content = content.replace('</manifest>', perms + '\n</manifest>')
+          with open(path, 'w') as f:
+              f.write(content)
+          print('Permissions injected!')
+          "
 
       - name: Install dependencies
         run: flutter pub get
