@@ -1,3 +1,4 @@
+import asyncio
 import flet as ft
 import flet_permission_handler as fph
 
@@ -9,10 +10,19 @@ def main(page: ft.Page):
     page.bgcolor = "#0F172A"
 
     is_mobile = page.platform in (ft.PagePlatform.ANDROID, ft.PagePlatform.IOS)
+
+    # ──────────────────────────────────────────────
+    # PERMISION HANDLER (dentro del layout principal)
+    # ──────────────────────────────────────────────
+    # Se crea pero NO se agrega todavía con page.add() separado.
+    # Se integrará dentro del árbol de controles principal para
+    # asegurar que el canal nativo se registre correctamente.
     ph = None
     if is_mobile:
         ph = fph.PermissionHandler()
-        page.add(ph)
+
+    # Flag para saber si el handler ya está montado en la página
+    ph_mounted = False
 
     # ──────────────────────────────────────────────
     # SNACKBAR
@@ -35,6 +45,50 @@ def main(page: ft.Page):
 
     status_texts = {}
 
+    async def request_permission_with_retry(perm_type, perm_name, max_retries=2):
+        """
+        Solicita un permiso con reintento automático.
+        Espera un breve momento antes de cada intento para dar tiempo
+        al canal nativo a estar listo.
+        """
+        nonlocal ph_mounted
+
+        if not is_mobile:
+            show_snack("Solo funciona en el APK Android", ok=False)
+            return None
+
+        if ph is None:
+            show_snack("PermissionHandler no disponible", ok=False)
+            return None
+
+        # Si el handler no está montado, esperar brevemente
+        if not ph_mounted:
+            await asyncio.sleep(0.5)
+
+        for attempt in range(max_retries):
+            try:
+                # Primero verificar el estado actual del permiso
+                check_result = await ph.check(perm_type)
+                check_name = check_result.name if check_result else "unknown"
+
+                if check_name == "granted":
+                    return check_result
+
+                # Si no está concedido, solicitarlo
+                result = await ph.request(perm_type)
+                return result
+
+            except Exception as ex:
+                error_msg = str(ex)
+                if "TimeoutException" in error_msg and attempt < max_retries - 1:
+                    # Esperar antes de reintentar
+                    await asyncio.sleep(1.5)
+                    continue
+                else:
+                    raise ex
+
+        return None
+
     def make_perm_row(p):
         st = ft.Text("—", size=13, color=ft.Colors.GREY_500, weight=ft.FontWeight.W_600)
         status_texts[p["key"]] = st
@@ -44,7 +98,7 @@ def main(page: ft.Page):
                 show_snack("Solo funciona en el APK Android", ok=False)
                 return
             try:
-                result = await ph.request(pt)
+                result = await request_permission_with_retry(pt, pn)
                 name = result.name if result else "unknown"
                 granted = name == "granted"
                 st.value = "✓ Concedido" if granted else "✗ Denegado"
@@ -52,7 +106,19 @@ def main(page: ft.Page):
                 page.update()
                 show_snack(f"{pn}: {name}", ok=granted)
             except Exception as ex:
-                show_snack(f"Error: {ex}", ok=False)
+                error_msg = str(ex)
+                if "TimeoutException" in error_msg:
+                    st.value = "⚠ Timeout"
+                    st.color = ft.Colors.AMBER_400
+                    show_snack(
+                        f"Timeout al solicitar {pn}. Intenta de nuevo o revisa los permisos en Ajustes del sistema.",
+                        ok=False,
+                    )
+                else:
+                    st.value = "✗ Error"
+                    st.color = ft.Colors.RED_400
+                    show_snack(f"Error en {pn}: {ex}", ok=False)
+                page.update()
 
         return ft.Container(
             content=ft.Row(
@@ -93,17 +159,33 @@ def main(page: ft.Page):
         if not is_mobile:
             show_snack("Solo funciona en el APK Android", ok=False)
             return
+
+        show_snack("Solicitando permisos...")
+
         for p in perm_list:
             try:
-                result = await ph.request(p["type"])
+                result = await request_permission_with_retry(p["type"], p["name"])
                 name = result.name if result else "unknown"
                 granted = name == "granted"
                 st = status_texts.get(p["key"])
                 if st:
                     st.value = "✓ Concedido" if granted else "✗ Denegado"
                     st.color = ft.Colors.GREEN_400 if granted else ft.Colors.RED_400
-            except Exception:
-                pass
+            except Exception as ex:
+                st = status_texts.get(p["key"])
+                if st:
+                    error_msg = str(ex)
+                    if "TimeoutException" in error_msg:
+                        st.value = "⚠ Timeout"
+                        st.color = ft.Colors.AMBER_400
+                    else:
+                        st.value = "✗ Error"
+                        st.color = ft.Colors.RED_400
+
+            # Esperar entre cada solicitud de permiso para no saturar
+            # el canal nativo de Android (causa del TimeoutException)
+            await asyncio.sleep(0.8)
+
         page.update()
         show_snack("Todos los permisos solicitados ✓")
 
@@ -230,7 +312,7 @@ def main(page: ft.Page):
     )
 
     # ──────────────────────────────────────────────
-    # NAVEGACIÓN MANUAL (sin ft.Tabs — API cambió en v0.85)
+    # NAVEGACIÓN
     # ──────────────────────────────────────────────
     body = ft.Container(content=perms_view, expand=True)
 
@@ -259,7 +341,17 @@ def main(page: ft.Page):
     btn_perms.on_click = go_perms
     btn_chat.on_click  = go_chat
 
-    page.add(
+    # ──────────────────────────────────────────────
+    # LAYOUT PRINCIPAL
+    # El PermissionHandler se incluye DENTRO del árbol de controles
+    # para asegurar que el canal nativo se registre correctamente.
+    # Se coloca como primer hijo del Column (es invisible).
+    # ──────────────────────────────────────────────
+    main_controls = []
+    if ph is not None:
+        main_controls.append(ph)  # Invisible, pero debe estar en el árbol
+
+    main_controls.append(
         ft.SafeArea(
             content=ft.Container(
                 content=ft.Column(
@@ -284,6 +376,11 @@ def main(page: ft.Page):
             expand=True,
         )
     )
+
+    page.add(*main_controls)
+
+    # Marcar que el PermissionHandler ya está montado
+    ph_mounted = True
 
 
 if __name__ == "__main__":
