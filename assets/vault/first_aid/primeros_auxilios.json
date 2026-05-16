@@ -1,0 +1,655 @@
+{
+  "version": "1.0",
+  "fecha": "2026-05-16",
+  "total_protocolos": 12,
+  "protocolos": [
+    {
+      "id": "prot_01",
+      "titulo": "RCP (Reanimación Cardiopulmonar)",
+      "categoria": "emergencia_cardiaca",
+      "prioridad": "critica",
+      "resumen": "Protocolo de emergencia para restaurar la respiración y circulación en personas en paro cardíaco o que no responden.",
+      "pasos": [
+        {
+          "numero": 1,
+          "titulo": "Verificar seguridad de la escena",
+          "descripcion": "Antes de aproximarte, asegúrate de que el area sea segura para ti y la víctima. Retira cualquier peligro inmediato (tráfico, fuego, electricidad). Solo procéd si es seguro.",
+          "advertencia": "No te conviertas en otra víctima. Evalúa riesgos antes de actuar."
+        },
+        {
+          "numero": 2,
+          "titulo": "Verificar respuesta de la víctima",
+          "descripcion": "Da golpecitos suaves en los hombros y pregunta en voz alta: '¿Estás bien?'. Mira si hay movimiento ocular o respuesta verbal. Si no responde, llama a emergencias inmediatamente (si hay alguien presente, pídele que llame mientras tú acts).",
+          "advertencia": "Si hay sospecha de lesión cervical, no muevas a la víctima. Solo verifica respiración sin inclinar la cabeza."
+        },
+        {
+          "numero": 3,
+          "titulo": "Llamar a emergencias",
+          "descripcion": "Si estás solo, llama a emergencias (123 en Colombia) y active el altavoz. Explain ubicación y estado de la víctima. Sigue instrucciones del operador mientras realizas RCP. Si hay alguien más, envía a esa persona a llamar.",
+          "advertencia": "En RCP para niños, si estás solo, realiza 2 minutos de RCP antes de llamar a emergencias."
+        },
+        {
+          "numero": 4,
+          "titulo": "Abrir vía aérea",
+          "descripcion": "Coloca a la víctima boca arriba sobre superficie firme. Inclina la cabeza hacia atrás levantando el mentón (maniobra frente-mentón). Esto abre la vía aérea. Verifica que no haya obstrucción visible en la boca.",
+          "advertencia": "Si hay sospecha de trauma cervical, solo realiza la inclinación si es absolutamente necesario para salvar la vida."
+        },
+        {
+          "numero": 5,
+          "titulo": "Verificar respiración",
+          "descripcion": "Observa el pecho durante no más de 10 segundos. Busca movimientos de respiración, escucha sonidos, siente flujo de aire en tu mejilla. Si no respira o solo jadea, inicia compresiones torácicas.",
+          "advertencia": "No confundas jadeos ocasionales con respiración normal. Si no hay respiración normal, inicia RCP."
+        },
+        {
+          "numero": 6,
+          "titulo": "Compresiones torácicas",
+          "descripcion": "Coloca el talón de una mano sobre el centro del pecho (entre los pezones). Pon la otra mano encima y entrelaza los dedos. Con brazos rectos, presiona fuerte y rápido: al menos 5 cm de profundidad, 100-120 compresiones por minuto. Deja que el pecho se expanda completamente entre compresiones.",
+          "advertencia": "Las compresiones incorrectas pueden causar lesiones. Presiona en el centro del pecho, no en las costillas ni en el abdomen."
+        },
+        {
+          "numero": 7,
+          "titulo": "Ventilaciones de rescate (si estás entrenado)",
+          "descripcion": "Después de 30 compresiones, inclina la cabeza, pellizca la nariz y sella tu boca sobre la boca de la víctima. Da 2 ventilaciones lentas (1 segundo cada una) observando que el pecho se eleve. Si no estás entrenado en RCP, solo realiza compresiones continuas.",
+          "advertencia": "Si hay riesgo de infección (sangre, vómito), no realices ventilaciones. Solo compresiones continuas."
+        },
+        {
+          "numero": 8,
+          "titulo": "Continuar RCP",
+          "descripcion": "Alterna 30 compresiones con 2 ventilaciones hasta que: llegue ayuda médica, la víctima recupere respiración normal, estés físicamente exhausto, o la escena se vuelva insegura. Si hay un DEA disponible, úsalo siguiendo las instrucciones del equipo.",
+          "advertencia": "Interrumpir compresiones reduce efectividad. Solo interrupciones breves para ventilaciones y uso de DEA."
+        }
+      ],
+      "advertencias": [
+        "El RCP en niños usa 2 dedos (bebés) o una mano (niños) para compresiones. La proporción sigue siendo 30:2.",
+        "En adultos, las compresiones torácicas son más importantes que las ventilaciones. Si no estás seguro, solo comprime.",
+        "RCP inmediatas pueden duplicar o triplicar las probabilidades de supervivencia. Cada segundo cuenta."
+      ],
+      "referencias": [
+        "Cruz Roja Colombiana - Protocolo RCP",
+        "American Heart Association - CPR Guidelines",
+        "OMS - Reanimación Cardiopulmonar"
+      ],
+      "cuando_buscar_ayuda": "Inmediatamente al confirmar que la víctima no responde y no respira. No esperes. Llama a emergencias mientras inicias RCP."
+    },
+    {
+      "id": "prot_02",
+      "titulo": "Control de hemorragias",
+      "categoria": "trauma",
+      "prioridad": "critica",
+      "resumen": "Protocolo para detener sangrados severos que pueden poner en riesgo la vida en minutos. Incluye técnicas directas e indirectas.",
+      "pasos": [
+        {
+          "numero": 1,
+          "titulo": "Evaluar la gravedad del sangrado",
+          "descripcion": "Clasifica el sangrado: Capilar (superficial, goteo), Venoso (flujo continuo oscuro), Arterial (chorro pulsante brillante). Los sangrados arteriales son los más graves y requieren acción inmediata. Si la sangre brota en chorro o la víctima muestra signos de shock, actúa rápido.",
+          "advertencia": "Si la víctima pierde más de un litro de sangre, puede entrar en shock. Actúa en los primeros 2 minutos."
+        },
+        {
+          "numero": 2,
+          "titulo": "Aplicar presión directa",
+          "descripcion": "Usa tela limpia (ropa, toalla, gasa si hay). Presiona firmemente sobre la herida. Si la sangre atraviesa, añade más capas sin retirar la primera. Mantén presión constante durante al menos 10 minutos sin verificar. El coágulo necesita tiempo para formarse.",
+          "advertencia": "No retires la tela para 'verificar' antes de 10 minutos. Esto interrumpe la formación de coágulo."
+        },
+        {
+          "numero": 3,
+          "titulo": "Elevar la extremidad",
+          "descripcion": "Si la herida está en una extremidad (brazo, pierna), elévarla por encima del nivel del corazón mientras mantienes presión. Esto reduce el flujo sanguíneo a la herida. Continúa aplicando presión firme.",
+          "advertencia": "No eleves si hay sospecha de fractura en la extremidad. Solo eleva si estás seguro de que no hay daño óseo."
+        },
+        {
+          "numero": 4,
+          "titulo": "Si la presión directa no funciona",
+          "descripcion": "Si after 15 minutos de presión constante el sangrado continúa, considera usar un Torniquete. Colócalo 5-7 cm por encima de la herida, nunca sobre articulaciones. Aprieta hasta que el sangrado se detenga completamente. Anota la hora de colocación.",
+          "advertencia": "El torniquete es último recurso. Causa daño tisular que aumenta con el tiempo. Solo para hemorragias que amenazan la vida."
+        },
+        {
+          "numero": 5,
+          "titulo": "Posición y monitoreo",
+          "descripcion": "Coloca a la víctima boca arriba. Cubre con manta para prevenir hipotermia (el frío agrava el shock). Monitorea constantemente: respiración, pulso, nivel de consciencia. Habla con la víctima para mantenerla consciente. NO le des nada por la boca si está inconsciente.",
+          "advertencia": "Los signos de shock incluyen: palidez, piel fría y húmeda, respiración rápida y superficial, confusión. Prepárate para RCP."
+        }
+      ],
+      "advertencias": [
+        "Los objetos empalados (cuchillo, bala, cristal) NO deben retirarse. La remoción puede causar más daño y sangrado. Inmoviliza el objeto y busca ayuda profesional.",
+        "Si hay sangrado en oído, nariz o cabeza, no apliques presión directa. Esto puede causar daño cerebral.",
+        "El uso de torniquete sin entrenamiento adecuado puede causar pérdida de extremidad. Si es posible, busca ayuda profesional primero."
+      ],
+      "referencias": [
+        "ATLS - Advanced Trauma Life Support",
+        "Cruz Roja - Control de Hemorragias",
+        "Stop the Bleed Campaign"
+      ],
+      "cuando_buscar_ayuda": "Inmediatamente para cualquier hemorragia arterial, sangrado que no se controla con presión en 15 minutos, o si hay signos de shock."
+    },
+    {
+      "id": "prot_03",
+      "titulo": "Manejo de quemaduras",
+      "categoria": "trauma",
+      "prioridad": "alta",
+      "resumen": "Protocolo para tratar quemaduras térmicas, químicas y solares, evaluando gravedad y aplicando tratamiento adecuado.",
+      "pasos": [
+        {
+          "numero": 1,
+          "titulo": "Detener el proceso de quemadura",
+          "descripcion": "Retira la fuente de calor inmediatamente. Si hay ropa ardiendo, apaga las llamas (arrollar en manta, rodar en el suelo, usar agua). Si hay chemical, retira la ropa contaminada y lava con agua abundante. Si hay exposición eléctrica, desconecta la fuente antes de tocar a la víctima.",
+          "advertencia": "No uses mantas sintéticas que pueden derretirse sobre la piel. Solo materiales naturales como lana o algodón."
+        },
+        {
+          "numero": 2,
+          "titulo": "Evaluar la severidad",
+          "descripcion": "Clasifica la quemadura: Primer grado (enrojecimiento, dolor, sin ampollas), Segundo grado (ampollas, dolor intenso), Tercer grado (piel blanca o carbonizada, sin dolor por daño a nervios). Calcula el área: regla del 9% (cabeza 9%, cada brazo 9%, cada pierna 18%, torso 36%).",
+          "advertencia": "Quemaduras en cara, manos, pies, ingles, articulaciones o más de 10% del cuerpo son emergencia médica."
+        },
+        {
+          "numero": 3,
+          "titulo": "Enfriamiento de la quemadura",
+          "descripcion": "Aplica agua fría (no helada) durante 10-20 minutos. Esto detiene el daño térmico profundización. No uses hielo directo, ni mantequilla, aceite, pasta dental u otros remedios caseros. Estos atrapan el calor y empeoran la quemadura.",
+          "advertencia": "Si la quemadura es muy extensa (>20%), no enfríes con agua fría porque puede causar hipotermia. Cubre ligeramente y busca ayuda."
+        },
+        {
+          "numero": 4,
+          "titulo": "Cubrir la quemadura",
+          "descripcion": "Cubre con apósito estéril (gasa limpia, sábana limpia). No apliques presión sobre las ampollas. Si no hay apósito, usa película de plástico (envoltura) como alternativa temporal limpia. Los vendajes deben ser holgados, no apretados.",
+          "advertencia": "No rompas las ampollas. Son protección natural contra infección. Si se rompen, lava suavemente con agua y soap."
+        },
+        {
+          "numero": 5,
+          "titulo": "Manejo del dolor y prevención de infección",
+          "descripcion": "Para dolor, el ibuprofeno o paracetamol pueden ayudar (si no hay contraindicación). Mantén la quemadura limpia y seca. No apliques ningún producto topical sin supervisión médica. Vigila signos de infección: aumento de dolor, enrojecimiento, fiebre, pus.",
+          "advertencia": "Las quemaduras de segundo y tercer grado siempre requieren atención médica profesional para evitar cicatrices severas e infecciones."
+        }
+      ],
+      "advertencias": [
+        "Quemaduras químicas requieren lavado extenso con agua durante al menos 20 minutos. Algunos chemicals reaccionan con agua (cal viva). Infórmate sobre el chemical específico.",
+        "Las quemaduras eléctricas pueden causar daño interno no visible. Toda víctima de electrocución debe ser evaluada médicamente.",
+        "Quemaduras en niños requieren atención médica aunque parezcan menores. La piel infantil es más Delgada y se daña más fácilmente."
+      ],
+      "referencias": [
+        "American Burn Association - First Aid",
+        "OMS - Quemaduras",
+        "Cruz Roja - Tratamiento de Quemaduras"
+      ],
+      "cuando_buscar_ayuda": "Quemaduras de segundo grado mayores a 10%, quemaduras de tercer grado en cualquier área, quemaduras en cara/manos/pies/ingle, y todas las quemaduras en niños."
+    },
+    {
+      "id": "prot_04",
+      "titulo": "Maniobra de Heimlich (Asfixia)",
+      "categoria": "emergencia_respiratoria",
+      "prioridad": "critica",
+      "resumen": "Protocolo para desobstruir las vías respiratorias cuando un objeto bloquea la tráquea, restaurando la respiración.",
+      "pasos": [
+        {
+          "numero": 1,
+          "titulo": "Identificar asfixia",
+          "descripcion": "La víctima typically hace el signo universal de asfixia: manos en la garganta. Puede tener tos débil o fuerte, sonidos guturales, dificultad para hablar o respirar, color azulado en labios y cara. Pregunta: '¿Te estás ahogando?' Si asiente y no puede hablar, actúa inmediatamente.",
+          "advertencia": "Si la víctima puede toser con fuerza, anímala a seguir tosiendo. La tos es más efectiva que cualquier maniobra."
+        },
+        {
+          "numero": 2,
+          "titulo": "Adultos y niños (mayores de 1 año)",
+          "descripcion": "Párate detrás de la víctima. Rodéala con tus brazos alrededor de la cintura. Place el puño de una mano ligeramente encima del ombligo y debajo de las costillas. Agarra tu puño con la otra mano. Realiza compresiones abdominales rápidas hacia arriba y hacia dentro.",
+          "advertencia": "No aplicques presión sobre el esternón ni las costillas. Esto puede causar fracturas."
+        },
+        {
+          "numero": 3,
+          "titulo": "Maniobra de 5 compresiones",
+          "descripcion": "Realiza 5 compresiones abdominales firmes. Alterna entre compresiones y verificar si el objeto fue expelido. Continúa hasta que el objeto sea expulsado o la víctima pierda consciencia. Si pierde consciencia, apoya cuidadosamente al suelo y llama a emergencias.",
+          "advertencia": "La fuerza debe ser proporcional a la persona. En niños, usa menos fuerza. En ancianos, ten precaución con posibles fracturas de costillas."
+        },
+        {
+          "numero": 4,
+          "titulo": "Si la víctima pierde consciencia",
+          "descripcion": "Baja a la víctima al suelo con cuidado, boca arriba. Inicia RCP (30 compresiones torácicas). Antes de dar ventilaciones, verifica si hay objeto visible en la boca y retíralo con cuidado. No realices barridos a ciegas con los dedos.",
+          "advertencia": "Si no puedes desalojar el objeto con compresiones, no uses pinzas u otros instrumentos. Solo las compresiones abdominales y RCP."
+        },
+        {
+          "numero": 5,
+          "titulo": "Embarazadas y personas obesas",
+          "descripcion": "No puedes rodear a la persona desde atrás en el abdomen. En lugar de eso, coloca tus manos más arriba, en el centro del esternón (técnica de pecho). Realiza compresiones hacia atrás como en RCP.",
+          "advertencia": "Esta variación también se aplica si tienes manos pequeñas o la víctima es mucho más grande que tú."
+        },
+        {
+          "numero": 6,
+          "titulo": "Automaniobra (si estás solo)",
+          "descripcion": "Si te estás asfixiando y no hay nadie, precipita contra el borde de una silla, mostrador, o cualquier superficie que proyecte hacia arriba a la altura del abdomen. Haz presión hacia arriba y hacia dentro. Puedes también encerrar los puños y presionar contra tu propio abdomen.",
+          "advertencia": "Esta técnica es de último recurso. Solo cuando no hay otra opción y no puedes llamar ayuda."
+        }
+      ],
+      "advertencias": [
+        "NO golpees en la espalda a una persona de pie si está consciente y puede toser. Esto puede empeorar la situación.",
+        "En bebés (menores de 1 año), la técnica es diferente: usa 5 golpes en la espalda con el bebé boca abajo sobre tu antebrazo, luego 5 compresiones torácicas con 2 dedos.",
+        "Después de exitos, lleva a la víctima a evaluación médica. Las compresiones abdominales pueden causar daño interno."
+      ],
+      "referencias": [
+        "Mayo Clinic - Choking First Aid",
+        "Cruz Roja - Maniobra de Heimlich",
+        "ACLS - Asfixia Adulto"
+      ],
+      "cuando_buscar_ayuda": "Después de cualquier episodio de asfixia, incluso si la obstrucción fue resuelta, para evaluar posibles lesiones internas."
+    },
+    {
+      "id": "prot_05",
+      "titulo": "Manejo del shock",
+      "categoria": "emergencia_medica",
+      "prioridad": "critica",
+      "resumen": "Protocolo para identificar y tratar el shock, condición potencialmente mortal donde los órganos no reciben suficiente sangre.",
+      "pasos": [
+        {
+          "numero": 1,
+          "titulo": "Identificar signos de shock",
+          "descripcion": "El shock se manifiesta con: piel fría, pálida y húmeda (sudoración fría), respiración rápida y superficial, pulso débil y rápido (más de 100 lpm), confusión mental o inquietud, sed, náuseas o vómitos, debilidad y mareos. Una víctima en shock puede quejarse de que tiene frío aunque la temperatura sea normal.",
+          "advertencia": "El shock puede progresar rápidamente a inconsciencia y muerte. Cada minuto cuenta."
+        },
+        {
+          "numero": 2,
+          "titulo": "Causar posición horizontal",
+          "descripcion": "Acuesta a la víctima sobre su espalda inmediatamente. Eleva las piernas 20-30 cm por encima del nivel del corazón (si no hay sospecha de lesión en cabeza, cuello, espalda o piernas). Esta posición mejora el retorno venoso y perfusión de órganos vitales.",
+          "advertencia": "Si hay sospecha de lesión en cabeza, cuello, espalda o piernas, NO eleves las piernas. Solo colócala boca arriba."
+        },
+        {
+          "numero": 3,
+          "titulo": "Mantener vía aérea abierta",
+          "descripcion": "Verifica que la víctima pueda respirar. Si hay objetos, vómito o sangre en la boca, girea ligeramente la cabeza hacia un lado para permitir drenaje. No inclines la cabeza si hay sospecha de trauma cervical. Abre la vía aérea con la maniobra frente-mentón.",
+          "advertencia": "Si la víctima vomita, limpia la boca rápidamente y vuelve a posicionar. vigila constantemente la respiración."
+        },
+        {
+          "numero": 4,
+          "titulo": "Control de temperatura",
+          "descripcion": "Cubre a la víctima con manta, ropa, cualquier material que proporcione calor. Evita el enfriamiento porque agrava el shock. Si hace mucho calor, protege de fuente de calor excesiva. La hipotermia en víctimas de shock es común y peligrosa.",
+          "advertencia": "No calientes con mantas eléctricas o botellas de agua caliente directas. El calor directo puede causar quemaduras."
+        },
+        {
+          "numero": 5,
+          "titulo": "Hidratación (con precaución)",
+          "descripcion": "Si la víctima está consciente y puede tragar, dale pequeños sorbos de agua. NO más de medio vaso cada 15 minutos. NO dé agua si hay sospecha de lesión abdominal interna, si está inconsciente, o si hay vómitos.",
+          "advertencia": "La hidratación oral solo es segura si la víctima está completamente consciente y sin riesgo de cirugía abdominal inminente."
+        },
+        {
+          "numero": 6,
+          "titulo": "Monitoreo continuo",
+          "descripcion": "Habla con la víctima para mantenerla consciente. Pregunta su nombre, la fecha, dónde está. Monitorea respiración y pulso cada 5 minutos. Prepárate para RCP si cesa la respiración. No dejes a la víctima sola.",
+          "advertencia": "Si la víctima deja de responder, verifica respiración inmediatamente. Puede requerir RCP urgente."
+        }
+      ],
+      "advertencias": [
+        "El shock puede tener múltiples causas: hemorragia (hipovolémico), infección (séptico), reacción alérgica severa (anafiláctico), falla cardíaca (cardiogénico). Cada uno requiere tratamiento específico.",
+        "No administrar nada por la boca a una víctima inconsciente o semiconsciente. Existe riesgo de asfixia por aspiración.",
+        "Las víctimas en shock deben ser transportadas a un centro médico lo antes posible, incluso si parecen haberse estabilizado."
+      ],
+      "referencias": [
+        "EMT - Shock Management",
+        "ATLS - Shock Assessment",
+        "Cruz Roja - Manejo del Shock"
+      ],
+      "cuando_buscar_ayuda": "Inmediatamente. El shock es emergencia médica. Cada minuto sin tratamiento aumenta el riesgo de muerte."
+    },
+    {
+      "id": "prot_06",
+      "titulo": "Inmovilización de fracturas",
+      "categoria": "trauma",
+      "prioridad": "alta",
+      "resumen": "Protocolo para estabilizar huesos rotos antes del transporte, evitando daño adicional a tejidos y nervios.",
+      "pasos": [
+        {
+          "numero": 1,
+          "titulo": "Evaluar la lesión",
+          "descripcion": "Identifica señales de fractura: dolor intenso que empeora con movimiento, hinchazón, deformidad visible, incapacidad para mover la extremidad, hematoma, sensación de crujido (crepitación). No intentes corregir la deformidad. Solo estabiliza la posición actual.",
+          "advertencia": "Si hay herida abierta junto a la fractura (fractura abierta), cubre con tela limpia. No empujes huesos protruding hacia adentro."
+        },
+        {
+          "numero": 2,
+          "titulo": "Inmovilizar la fractura",
+          "descripcion": "Inmoviliza la articulación arriba y abajo de la fractura. Por ejemplo, si el hueso del antebrazo está roto, inmoviliza muñeca y codo. Usa férulas rígidas (madera, cartón grueso, revistas enrolladas) acolchadas con tela. Fija sin apretar demasiado.",
+          "advertencia": "No vendas muy apretado. Debe caber un dedo entre el vendaje y la piel. El apretado excesivo corta circulación."
+        },
+        {
+          "numero": 3,
+          "titulo": "Férulas improvisadas",
+          "descripcion": "Si no hay férula comercial, usa materiales rígidos disponibles: tablones, revistas enrolladas, ramas, cartón grueso. Acolcha con tela, ropa, toallas. Fija con cinta adhesiva, correas, tiras de tela. Asegura que la férula cubra toda la extremidad involucrada.",
+          "advertencia": "En fracturas de cadera o pelvis, NO muevas a la víctima a menos que sea absolutamente necesario (incendio, otro peligro). Espera ayuda especializada."
+        },
+        {
+          "numero": 4,
+          "titulo": "Elevación y frío",
+          "descripcion": "Eleva la extremidad lesionada por encima del nivel del corazón si es posible. Aplica frío (hielo envuelto en tela, nunca directo sobre piel) durante 20 minutos cada hora para reducir hinchazón. Esto disminuye el dolor y la inflamación.",
+          "advertencia": "El frío directo puede causar quemaduras por frío. Siempre usa barrera de tela entre el hielo y la piel."
+        },
+        {
+          "numero": 5,
+          "titulo": "Monitorizar circulación",
+          "descripcion": "Después de inmovilizar, verifica circulación en dedos de manos o pies: color (debería ser rosado), temperatura (caliente), sensibilidad (puede sentir toque), movimiento (debería poder mover dedos). Si alguno falta, afloja el vendaje y vuelve a verificar.",
+          "advertencia": "Inflamación severa puede ocurrir después de la inmovilización. Mantén vigilancia continua de circulación."
+        }
+      ],
+      "advertencias": [
+        "Fracturas en columna vertebral o cuello: NO MUEVAS al paciente salvo que haya peligro inmediato. Llamar ayuda especializada.",
+        "Fracturas de costillas pueden afectar respiración. Monitorea frecuencia respiratoria. Dolor intenso al respirar puede indicar neumotórax.",
+        "Nunca intentes 'enar el hueso' o corregir deformidad. Esto puede causar daño severo a nervios y vasos sanguíneos."
+      ],
+      "referencias": [
+        "AAOS - Splinting Techniques",
+        "EMT - Fracture Management",
+        "Wilderness Medicine - Fracture Care"
+      ],
+      "cuando_buscar_ayuda": "Todas las fracturas requieren evaluación médica con radiografías. Fracturas abiertas (con herida abierta) son emergencia inmediata."
+    },
+    {
+      "id": "prot_07",
+      "titulo": "Mordedura de serpiente venenosa",
+      "categoria": "envenenamiento",
+      "prioridad": "critica",
+      "resumen": "Protocolo de emergencia para mordeduras de serpientes venenosas, minimizando la propagación del veneno y recibiendo atención médica.",
+      "pasos": [
+        {
+          "numero": 1,
+          "titulo": "Identificar serpiente (si es posible)",
+          "descripcion": "No抓捕 la serpiente. Solo mírala de lejos para describirla: color, patrones, forma de la cabeza (triangular en víboras), sonido. Toma foto desde distancia segura si puedes. Esta información ayudará al personal médico a identificar el antídoto necesario.",
+          "advertencia": "NO intentes matar, capturar ni manejar la serpiente. Es la causa más común de mordeduras adicionales."
+        },
+        {
+          "numero": 2,
+          "titulo": "Retirarse del área",
+          "descripcion": "Aléjate de la serpiente inmediatamente. Retrocede lentamente sin correr. La mayoría de las mordeduras ocurren cuando la persona intenta matar o mover la serpiente. Una vez mordido, aléjate para evitar una segunda mordedura.",
+          "advertencia": "Las serpientes pueden morder más de una vez con una sola mordida. Incluso serpientes 'muertas' pueden morder por reflejos."
+        },
+        {
+          "numero": 3,
+          "titulo": "Inmovilizar y posicionar",
+          "descripcion": "Mantén la extremidad mordida por debajo del nivel del corazón. Inmoviliza con férula sin presionar. Mantén a la víctima calmada y quieta. El movimiento aumenta la frecuencia cardíaca y acelera la propagación del veneno. Evita cualquier esfuerzo físico.",
+          "advertencia": "NO uses torniquete, no cortes la herida, no chuipes el veneno, no aplique hielo ni medicamentos tópicos. Ninguno de estos métodos ayuda y pueden empeorar."
+        },
+        {
+          "numero": 4,
+          "titulo": "Limpiar la herida",
+          "descripcion": "Lava la herida suavemente con agua y jabón si hay disponible. No uses alcohol ni peróxido ya que pueden empeorar el sangrado. Cubre con vendaje limpio y seco. NO succiones con la boca.",
+          "advertencia": "Los kits de succión comerciales tampoco son efectivos. No los uses tampoco."
+        },
+        {
+          "numero": 5,
+          "titulo": "Monitorizar síntomas",
+          "descripcion": "Observa signos de envenenamiento sistémico: hinchazón progresiva, dolor intenso que se extiende, náuseas, vómitos, visión doble, dificultad para respirar, sangrado de encías o heridas. Anota la hora de la mordedura. Estos síntomas pueden aparecer entre 30 minutos y varias horas.",
+          "advertencia": "La ausencia de síntomas inmediatos no significa que no haya veneno. Sigue monitoreando durante al menos 8 horas."
+        },
+        {
+          "numero": 6,
+          "titulo": "Transporte a centro médico",
+          "descripcion": "Transporta a la víctima a un centro médico con antídotos lo más rápido posible. Mantén la calma, limita movimiento, y continúa monitoreando signos vitales. Si es posible, llama adelante al hospital para avisar sobre la mordedura de serpiente.",
+          "advertencia": "El único tratamiento efectivo para mordedura de serpiente venenosa es el suero antiofídico (antídoto), que solo está disponible en centros médicos."
+        }
+      ],
+      "advertencias": [
+        "En Colombia, las serpientes venenosas más comunes son: Bothrops (mapaná, terciopelo), Crotalus (cascabel), Lachesis (busmaster). Todas requieren atención médica urgente.",
+        "Prevención: Usa botas altas y pantsalonesanchos al caminar en zonas rurales. Mira donde pisas y donde pones las manos. No camines descalzo de noche.",
+        "Los remedios caseros como el permanganato de potasio, kerosene, o plantas no Neutralizan el veneno y pueden causar infecciones."
+      ],
+      "referencias": [
+        "INS - Institut Nacional de Salud Colombia",
+        "WHO - Snakebite Management",
+        "Cruz Roja - Mordeduras de Serpiente"
+      ],
+      "cuando_buscar_ayuda": "Inmediatamente. Cada hora que pasa sin antídoto aumenta el riesgo de daño permanente o muerte."
+    },
+    {
+      "id": "prot_08",
+      "titulo": "Envenenamiento",
+      "categoria": "envenenamiento",
+      "prioridad": "critica",
+      "resumen": "Protocolo para actuar ante ingestion, inhalación o contacto con sustancias tóxicas, dependiendo del tipo de toxina.",
+      "pasos": [
+        {
+          "numero": 1,
+          "titulo": "Identificar la toxina",
+          "descripcion": "Pregunta a la víctima o busca envases vacíos. Identifica: qué sustancia, cuánta, cuándo fue ingestion o exposición. Revisa el envase para instrucciones de emergencia. Si hay etiqueta de poison control, llama al número. Mantén la sustancia o un envase para mostrar al médico.",
+          "advertencia": "No inducas vómito a menos que poison control o médico lo indique explícitamente. Algunos venenos causan más daño al vomitar."
+        },
+        {
+          "numero": 2,
+          "titulo": "Ingestion de sustancias",
+          "descripcion": "Si la persona está consciente y no tiene convulsiones, puede beber agua para diluir (solo si la sustancia no es petróleo o cáustica). NO induzcas vómito. NO des nada por la boca si está inconsciente o tiene convulsiones.",
+          "advertencia": "Nunca induzcas vómito con sustancias cáusticas (ácidos, sales), derivados del petróleo, o objetos cortantes. Causará más daño al volver a pasar."
+        },
+        {
+          "numero": 3,
+          "titulo": "Inhalación de gases tóxicos",
+          "descripcion": "Retira a la víctima del área contaminada inmediatamente. Si es seguro, llévala a aire fresco. Sentéla o colócala semi-incorporada para facilitar respiración. Afloja ropa ajustada. NO realices respiración de boca a boca si no tienes máscara de barrera.",
+          "advertencia": "No entres a espacios confinados con gases tóxicos sin equipo de protección. Te convertirás en otra víctima."
+        },
+        {
+          "numero": 4,
+          "titulo": "Contacto con sustancias en piel",
+          "descripcion": "Retira ropa contaminada inmediatamente. Lava área afectada con agua abundante durante 15-20 minutos. Usa soap solo si la sustancia es soluble en agua. No frotes la piel. Si hay quemazón química, continúa lavando mientras trasportas.",
+          "advertencia": "某些 sustancias reaccionan con agua (cal viva, sodio metálico). Verifica la etiqueta antes de lavar con agua."
+        },
+        {
+          "numero": 5,
+          "titulo": "Intoxicación por monóxido de carbono (CO)",
+          "descripcion": "El CO es invisible e inodoro. Signos: dolor de cabeza, mareo, náuseas, confusión, desmayo. Sal del area inmediatamente. Abre ventanas y puertas si es seguro. Si la víctima no respira, inicia RCP. El CO se disipa con ventilación.",
+          "advertencia": "Dormir en vehículos con motor encendido, braseros, estufas de gas mal ventiladas son causas comunes de muerte por CO."
+        },
+        {
+          "numero": 6,
+          "titulo": "Línea de ayuda contra venenos",
+          "descripcion": "En Colombia, llama al CISPROQUIM (Centro de Información, Seguridad y Asistencia Toxicológica): 01-800-091-0010 (línea gratuita) o (601) 1277-6779. Proporciona la información del tóxico y sigue instrucciones específicas.",
+          "advertencia": "Guarda el número de poison control en tu teléfono. La respuesta rápida salva vidas."
+        }
+      ],
+      "advertencias": [
+        "Productos domésticos comunes que son tóxicos: limpiadores de desague, lejía, amoníaco, anticongelante, medicamentos, pesticidas.",
+        "Los niños son particularmente vulnerables a intoxicaciones accidentales. Mantén productos químicos y medicamentos fuera de su alcance.",
+        "Nunca mezcles productos de limpieza (lejía + amoníaco = gas mortal). Siempre lee etiquetas y usa en áreas ventiladas."
+      ],
+      "referencias": [
+        "CISPROQUIM Colombia - Línea de Intoxicaciones",
+        "CDC - Poisoning Prevention",
+        "WHO - Chemical Safety"
+      ],
+      "cuando_buscar_ayuda": "Inmediatamente si hay pérdida de consciencia, convulsiones, dificultad respiratoria, o si la sustancia es desconocida o altamente tóxica."
+    },
+    {
+      "id": "prot_09",
+      "titulo": "Hipotermia",
+      "categoria": "emergencia_ambiental",
+      "prioridad": "critica",
+      "resumen": "Protocolo para reconocer y tratar la hipotermia, condición donde la temperatura corporal cae peligrosamente por debajo de 35°C.",
+      "pasos": [
+        {
+          "numero": 1,
+          "titulo": "Reconocer signos de hipotermia",
+          "descripcion": "Signos leves (32-35°C): escalofríos intensos, piel fría y pálida, torpeza, confusión leve, habla arrastrada. Signos moderados (28-32°C): escalofríos cesan, piel azulosa, confusión severa, somnolencia, pulso lento e irregular. Signos graves (<28°C): inconsciencia, pulso muy débil, respiración muy lenta, rigidez muscular.",
+          "advertencia": "Escalofríos que se detienen puede indicar que la hipotermia ha empeorado, no mejorado. Tome esto como señal de urgencia."
+        },
+        {
+          "numero": 2,
+          "titulo": "Retirar de ambiente frío",
+          "descripcion": "Traslada a la víctima a un lugar cálido y seco. Retira ropa mojada y reemplazarla con ropa seca. Si no hay ropa seca disponible, envuelve en materiales secos (mantas, plástico, papel). Vigila que el refugio esté protegido del viento.",
+          "advertencia": "Manipula a la víctima con cuidado. Movimientos bruscos pueden causar arresto cardíaco en hipotermia severa."
+        },
+        {
+          "numero": 3,
+          "titulo": "Calentamiento pasivo",
+          "descripcion": "Cubre cabeza y cuello (gran pérdida de calor). Envolver en mantas secas, capas de ropa, materiales aislantes (folle, espuma, ramas). Crea una capa entre el suelo y la víctima para prevenir pérdida de calor hacia abajo.",
+          "advertencia": "No frotes extremidades (brazos, piernas). Puede devolver sangre fría al corazón causando parada cardíaca."
+        },
+        {
+          "numero": 4,
+          "titulo": "Calentamiento activo (si hay recursos)",
+          "descripcion": "Si la víctima está consciente y puede tragar, dale bebidas calientes y azucaradas (no alcohol). Aplica compresas calientes en axilas, cuello e ingles (no directas en piel). Usa tu propio calor corporal: acuéstate junto a la víctima.",
+          "advertencia": "En hipotermia moderada a severa, el calentamiento debe ser gradual. Calentamiento demasiado rápido puede causar Shock."
+        },
+        {
+          "numero": 5,
+          "titulo": "Posición y monitoreo",
+          "descripcion": "Coloca a la víctima en posición horizontal. No la sente ni pongas de pie. Mantén cabeza cubierta. Monitorea respiración y pulso continuamente (puede ser muy difícil de detectar). Prepárate para RCP.",
+          "advertencia": "Víctimas en hipotermia severa pueden parecer muertas (pulso muy débil). Nunca asumas muerte. Inicia RCP y continúa hasta que responda o llegue ayuda médica."
+        }
+      ],
+      "advertencias": [
+        "Personas hipotérmicas NO deben dejarse solas. El manejo incorrecto puede causar la muerte.",
+        "El alcohol da sensación de calor pero en realidad acelera la pérdida de calor. No lo uses.",
+        "En hipotermia severa, el corazón es muy sensible. Movimientos bruscos pueden causar fibrilación ventricular y muerte súbita."
+      ],
+      "referencias": [
+        "ACEP - Hypothermia Management",
+        "Wilderness Medicine - Cold Emergencies",
+        "CDC - Winter Weather Hypothermia"
+      ],
+      "cuando_buscar_ayuda": "Siempre. La hipotermia moderada a severa requiere atención médica para calentamiento controlado y monitoreo de complicaciones."
+    },
+    {
+      "id": "prot_10",
+      "titulo": "Golpe de calor",
+      "categoria": "emergencia_ambiental",
+      "prioridad": "critica",
+      "resumen": "Protocolo para tratar el golpe de calor, condición potencialmente mortal donde el cuerpo no puede regular su temperatura.",
+      "pasos": [
+        {
+          "numero": 1,
+          "titulo": "Reconocer signos de golpe de calor",
+          "descripcion": "Signos clásicos: temperatura corporal muy alta (>40°C), piel caliente y roja, ausencia de sudor (aunque esté haciendo calor), confusión, dolor de cabeza intenso, náuseas, desmayo, convulsiones. Es una emergencia que puede matar en minutos.",
+          "advertencia": "A diferencia de la deshidratación, la víctima de golpe de calor puede dejar de sudar. Esto no es buena señal."
+        },
+        {
+          "numero": 2,
+          "titulo": "Enfriar rápidamente",
+          "descripcion": "Mueve a la víctima a zona fresca, sombra o aire acondicionado. Retira ropa excesiva. Aplica agua fría en todo el cuerpo, especialmente cuello, axilas e ingles. Puedes usar hielo envuelto en tela en estas zonas. Abanica vigorosamente para aumentar evaporación.",
+          "advertencia": "El enfriamiento debe ser agresivo y rápido. Cada minuto cuenta. Baja la temperatura por debajo de 39°C lo más rápido posible."
+        },
+        {
+          "numero": 3,
+          "titulo": "Inmersión en agua fría",
+          "descripcion": "Si hay disponible, sumerge a la víctima en agua fría (no helada, 1-15°C). Si no hay bañera, usa cualquier contenedor, aunque sea una alberca portátil. Si no hay agua,envuelve en sábana mojada y abanica. Continúa hasta que la temperatura baje.",
+          "advertencia": "El agua muy fría puede causar temblores que generan más calor. Usa agua fresca, no helada directamente del congelador."
+        },
+        {
+          "numero": 4,
+          "titulo": "Hidratación (si está consciente)",
+          "descripcion": "Si puede tragar, dale agua fresca. Pequeños sorbos frecuentes, no grandes cantidades de golpe. sports drinks pueden ayudar a reponer electrolitos. NO des líquidos muy fríos (pueden causar vómitos).",
+          "advertencia": "Si la víctima está inconsciente o vomitando, NO intentes dar líquidos por la boca. Hay riesgo de asfixia."
+        },
+        {
+          "numero": 5,
+          "titulo": "Posición y monitoreo",
+          "descripcion": "Coloca a la víctima boca arriba con piernas ligeramente elevadas. Si hay vómitos o está inconsciente, colócala de lado. Continúa enfriamiento hasta que llegue ayuda médica o la temperatura baje de 38°C. Monitorea respiración y pulso.",
+          "advertencia": "No administering analgésicos (paracetamol, ibuprofeno). No ayudan y pueden empeorar."
+        }
+      ],
+      "advertencias": [
+        "Los grupos más vulnerables: ancianos, niños, personas con enfermedades crónicas, trabajadores outdoors, atletas. Ten especial precaución con estos grupos.",
+        "El golpe de calor puede ocurrir sin exposición solar directa. Ambientes calientes y húmedos con poca ventilación también lo causan.",
+        "La tasa de mortalidad del golpe de calor sin tratamiento es muy alta. La intervención rápida es crítica."
+      ],
+      "referencias": [
+        "WHO - Heat Related Illness",
+        "CDC - Heat Emergency",
+        "ACSM - Exertional Heat Illness"
+      ],
+      "cuando_buscar_ayuda": "Inmediatamente. El golpe de calor es emergencia médica con alta mortalidad. La víctima necesita atención hospitalaria."
+    },
+    {
+      "id": "prot_11",
+      "titulo": "Intoxicación por monóxido de carbono",
+      "categoria": "envenenamiento",
+      "prioridad": "critica",
+      "resumen": "Protocolo específico para tratar la intoxicación por monóxido de carbono (CO), gas letal que puede acumularse sin olor ni видимость.",
+      "pasos": [
+        {
+          "numero": 1,
+          "titulo": "Reconocer signos de intoxicación por CO",
+          "descripcion": "Los síntomas incluyen: dolor de cabeza (principal señal), mareo, náuseas, vómitos, confusión, fatiga, dolor de pecho, visión borrosa. En casos severos: pérdida de consciencia, convulsiones, paro cardíaco. Múltiples personas en el mismo lugar sintiendo los mismos síntomas indica envenenamiento por CO.",
+          "advertencia": "El CO es completamente invisible e inodoro. No hay forma de detectarlo sin monitores especializados. Ante la duda, asume CO."
+        },
+        {
+          "numero": 2,
+          "titulo": "Salir inmediatamente",
+          "descripcion": "Evacúa a todas las personas del área afectada inmediatamente. Abra puertas y ventanas de camino a la salida si es posible sin perder tiempo. No te detengas a buscar la fuente del CO. La vida es prioritaria.",
+          "advertencia": "No permanezcas en el área para 'investigar' o 'apagar la fuente'. Cada segundo aumenta la exposición y el daño."
+        },
+        {
+          "numero": 3,
+          "titulo": "Buscar aire fresco",
+          "descripcion": "Una vez afuera, asegúrate de que todos respiren aire fresco. Si alguien está inconsciente, verificar respiración y pulso. Si no respira, iniciar RCP. Mantener a las víctimas cálidas pero no sobrecalentar.",
+          "advertencia": "No realices respiración boca a boca sin protector, especialmente si hubo exposición a CO. Pueden existir otros gases tóxicos."
+        },
+        {
+          "numero": 4,
+          "titulo": "Llamar a emergencias",
+          "descripcion": "Llama a emergencias (123) imediatamente. Explain que hay sospecha de intoxicación por monóxido de carbono. Indica la dirección donde puede estar la fuente (vehículo en garage, estufa de gas, brasero, generador).",
+          "advertencia": "No reingreses al area hasta que los servicios de emergencia confirmen que es seguro."
+        },
+        {
+          "numero": 5,
+          "titulo": "Tratamiento médico",
+          "descripcion": "El tratamiento definitivo es oxígeno al 100% con máscara facial. Esto acelera la eliminación del CO de la sangre. En casos severos, se usa cámara hiperbárica. Todos los casos de envenenamiento por CO requieren evaluación médica, incluso si parecen haberse recuperado.",
+          "advertencia": "Las víctimas pueden sentirse mejor afuera pero todavía tener niveles peligrosos de CO en sangre. Necesitan tratamiento médico."
+        }
+      ],
+      "advertencias": [
+        "Fuentes comunes de CO: vehículos con motor encendido en garaje cerrado, estufas de gas sin ventilación, braseros, generadores eléctricos, calentadores de agua, carbón vegetal en espacios cerrados.",
+        "Prevención: Nunca uses estufas de combustión (gas, petróleo, carbón) en espacios cerrados sin ventilación. Instala detectores de CO.",
+        "Los síntomas de envenenamiento por CO pueden confundirse con gripe o intoxicación alimentaria. Ante la duda, asume CO y sal."
+      ],
+      "referencias": [
+        "CDC - Carbon Monoxide Poisoning",
+        "OSHA - CO Safety",
+        "Cruz Roja - Intoxicación por CO"
+      ],
+      "cuando_buscar_ayuda": "Inmediatamente. El CO puede ser letal. Toda persona expuesta necesita evaluación médica."
+    },
+    {
+      "id": "prot_12",
+      "titulo": "Convulsiones y estatus epiléptico",
+      "categoria": "neurologico",
+      "prioridad": "critica",
+      "resumen": "Protocolo para manejar convulsiones, protegiendo a la víctima de lesiones mientras ocurre y después del episodio.",
+      "pasos": [
+        {
+          "numero": 1,
+          "titulo": "Proteger durante la convulsión",
+          "descripcion": "Si la persona cae o va a caer, ayúdala suavemente al suelo. Retira objetos peligrosos cercanos (muebles, escaleras, objetos cortantes). No sujetes a la persona ni intentes detener los movimientos. Solo protege su cabeza con algo suave (ropa, almohada, manos).",
+          "advertencia": "NO pongas nada en la boca de la víctima. No hay riesgo de tragarse la lengua. Poner objetos puede romper dientes o causar asfixia."
+        },
+        {
+          "numero": 2,
+          "titulo": "Posición durante la convulsión",
+          "descripcion": "Gira suavemente a la persona de lado si es posible (esto ayuda a que la saliva salga y no bloquee vías respiratorias). No forzar. Solo facilitar si hay movimiento voluntario. Esto también ayuda si hay vómito.",
+          "advertencia": "No introduzcas tus dedos en la boca de la víctima en ningún momento. Puede morderte involuntariamente."
+        },
+        {
+          "numero": 3,
+          "titulo": "Cronometrar la convulsión",
+          "descripcion": "Mira el reloj cuando comienza la convulsión. La mayaría dura menos de 2 minutos. Si dura más de 5 minutos, es estatus epiléptico (emergencia). Busca ayuda médica urgente. Avisa a otros presentes para que estén listos para ayudar.",
+          "advertencia": "Si la convulsión dura más de 5 minutos, es probable que necesite medicación de emergencia (diazepam rectal o midazolam sublingual) que solo personal médico puede administrar."
+        },
+        {
+          "numero": 4,
+          "titulo": "Durante la fase post-ictal",
+          "descripcion": "Después de la convulsión, la persona puede estar confuse, tired, tener dolor de cabeza. No la dejes sola. Permanece con ella hasta que esté completamente alerta y pueda comunicarse normalmente. Háblale con calma. No le ofrezcas comida ni agua hasta que esté completamente despierta.",
+          "advertencia": "La persona puede no recordar lo que pasó. Puede tener vergüenza o miedo. Ofrece apoyo emocional."
+        },
+        {
+          "numero": 5,
+          "titulo": "Cuando buscar ayuda",
+          "descripcion": "Llama a emergencias si: es la primera convulsión, dura más de 5 minutos, la persona no recupera consciencia después de 10 minutos, hay otra convulsión inmediatamente después, la persona está embarazada, tiene diabetes, o hay lesiones. También si la persona no tiene historial de convulsiones.",
+          "advertencia": "Las personas con epilepsia diagnosticada que toman medicación pueden tener convulsiones si olvidan tomar su medicamento. Verifica si toma medicación antiepiléptica."
+        },
+        {
+          "numero": 6,
+          "titulo": "Prevención de lesiones recurrentes",
+          "descripcion": "Después de una convulsión, la persona puede tener otra. Hasta que esté estabilizada, mantenla en un lugar seguro, lejos de objetos peligrosos. Si conoces su condición y medicación, ayúdala a tomarla si la olvidó. Si no tiene historial, asume emergencia.",
+          "advertencia": "No forcing medication or liquids into someone's mouth during or immediately after a seizure."
+        }
+      ],
+      "advertencias": [
+        "La mayoría de las convulsiones duran menos de 2 minutos y terminan por sí solas. Mantén la calma.",
+        "Las personas con epilepsia pueden usar pulseras de alerta médica. Buscar esta información puede ayudar a los servicios de emergencia.",
+        "Convulsiones febriles en niños generalmente son benignas pero deben ser evaluadas por médico para descartar causas graves."
+      ],
+      "referencias": [
+        "Epilepsy Foundation - Seizure First Aid",
+        "ILAE - International League Against Epilepsy",
+        "CDC - Seizure Disorders"
+      ],
+      "cuando_buscar_ayuda": "Primera convulsión, convulsiones recurrentes, convulsiones de más de 5 minutos, lesiones asociadas, o si la persona no recupera completamente."
+    }
+  ]
+}

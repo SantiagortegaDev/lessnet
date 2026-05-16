@@ -1,0 +1,16 @@
+{
+  "iso": "de",
+  "flores": "deu_Latn",
+  "nombre": "Aleman",
+  "script": "Latn",
+  "builtin": true,
+  "installed": true,
+  "version": "1.0",
+  "frases_emergencia": [],
+  "teclado": {"tipo": "qwerty", "locale": "de"},
+  "metadatos": {
+    "modelo_requerido": "nllb-200-distilled-600m",
+    "formato_modelo": "gguf",
+    "cuantizacion_minima": "Q4_K_M"
+  }
+}
