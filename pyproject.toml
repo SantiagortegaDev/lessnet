@@ -6,9 +6,6 @@ dependencies = [
     "flet-permission-handler",
 ]
 
-[tool.flet]
-packages = ["flet_permission_handler"]
-
 [tool.flet.android.permission]
 "android.permission.BLUETOOTH" = true
 "android.permission.BLUETOOTH_ADMIN" = true
@@ -20,6 +17,7 @@ packages = ["flet_permission_handler"]
 "android.permission.NEARBY_WIFI_DEVICES" = true
 "android.permission.ACCESS_WIFI_STATE" = true
 "android.permission.CHANGE_WIFI_STATE" = true
+"android.permission.INTERNET" = true
 "android.permission.ACCESS_NETWORK_STATE" = true
 
 [tool.flet.android.feature]
