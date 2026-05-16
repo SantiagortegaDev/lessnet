@@ -15,20 +15,24 @@ jobs:
         with:
           channel: stable
 
-      - name: Regenerate Android project files
+      - name: Regenerate Android project and restore configs
         run: |
-          # Save our custom source files
+          # Save our custom files before regenerating
           cp -r lib /tmp/lib_backup
           cp -r assets /tmp/assets_backup 2>/dev/null || true
           cp pubspec.yaml /tmp/pubspec_backup.yaml
+          cp android/app/src/main/AndroidManifest.xml /tmp/AndroidManifest_backup.xml
           
           # Create a fresh Flutter project with correct name and org
           cd /tmp
           flutter create --org com.lessnet --project-name lessnet lessnet_fresh
           
-          # Replace the entire Android directory with fresh one
+          # Replace the Android directory with fresh one
           rm -rf "$GITHUB_WORKSPACE/android"
           cp -r /tmp/lessnet_fresh/android "$GITHUB_WORKSPACE/android"
+          
+          # Restore our AndroidManifest with BT permissions
+          cp /tmp/AndroidManifest_backup.xml "$GITHUB_WORKSPACE/android/app/src/main/AndroidManifest.xml"
           
           # Restore our source code
           rm -rf "$GITHUB_WORKSPACE/lib"
@@ -41,28 +45,6 @@ jobs:
           
           # Use our pubspec.yaml with our dependencies
           cp /tmp/pubspec_backup.yaml "$GITHUB_WORKSPACE/pubspec.yaml"
-
-      - name: Add Bluetooth permissions to AndroidManifest
-        run: |
-          python3 -c "
-          path = 'android/app/src/main/AndroidManifest.xml'
-          with open(path, 'r') as f:
-              content = f.read()
-          perms = '''    <uses-permission android:name="android.permission.BLUETOOTH" />
-              <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
-              <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
-              <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-              <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
-              <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-              <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-              <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
-              <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
-          '''
-          content = content.replace('</manifest>', perms + '\n</manifest>')
-          with open(path, 'w') as f:
-              f.write(content)
-          print('Permissions injected!')
-          "
 
       - name: Install dependencies
         run: flutter pub get
