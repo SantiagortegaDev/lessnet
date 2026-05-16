@@ -417,7 +417,7 @@ class _PermissionsPageState extends State<PermissionsPage> {
   Future<void> _checkHardware() async {
     try {
       final adapterOn = await FlutterBluePlus.adapterState.first
-          .timeout(const Duration(seconds: 3), onTimeout: (_) => BluetoothAdapterState.unknown);
+          .timeout(const Duration(seconds: 3), onTimeout: () => BluetoothAdapterState.unknown);
       if (mounted) setState(() => _bluetoothOn = adapterOn == BluetoothAdapterState.on);
     } catch (_) {}
     try {
@@ -704,7 +704,7 @@ class _ScanPageState extends State<ScanPage> {
     // Check if Bluetooth is on
     try {
       final adapterState = await FlutterBluePlus.adapterState.first
-          .timeout(const Duration(seconds: 3), onTimeout: (_) => BluetoothAdapterState.unknown);
+          .timeout(const Duration(seconds: 3), onTimeout: () => BluetoothAdapterState.unknown);
       if (adapterState != BluetoothAdapterState.on) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
