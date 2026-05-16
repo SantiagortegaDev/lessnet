@@ -1,262 +1,239 @@
 import flet as ft
 import flet_permission_handler as fph
 
-
 def main(page: ft.Page):
-    page.title = "LessNet - Permisos"
+    page.title = "LessNet"
     page.theme_mode = ft.ThemeMode.DARK
     page.padding = 0
     page.bgcolor = "#0F172A"
 
-    page.fonts = {
-        "Outfit": "https://github.com/google/fonts/raw/main/ofl/outfit/Outfit-VariableFont_wght.ttf"
-    }
-    page.theme = ft.Theme(
-        font_family="Outfit",
-        color_scheme_seed=ft.Colors.BLUE,
-        visual_density=ft.VisualDensity.COMFORTABLE,
-    )
-
-    # ✅ Solo agregar PermissionHandler en plataformas compatibles
     is_mobile = page.platform in (ft.PagePlatform.ANDROID, ft.PagePlatform.IOS)
     ph = None
-
     if is_mobile:
-      ph = fph.PermissionHandler()
-      page.add(ph)  # ✅ directo a la página, no al overlay
+        ph = fph.PermissionHandler()
+        page.add(ph)
 
-    perms = [
-        {
-            "name": "Ubicación",
-            "desc": "Requerida para WiFi Direct y Bluetooth scan",
-            "icon": ft.Icons.LOCATION_ON_ROUNDED,
-            "type": fph.Permission.LOCATION,
-            "color": ft.Colors.ORANGE_400,
-        },
-        {
-            "name": "Bluetooth",
-            "desc": "Conexión básica entre dispositivos",
-            "icon": ft.Icons.BLUETOOTH_ROUNDED,
-            "type": fph.Permission.BLUETOOTH,
-            "color": ft.Colors.BLUE_400,
-        },
-        {
-            "name": "Bluetooth Scan",
-            "desc": "Buscar dispositivos cercanos (Android 12+)",
-            "icon": ft.Icons.BLUETOOTH_SEARCHING_ROUNDED,
-            "type": fph.Permission.BLUETOOTH_SCAN,
-            "color": ft.Colors.CYAN_400,
-        },
-        {
-            "name": "Bluetooth Connect",
-            "desc": "Conectarse a dispositivos emparejados (Android 12+)",
-            "icon": ft.Icons.BLUETOOTH_CONNECTED_ROUNDED,
-            "type": fph.Permission.BLUETOOTH_CONNECT,
-            "color": ft.Colors.LIGHT_BLUE_400,
-        },
-        {
-            "name": "Dispositivos WiFi Cercanos",
-            "desc": "WiFi Direct / P2P sin internet (Android 13+)",
-            "icon": ft.Icons.WIFI_ROUNDED,
-            "type": fph.Permission.NEARBY_WIFI_DEVICES,
-            "color": ft.Colors.GREEN_400,
-        },
+    # --- Estado de permisos ---
+    perms_granted = {
+        "bt": False,
+        "bt_scan": False,
+        "bt_connect": False,
+        "location": False,
+    }
+
+    perm_list = [
+        {"key": "location",     "name": "Ubicación",         "type": fph.Permission.LOCATION,         "icon": ft.Icons.LOCATION_ON_ROUNDED,         "color": ft.Colors.ORANGE_400},
+        {"key": "bt",           "name": "Bluetooth",         "type": fph.Permission.BLUETOOTH,         "icon": ft.Icons.BLUETOOTH_ROUNDED,           "color": ft.Colors.BLUE_400},
+        {"key": "bt_scan",      "name": "BT Scan",           "type": fph.Permission.BLUETOOTH_SCAN,    "icon": ft.Icons.BLUETOOTH_SEARCHING_ROUNDED, "color": ft.Colors.CYAN_400},
+        {"key": "bt_connect",   "name": "BT Connect",        "type": fph.Permission.BLUETOOTH_CONNECT, "icon": ft.Icons.BLUETOOTH_CONNECTED_ROUNDED, "color": ft.Colors.LIGHT_BLUE_400},
     ]
 
-    def show_snackbar(message: str, error: bool = False):
-        page.show_dialog(
-            ft.SnackBar(
-                ft.Text(message, color=ft.Colors.WHITE),
-                bgcolor=ft.Colors.RED_800 if error else ft.Colors.BLUE_800,
-            )
-        )
+    def show_snack(msg: str, ok: bool = True):
+        page.show_dialog(ft.SnackBar(
+            ft.Text(msg, color=ft.Colors.WHITE),
+            bgcolor=ft.Colors.BLUE_800 if ok else ft.Colors.RED_800,
+        ))
 
-    def make_card(p):
-        perm_name = p["name"]
-        perm_type = p["type"]
-        perm_icon = p["icon"]
-        perm_color = p["color"]
-        perm_desc = p["desc"]
+    # --- Pantalla de permisos ---
+    status_texts = {}
 
-        status_text = ft.Text("—", size=12, color=ft.Colors.GREY_400, weight=ft.FontWeight.W_600)
+    def make_perm_row(p):
+        st = ft.Text("—", size=12, color=ft.Colors.GREY_500, weight=ft.FontWeight.W_600)
+        status_texts[p["key"]] = st
 
-        async def get_status(e, pt=perm_type, pn=perm_name):
+        async def do_request(e, pt=p["type"], pk=p["key"], pn=p["name"]):
             if not is_mobile:
-                show_snackbar("Solo funciona en Android/iOS", error=True)
+                show_snack("Solo funciona en el APK Android", ok=False)
                 return
             try:
-                status = await ph.get_status(pt)
-                status_name = status.name if status else "Desconocido"
-                status_text.value = status_name
-                status_text.color = ft.Colors.GREEN_400 if status_name == "granted" else ft.Colors.RED_400
+                result = await ph.request(pt)
+                name = result.name if result else "unknown"
+                granted = name == "granted"
+                perms_granted[pk] = granted
+                st.value = "✓" if granted else "✗"
+                st.color = ft.Colors.GREEN_400 if granted else ft.Colors.RED_400
                 page.update()
-                show_snackbar(f"{pn}: {status_name}")
+                show_snack(f"{pn}: {name}", ok=granted)
             except Exception as ex:
-                show_snackbar(f"Error: {ex}", error=True)
-
-        async def request_perm(e, pt=perm_type, pn=perm_name):
-            if not is_mobile:
-                show_snackbar("Solo funciona en Android/iOS", error=True)
-                return
-            try:
-                status = await ph.request(pt)
-                status_name = status.name if status else "Desconocido"
-                status_text.value = status_name
-                status_text.color = ft.Colors.GREEN_400 if status_name == "granted" else ft.Colors.RED_400
-                page.update()
-                show_snackbar(f"{pn}: {status_name}")
-            except Exception as ex:
-                show_snackbar(f"Error: {ex}", error=True)
+                show_snack(f"Error: {ex}", ok=False)
 
         return ft.Container(
-            content=ft.Column(
-                controls=[
-                    ft.Row(
-                        controls=[
-                            ft.Container(
-                                content=ft.Icon(perm_icon, color=perm_color, size=24),
-                                bgcolor=ft.Colors.with_opacity(0.1, perm_color),
-                                padding=10,
-                                border_radius=12,
-                            ),
-                            ft.Column(
-                                controls=[
-                                    ft.Text(perm_name, size=16, weight=ft.FontWeight.W_600, color=ft.Colors.WHITE),
-                                    ft.Text(perm_desc, size=11, color=ft.Colors.BLUE_200),
-                                ],
-                                spacing=2,
-                                expand=True,
-                            ),
-                            status_text,
-                        ],
-                        spacing=12,
-                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            content=ft.Row(controls=[
+                ft.Container(
+                    content=ft.Icon(p["icon"], color=p["color"], size=22),
+                    bgcolor=ft.Colors.with_opacity(0.1, p["color"]),
+                    padding=10, border_radius=10,
+                ),
+                ft.Text(p["name"], size=15, color=ft.Colors.WHITE, expand=True, weight=ft.FontWeight.W_500),
+                st,
+                ft.FilledButton(
+                    "Solicitar",
+                    on_click=do_request,
+                    style=ft.ButtonStyle(
+                        bgcolor=ft.Colors.BLUE_700,
+                        shape=ft.RoundedRectangleBorder(radius=8),
                     ),
-                    ft.Row(
-                        controls=[
-                            ft.FilledButton(
-                                "Solicitar",
-                                icon=ft.Icons.LOCK_OPEN_ROUNDED,
-                                on_click=request_perm,
-                                style=ft.ButtonStyle(
-                                    bgcolor=ft.Colors.BLUE_700,
-                                    shape=ft.RoundedRectangleBorder(radius=10),
-                                ),
-                                expand=True,
-                            ),
-                            ft.OutlinedButton(
-                                "Estado",
-                                icon=ft.Icons.INFO_OUTLINE_ROUNDED,
-                                on_click=get_status,
-                                style=ft.ButtonStyle(
-                                    color=ft.Colors.BLUE_200,
-                                    shape=ft.RoundedRectangleBorder(radius=10),
-                                ),
-                                expand=True,
-                            ),
-                        ],
-                        spacing=8,
-                    ),
-                ],
-                spacing=12,
-            ),
+                ),
+            ], spacing=10, vertical_alignment=ft.CrossAxisAlignment.CENTER),
             bgcolor=ft.Colors.with_opacity(0.06, ft.Colors.WHITE),
-            padding=16,
-            border_radius=16,
+            padding=ft.Padding.symmetric(horizontal=14, vertical=12),
+            border_radius=12,
             border=ft.Border.all(1, ft.Colors.with_opacity(0.1, ft.Colors.WHITE)),
         )
 
     async def solicitar_todos(e):
         if not is_mobile:
-            show_snackbar("Solo funciona en Android/iOS", error=True)
+            show_snack("Solo funciona en el APK Android", ok=False)
             return
-        for p in perms:
+        for p in perm_list:
             try:
-                await ph.request(p["type"])
+                result = await ph.request(p["type"])
+                name = result.name if result else "unknown"
+                granted = name == "granted"
+                perms_granted[p["key"]] = granted
+                if p["key"] in status_texts:
+                    status_texts[p["key"]].value = "✓" if granted else "✗"
+                    status_texts[p["key"]].color = ft.Colors.GREEN_400 if granted else ft.Colors.RED_400
             except Exception:
                 pass
-        show_snackbar("Todos los permisos solicitados ✓")
+        page.update()
+        show_snack("Permisos solicitados ✓")
 
-    async def open_settings(e):
-        if not is_mobile:
-            show_snackbar("Solo funciona en Android/iOS", error=True)
+    # --- Mensajería (simulada / preparada para socket) ---
+    messages = []
+    messages_col = ft.Column(controls=[], spacing=8, scroll=ft.ScrollMode.ADAPTIVE, expand=True)
+    msg_input = ft.TextField(
+        hint_text="Escribe un mensaje...",
+        bgcolor=ft.Colors.with_opacity(0.08, ft.Colors.WHITE),
+        border_color=ft.Colors.with_opacity(0.2, ft.Colors.WHITE),
+        color=ft.Colors.WHITE,
+        hint_style=ft.TextStyle(color=ft.Colors.GREY_500),
+        expand=True,
+        border_radius=12,
+    )
+
+    def add_message(sender: str, text: str, mine: bool = True):
+        bubble = ft.Container(
+            content=ft.Column(controls=[
+                ft.Text(sender, size=10, color=ft.Colors.BLUE_300 if mine else ft.Colors.GREEN_300, weight=ft.FontWeight.W_600),
+                ft.Text(text, size=14, color=ft.Colors.WHITE),
+            ], spacing=2),
+            bgcolor=ft.Colors.BLUE_900 if mine else ft.Colors.with_opacity(0.12, ft.Colors.WHITE),
+            padding=ft.Padding.symmetric(horizontal=14, vertical=10),
+            border_radius=ft.BorderRadius(
+                top_left=12, top_right=12,
+                bottom_left=4 if mine else 12,
+                bottom_right=12 if mine else 4,
+            ),
+            alignment=ft.Alignment(1 if mine else -1, 0),
+        )
+        row = ft.Row(
+            controls=[bubble],
+            alignment=ft.MainAxisAlignment.END if mine else ft.MainAxisAlignment.START,
+        )
+        messages_col.controls.append(row)
+        page.update()
+
+    def send_msg(e):
+        text = msg_input.value.strip()
+        if not text:
             return
-        await ph.open_app_settings()
+        msg_input.value = ""
+        add_message("Tú", text, mine=True)
+        # TODO: enviar vía socket Bluetooth / WiFi Direct
+        # Por ahora simula respuesta
+        page.update()
 
-    # Banner de advertencia si estás en desktop
-    desktop_banner = ft.Container(
-        content=ft.Row(
-            controls=[
-                ft.Icon(ft.Icons.WARNING_AMBER_ROUNDED, color=ft.Colors.AMBER_400),
-                ft.Text(
-                    "Modo preview — los permisos solo funcionan en el APK instalado en Android",
-                    size=12,
-                    color=ft.Colors.AMBER_200,
-                    expand=True,
+    # --- Tabs ---
+    perms_tab = ft.Column(
+        controls=[
+            ft.Text("Permisos Bluetooth", size=18, weight=ft.FontWeight.W_700, color=ft.Colors.WHITE),
+            ft.Text("Necesarios para descubrir y conectar dispositivos cercanos", size=12, color=ft.Colors.BLUE_300),
+            ft.Divider(color=ft.Colors.with_opacity(0.1, ft.Colors.WHITE)),
+            *[make_perm_row(p) for p in perm_list],
+            ft.Container(height=4),
+            ft.FilledButton(
+                "Solicitar todos",
+                icon=ft.Icons.DONE_ALL_ROUNDED,
+                on_click=solicitar_todos,
+                style=ft.ButtonStyle(
+                    bgcolor=ft.Colors.BLUE_600,
+                    shape=ft.RoundedRectangleBorder(radius=10),
                 ),
-            ],
-            spacing=8,
-        ),
-        bgcolor=ft.Colors.with_opacity(0.15, ft.Colors.AMBER),
-        padding=ft.padding.symmetric(horizontal=16, vertical=10),
-        border_radius=10,
-        border=ft.Border.all(1, ft.Colors.with_opacity(0.3, ft.Colors.AMBER)),
-        visible=not is_mobile,
+                width=float("inf"),
+            ),
+            ft.Container(
+                content=ft.Row(controls=[
+                    ft.Icon(ft.Icons.INFO_OUTLINE_ROUNDED, color=ft.Colors.AMBER_400, size=16),
+                    ft.Text(
+                        "Los permisos solo funcionan en el APK instalado en Android.",
+                        size=11, color=ft.Colors.AMBER_300, expand=True,
+                    ),
+                ], spacing=8),
+                bgcolor=ft.Colors.with_opacity(0.12, ft.Colors.AMBER),
+                padding=ft.Padding.symmetric(horizontal=12, vertical=10),
+                border_radius=10,
+                visible=not is_mobile,
+            ),
+        ],
+        spacing=12,
+        scroll=ft.ScrollMode.ADAPTIVE,
+    )
+
+    chat_tab = ft.Column(
+        controls=[
+            ft.Text("Chat Local", size=18, weight=ft.FontWeight.W_700, color=ft.Colors.WHITE),
+            ft.Text("Mensajes entre dispositivos por Bluetooth (sin internet)", size=12, color=ft.Colors.BLUE_300),
+            ft.Divider(color=ft.Colors.with_opacity(0.1, ft.Colors.WHITE)),
+            ft.Container(
+                content=messages_col,
+                expand=True,
+                bgcolor=ft.Colors.with_opacity(0.04, ft.Colors.WHITE),
+                border_radius=12,
+                padding=12,
+                height=400,
+            ),
+            ft.Row(controls=[
+                msg_input,
+                ft.IconButton(
+                    icon=ft.Icons.SEND_ROUNDED,
+                    icon_color=ft.Colors.BLUE_400,
+                    on_click=send_msg,
+                    style=ft.ButtonStyle(bgcolor=ft.Colors.BLUE_900),
+                ),
+            ], spacing=8),
+        ],
+        spacing=12,
+        expand=True,
+    )
+
+    tabs = ft.Tabs(
+        selected_index=0,
+        animation_duration=200,
+        tabs=[
+            ft.Tab(text="Permisos", icon=ft.Icons.SHIELD_ROUNDED, content=ft.Container(content=perms_tab, padding=ft.Padding.only(top=16))),
+            ft.Tab(text="Chat", icon=ft.Icons.CHAT_ROUNDED, content=ft.Container(content=chat_tab, padding=ft.Padding.only(top=16))),
+        ],
+        expand=True,
     )
 
     page.add(
         ft.SafeArea(
             content=ft.Container(
-                content=ft.Column(
-                    controls=[
-                        ft.Row(
-                            controls=[
-                                ft.Icon(ft.Icons.HUB_ROUNDED, color=ft.Colors.BLUE_400, size=32),
-                                ft.Column(
-                                    controls=[
-                                        ft.Text("LessNet", size=26, weight=ft.FontWeight.W_700, color=ft.Colors.WHITE),
-                                        ft.Text("Permisos para red local", size=13, color=ft.Colors.BLUE_300),
-                                    ],
-                                    spacing=0,
-                                ),
-                            ],
-                            spacing=12,
-                        ),
-                        desktop_banner,
-                        ft.Divider(color=ft.Colors.with_opacity(0.1, ft.Colors.WHITE), height=24),
-                        *[make_card(p) for p in perms],
-                        ft.Container(height=8),
-                        ft.FilledButton(
-                            "Solicitar todos los permisos",
-                            icon=ft.Icons.DONE_ALL_ROUNDED,
-                            on_click=solicitar_todos,
-                            style=ft.ButtonStyle(
-                                bgcolor=ft.Colors.BLUE_600,
-                                shape=ft.RoundedRectangleBorder(radius=12),
-                            ),
-                            width=float("inf"),
-                        ),
-                        ft.OutlinedButton(
-                            "Abrir configuración de la app",
-                            icon=ft.Icons.SETTINGS_ROUNDED,
-                            on_click=open_settings,
-                            style=ft.ButtonStyle(
-                                color=ft.Colors.GREY_400,
-                                shape=ft.RoundedRectangleBorder(radius=12),
-                            ),
-                            width=float("inf"),
-                        ),
-                    ],
-                    scroll=ft.ScrollMode.ADAPTIVE,
-                    spacing=12,
-                ),
-                padding=20,
+                content=ft.Column(controls=[
+                    ft.Row(controls=[
+                        ft.Icon(ft.Icons.HUB_ROUNDED, color=ft.Colors.BLUE_400, size=28),
+                        ft.Text("LessNet", size=24, weight=ft.FontWeight.W_700, color=ft.Colors.WHITE),
+                    ], spacing=10),
+                    ft.Divider(color=ft.Colors.with_opacity(0.1, ft.Colors.WHITE), height=16),
+                    tabs,
+                ], spacing=0, expand=True),
+                padding=16,
                 expand=True,
             ),
             expand=True,
         )
     )
-
 
 if __name__ == "__main__":
     ft.run(main)
