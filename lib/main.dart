@@ -61,10 +61,7 @@ class BtService {
   final _connectionController = StreamController<BluetoothDevice?>.broadcast();
   Stream<BluetoothDevice?> get onConnectionChange => _connectionController.stream;
 
-  bool _advertising = false;
-  bool get isAdvertising => _advertising;
-  final _advertisingController = StreamController<bool>.broadcast();
-  Stream<bool> get onAdvertisingChange => _advertisingController.stream;
+
 
   Future<void> connectToDevice(BluetoothDevice device) async {
     try {
@@ -124,28 +121,7 @@ class BtService {
     await rxChar!.write(Uint8List.fromList([0x00]), withoutResponse: false);
   }
 
-  Future<void> startAdvertising() async {
-    try {
-      await FlutterBluePlus.startAdvertising(
-        name: 'LessNet-${DateTime.now().millisecondsSinceEpoch % 10000}',
-        services: [Guid(lessnetServiceUuid)],
-      );
-      _advertising = true;
-      _advertisingController.add(true);
-    } catch (e) {
-      // Advertising puede fallar en algunos dispositivos
-      _advertising = false;
-      _advertisingController.add(false);
-    }
-  }
 
-  Future<void> stopAdvertising() async {
-    try {
-      await FlutterBluePlus.stopAdvertising();
-    } catch (_) {}
-    _advertising = false;
-    _advertisingController.add(false);
-  }
 
   void _cleanup() {
     _txSub?.cancel();
@@ -154,8 +130,7 @@ class BtService {
     rxChar = null;
     txChar = null;
     _connectionController.add(null);
-    _advertising = false;
-    _advertisingController.add(false);
+
   }
 
   Future<void> disconnect() async {
@@ -168,7 +143,7 @@ class BtService {
     _connSub?.cancel();
     _msgController.close();
     _connectionController.close();
-    _advertisingController.close();
+
   }
 }
 
@@ -473,7 +448,7 @@ class _ScanPageState extends State<ScanPage> {
   StreamSubscription? _scanSub;
   StreamSubscription? _scanningSub;
   StreamSubscription? _connSub;
-  StreamSubscription? _advSub;
+
 
   @override
   void initState() {
@@ -481,9 +456,7 @@ class _ScanPageState extends State<ScanPage> {
     _connSub = bt.onConnectionChange.listen((_) {
       if (mounted) setState(() {});
     });
-    _advSub = bt.onAdvertisingChange.listen((_) {
-      if (mounted) setState(() {});
-    });
+
   }
 
   Future<void> _startScan() async {
@@ -540,7 +513,7 @@ class _ScanPageState extends State<ScanPage> {
     _scanSub?.cancel();
     _scanningSub?.cancel();
     _connSub?.cancel();
-    _advSub?.cancel();
+
     FlutterBluePlus.stopScan();
     super.dispose();
   }
@@ -578,31 +551,17 @@ class _ScanPageState extends State<ScanPage> {
                 ]),
               ),
 
-            // Botones de accion
-            Row(children: [
-              Expanded(child: FilledButton.icon(
+            // Boton de buscar
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
                 icon: _scanning
                     ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                     : const Icon(Icons.search),
-                label: Text(_scanning ? 'Buscando...' : 'Buscar', style: const TextStyle(fontSize: 13)),
+                label: Text(_scanning ? 'Buscando...' : 'Buscar dispositivos'),
                 onPressed: _scanning ? null : _startScan,
-              )),
-              const SizedBox(width: 8),
-              Expanded(child: FilledButton.icon(
-                icon: Icon(bt.isAdvertising ? Icons.visibility_off : Icons.visibility),
-                label: Text(bt.isAdvertising ? 'Visible ON' : 'Ser Visible', style: const TextStyle(fontSize: 13)),
-                onPressed: () async {
-                  if (bt.isAdvertising) {
-                    await bt.stopAdvertising();
-                  } else {
-                    await bt.startAdvertising();
-                  }
-                },
-                style: FilledButton.styleFrom(
-                  backgroundColor: bt.isAdvertising ? Colors.green : null,
-                ),
-              )),
-            ]),
+              ),
+            ),
             const SizedBox(height: 12),
 
             // Info de como funciona
@@ -620,8 +579,8 @@ class _ScanPageState extends State<ScanPage> {
                   const Text('Como conectarse:', style: TextStyle(color: Color(0xFF60A5FA), fontWeight: FontWeight.w700, fontSize: 12)),
                 ]),
                 const SizedBox(height: 6),
-                Text('1. Un celular presiona "Ser Visible"', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 11)),
-                Text('2. El otro celular presiona "Buscar"', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 11)),
+                Text('1. Ambos celulares deben tener Bluetooth activado y LessNet abierto', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 11)),
+                Text('2. Presiona "Buscar dispositivos"', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 11)),
                 Text('3. Toca "Conectar" en el dispositivo encontrado', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 11)),
                 Text('4. Ve a Chat y envia mensajes!', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 11)),
               ]),
