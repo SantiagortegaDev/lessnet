@@ -8,35 +8,7 @@ on:
 jobs:
   build-apk:
     runs-on: ubuntu-latest
-    steps:name: Build Android APK
-on:
-  push:
-    branches:
-      - main
-  workflow_dispatch:
-jobs:
-  build-apk:
-    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-      - run: pip install flet==0.85.1
-      - run: pip install flet-permission-handler==0.85.1
-      - run: flet build apk
-      - uses: actions/upload-artifact@v4
-        with:
-          name: app-release
-          path: build/apk/*.apk
-
       - name: Clonar repositorio
         uses: actions/checkout@v4
 
@@ -56,32 +28,14 @@ jobs:
         with:
           channel: stable
 
-      - name: Instalar Flet y dependencias
-        run: |
-          pip install flet==0.85.1 flet-permission-handler
+      - name: Instalar Flet
+        run: pip install flet==0.85.1 flet-permission-handler
 
       - name: Build APK
-        run: |
-          flet build apk \
-            --android-permissions android.permission.BLUETOOTH=true \
-            --android-permissions android.permission.BLUETOOTH_ADMIN=true \
-            --android-permissions android.permission.BLUETOOTH_SCAN=true \
-            --android-permissions android.permission.BLUETOOTH_CONNECT=true \
-            --android-permissions android.permission.BLUETOOTH_ADVERTISE=true \
-            --android-permissions android.permission.ACCESS_FINE_LOCATION=true \
-            --android-permissions android.permission.ACCESS_COARSE_LOCATION=true \
-            --android-permissions android.permission.NEARBY_WIFI_DEVICES=true \
-            --android-permissions android.permission.ACCESS_WIFI_STATE=true \
-            --android-permissions android.permission.CHANGE_WIFI_STATE=true \
-            --android-permissions android.permission.INTERNET=true \
-            --android-permissions android.permission.ACCESS_NETWORK_STATE=true
+        run: flet build apk --verbose
 
       - name: Subir APK
         uses: actions/upload-artifact@v4
         with:
           name: app-release
           path: build/apk/*.apk
-
-
-
-          
