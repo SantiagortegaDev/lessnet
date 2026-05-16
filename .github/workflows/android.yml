@@ -10,6 +10,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: subosito/flutter-action@v2
         with:
@@ -22,18 +25,18 @@ jobs:
           cp -r assets /tmp/assets_backup 2>/dev/null || true
           cp pubspec.yaml /tmp/pubspec_backup.yaml
           cp android/app/src/main/AndroidManifest.xml /tmp/AndroidManifest_backup.xml
-          
+
           # Create a fresh Flutter project with correct name and org
           cd /tmp
           flutter create --org com.lessnet --project-name lessnet lessnet_fresh
-          
+
           # Replace the Android directory with fresh one
           rm -rf "$GITHUB_WORKSPACE/android"
           cp -r /tmp/lessnet_fresh/android "$GITHUB_WORKSPACE/android"
-          
+
           # Restore our AndroidManifest with BT permissions
           cp /tmp/AndroidManifest_backup.xml "$GITHUB_WORKSPACE/android/app/src/main/AndroidManifest.xml"
-          
+
           # ── Install our custom native BLE peripheral Kotlin files ──
           # Find the gradle file (could be .gradle or .gradle.kts)
           GRADLE_FILE=""
@@ -42,18 +45,18 @@ jobs:
           elif [ -f "$GITHUB_WORKSPACE/android/app/build.gradle" ]; then
             GRADLE_FILE="$GITHUB_WORKSPACE/android/app/build.gradle"
           fi
-          
+
           echo "Gradle file: $GRADLE_FILE"
           echo "Gradle contents (first 30 lines):"
           head -30 "$GRADLE_FILE" || true
-          
+
           # Extract package name: try namespace first, then applicationId
           PACKAGE=""
           if [ -n "$GRADLE_FILE" ]; then
             # Extract the value inside quotes after namespace or applicationId
             PACKAGE=$(grep -E "namespace|applicationId" "$GRADLE_FILE" | head -1 | sed -E 's/[^"]*"([^"]+)".*/\1/' | tr -d ' ')
           fi
-          
+
           # Fallback: find it from the generated MainActivity.kt
           if [ -z "$PACKAGE" ]; then
             GENERATED_MAIN=$(find "$GITHUB_WORKSPACE/android/app/src/main/kotlin" -name "MainActivity.kt" | head -1)
@@ -61,43 +64,43 @@ jobs:
               PACKAGE=$(head -1 "$GENERATED_MAIN" | sed 's/package //' | tr -d ' ')
             fi
           fi
-          
+
           if [ -z "$PACKAGE" ]; then
             echo "ERROR: Could not detect package name!"
             find "$GITHUB_WORKSPACE/android/app/src/main/kotlin" -type f 2>/dev/null || true
             exit 1
           fi
-          
+
           echo "Detected package: $PACKAGE"
-          
+
           # Compute the Kotlin directory from the package name
           KOTLIN_DIR="$GITHUB_WORKSPACE/android/app/src/main/kotlin/$(echo $PACKAGE | tr '.' '/')"
           echo "Kotlin dir: $KOTLIN_DIR"
-          
+
           # Remove any existing files and ensure directory exists
           rm -rf "$KOTLIN_DIR"
           mkdir -p "$KOTLIN_DIR"
-          
+
           # Replace package placeholder and copy our custom Kotlin files
           sed "s/PACKAGE_PLACEHOLDER/$PACKAGE/g" "$GITHUB_WORKSPACE/native/BlePeripheralPlugin.kt" > "$KOTLIN_DIR/BlePeripheralPlugin.kt"
           sed "s/PACKAGE_PLACEHOLDER/$PACKAGE/g" "$GITHUB_WORKSPACE/native/MainActivity.kt" > "$KOTLIN_DIR/MainActivity.kt"
-          
+
           echo "Installed custom Kotlin files:"
           ls -la "$KOTLIN_DIR/"
           echo "--- MainActivity.kt head ---"
           head -3 "$KOTLIN_DIR/MainActivity.kt"
           echo "--- BlePeripheralPlugin.kt head ---"
           head -3 "$KOTLIN_DIR/BlePeripheralPlugin.kt"
-          
+
           # Restore our source code
           rm -rf "$GITHUB_WORKSPACE/lib"
           cp -r /tmp/lib_backup "$GITHUB_WORKSPACE/lib"
-          
+
           if [ -d "/tmp/assets_backup" ]; then
             rm -rf "$GITHUB_WORKSPACE/assets"
             cp -r /tmp/assets_backup "$GITHUB_WORKSPACE/assets"
           fi
-          
+
           # Use our pubspec.yaml with our dependencies
           cp /tmp/pubspec_backup.yaml "$GITHUB_WORKSPACE/pubspec.yaml"
 

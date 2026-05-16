@@ -50,7 +50,25 @@ class BlePeripheralPlugin(private val context: Context) : MethodChannel.MethodCa
                 sendData(data, result)
             }
             "isAdvertising" -> result.success(isCurrentlyAdvertising)
+            "supportsAdvertising" -> {
+                val supported = checkAdvertisingSupport()
+                result.success(supported)
+            }
             else -> result.notImplemented()
+        }
+    }
+
+    private fun checkAdvertisingSupport(): Boolean {
+        try {
+            val btManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
+            val btAdapter = btManager?.adapter
+            if (btAdapter == null || !btAdapter.isEnabled) return false
+
+            val adv = btAdapter.bluetoothLeAdvertiser
+            // Check if multiple advertisement is supported
+            return adv != null && btAdapter.isMultipleAdvertisementSupported
+        } catch (e: Exception) {
+            return false
         }
     }
 
@@ -64,28 +82,28 @@ class BlePeripheralPlugin(private val context: Context) : MethodChannel.MethodCa
                 return
             }
 
+            // Check advertising support first
+            advertiser = bluetoothAdapter?.bluetoothLeAdvertiser
+            if (advertiser == null) {
+                result.error("ADV_ERROR", "Este dispositivo NO soporta BLE advertising. Muchos celulares OPPO, Realme y gamas bajas no lo soportan. Usa este celular para BUSCAR.", null)
+                return
+            }
+
             // Start GATT server first (must be ready before advertising)
             if (!startGattServer()) {
                 result.error("GATT_ERROR", "No se pudo crear el servidor GATT", null)
                 return
             }
 
-            // Start BLE advertising
-            advertiser = bluetoothAdapter?.bluetoothLeAdvertiser
-            if (advertiser == null) {
-                gattServer?.close()
-                gattServer = null
-                result.error("ADV_ERROR", "Este dispositivo no soporta BLE advertising", null)
-                return
-            }
-
+            // Start BLE advertising with LOW_LATENCY for faster discovery
             val settings = AdvertiseSettings.Builder()
                 .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
                 .setConnectable(true)
-                .setTimeout(0) // No timeout - keep advertising
+                .setTimeout(0) // No timeout - keep advertising indefinitely
                 .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
                 .build()
 
+            // Include service UUID so scanners can identify us
             val data = AdvertiseData.Builder()
                 .setIncludeDeviceName(true)
                 .addServiceUuid(ParcelUuid(SERVICE_UUID))
@@ -109,6 +127,14 @@ class BlePeripheralPlugin(private val context: Context) : MethodChannel.MethodCa
 
         override fun onStartFailure(errorCode: Int) {
             isCurrentlyAdvertising = false
+            val errorMsg = when (errorCode) {
+                ADVERTISE_FAILED_DATA_TOO_LARGE -> "Datos de advertising demasiado grandes"
+                ADVERTISE_FAILED_TOO_MANY_ADVERTISERS -> "Demasiados advertisers activos"
+                ADVERTISE_FAILED_ALREADY_STARTED -> "Advertising ya esta activo"
+                ADVERTISE_FAILED_INTERNAL_ERROR -> "Error interno de BLE"
+                ADVERTISE_FAILED_FEATURE_UNSUPPORTED -> "BLE advertising no soportado por este dispositivo"
+                else -> "Error desconocido: $errorCode"
+            }
             mainHandler.post {
                 channel?.invokeMethod("onAdvertiseStatus", false)
             }

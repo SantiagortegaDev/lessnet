@@ -8,8 +8,8 @@ import 'package:permission_handler/permission_handler.dart';
 
 // ─── UUIDs del servicio BLE de chat de LessNet ───
 const String lessnetServiceUuid = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
-const String lessnetCharRxUuid  = "6e400002-b5a3-f393-e0a9-e50e24dcca9e"; // Teléfono ESCRIBE
-const String lessnetCharTxUuid  = "6e400003-b5a3-f393-e0a9-e50e24dcca9e"; // Teléfono LEE (notificaciones)
+const String lessnetCharRxUuid  = "6e400002-b5a3-f393-e0a9-e50e24dcca9e"; // Telefono ESCRIBE
+const String lessnetCharTxUuid  = "6e400003-b5a3-f393-e0a9-e50e24dcca9e"; // Telefono LEE (notificaciones)
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -67,6 +67,7 @@ class BtService {
   bool _isAdvertising = false;
   bool _peripheralConnected = false;
   String _peripheralDeviceName = '';
+  String _advertisingError = '';
 
   // ─── Shared state ───
   final List<ChatMessage> messages = [];
@@ -82,6 +83,7 @@ class BtService {
   bool get isAdvertising => _isAdvertising;
   bool get isPeripheralConnected => _peripheralConnected;
   bool get isConnected => connectedDevice != null || _peripheralConnected;
+  String get advertisingError => _advertisingError;
   String get connectedName {
     if (connectedDevice != null) {
       return connectedDevice!.platformName.isEmpty
@@ -90,6 +92,17 @@ class BtService {
     }
     if (_peripheralConnected) return _peripheralDeviceName.isEmpty ? 'Dispositivo' : _peripheralDeviceName;
     return '';
+  }
+
+  // ─── Check if device supports BLE advertising ───
+  Future<bool> supportsAdvertising() async {
+    try {
+      final result = await _peripheralChannel.invokeMethod('supportsAdvertising');
+      return result as bool? ?? false;
+    } catch (e) {
+      // If method not found, try to start and catch the error
+      return false;
+    }
   }
 
   // ─── Setup MethodChannel with native BLE peripheral ───
@@ -118,6 +131,9 @@ class BtService {
           break;
         case 'onAdvertiseStatus':
           final success = call.arguments as bool? ?? false;
+          if (!success) {
+            _advertisingError = 'El dispositivo no pudo iniciar advertising. Puede que no soporte modo periferico BLE.';
+          }
           _isAdvertising = success;
           _advertisingController.add(success);
           break;
@@ -127,6 +143,7 @@ class BtService {
 
   // ─── Peripheral: start advertising ───
   Future<void> startAdvertising() async {
+    _advertisingError = '';
     try {
       await _peripheralChannel.invokeMethod('startAdvertising');
       _isPeripheral = true;
@@ -134,6 +151,9 @@ class BtService {
       _advertisingController.add(true);
     } catch (e) {
       _isAdvertising = false;
+      _advertisingError = e.toString().contains('ADV_ERROR')
+          ? 'Este dispositivo NO soporta BLE advertising. Usa este celular para BUSCAR.'
+          : 'Error: $e';
       _advertisingController.add(false);
       rethrow;
     }
@@ -153,9 +173,15 @@ class BtService {
   // ─── Central: connect to a peripheral device ───
   Future<void> connectToDevice(BluetoothDevice device) async {
     try {
-      await device.connect(timeout: const Duration(seconds: 15));
+      // Request larger MTU for better throughput
+      await device.connect(timeout: const Duration(seconds: 20));
       connectedDevice = device;
       _connectionController.add(true);
+
+      // Request MTU negotiation
+      try {
+        await device.requestMtu(512);
+      } catch (_) {}
 
       final services = await device.discoverServices();
       for (final service in services) {
@@ -378,11 +404,27 @@ class _PermissionsPageState extends State<PermissionsPage> {
 
   final Map<Permission, PermissionStatus> _statuses = {};
   bool _loading = false;
+  bool _bluetoothOn = false;
+  bool _locationOn = false;
 
   @override
   void initState() {
     super.initState();
     _checkAll();
+    _checkHardware();
+  }
+
+  Future<void> _checkHardware() async {
+    try {
+      final adapterOn = await FlutterBluePlus.adapterState.first
+          .timeout(const Duration(seconds: 3), onTimeout: (_) => BluetoothAdapterState.unknown);
+      if (mounted) setState(() => _bluetoothOn = adapterOn == BluetoothAdapterState.on);
+    } catch (_) {}
+    try {
+      final locOn = await Permission.locationWhenInUse.status;
+      // Can't directly check if location service is on, but we can check permission
+      if (mounted) setState(() => _locationOn = locOn.isGranted);
+    } catch (_) {}
   }
 
   Future<void> _checkAll() async {
@@ -405,6 +447,7 @@ class _PermissionsPageState extends State<PermissionsPage> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+    _checkHardware();
   }
 
   String _statusText(PermissionStatus? s) {
@@ -426,6 +469,44 @@ class _PermissionsPageState extends State<PermissionsPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const _Header('Permisos', Icons.shield, 'Necesarios para Bluetooth'),
+
+            // ─── Bluetooth & Location status ───
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: (_bluetoothOn ? Colors.green : Colors.red).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: (_bluetoothOn ? Colors.green : Colors.red).withOpacity(0.3)),
+              ),
+              child: Row(children: [
+                Icon(_bluetoothOn ? Icons.bluetooth : Icons.bluetooth_disabled,
+                    color: _bluetoothOn ? Colors.greenAccent : Colors.redAccent, size: 20),
+                const SizedBox(width: 10),
+                Expanded(child: Text(
+                  _bluetoothOn ? 'Bluetooth ACTIVADO' : 'Bluetooth DESACTIVADO - Activa Bluetooth en ajustes!',
+                  style: TextStyle(color: _bluetoothOn ? Colors.greenAccent : Colors.redAccent, fontWeight: FontWeight.w600, fontSize: 13),
+                )),
+              ]),
+            ),
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.amber.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.amber.withOpacity(0.3)),
+              ),
+              child: Row(children: [
+                const Icon(Icons.gps_fixed, color: Colors.amber, size: 20),
+                const SizedBox(width: 10),
+                Expanded(child: Text(
+                  'Asegurate de que la UBICACION este activada en ajustes del telefono. Es necesaria para buscar BLE en muchos dispositivos.',
+                  style: TextStyle(color: Colors.amber.withOpacity(0.9), fontSize: 12),
+                )),
+              ]),
+            ),
+
             const SizedBox(height: 16),
             Expanded(
               child: ListView(
@@ -559,6 +640,9 @@ class _ScanPageState extends State<ScanPage> {
   final bt = BtService();
   final List<ScanResult> _results = [];
   bool _scanning = false;
+  bool _scanAll = true; // Default: scan ALL devices (no filter)
+  int _scanSeconds = 0;
+  Timer? _scanTimer;
   StreamSubscription? _scanSub;
   StreamSubscription? _scanningSub;
   StreamSubscription? _connSub;
@@ -604,53 +688,105 @@ class _ScanPageState extends State<ScanPage> {
       Permission.bluetoothScan,
       Permission.bluetoothConnect,
     ].request();
-    if (!statuses.values.every((s) => s.isGranted)) {
+
+    // More lenient permission check - only require scan and connect
+    final scanGranted = statuses[Permission.bluetoothScan]?.isGranted ?? false;
+    final connectGranted = statuses[Permission.bluetoothConnect]?.isGranted ?? false;
+    if (!scanGranted || !connectGranted) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Concede los permisos primero'), backgroundColor: Colors.red),
+          const SnackBar(content: Text('Concede los permisos de Bluetooth Scan y Connect primero'), backgroundColor: Colors.red),
         );
       }
       return;
     }
+
+    // Check if Bluetooth is on
+    try {
+      final adapterState = await FlutterBluePlus.adapterState.first
+          .timeout(const Duration(seconds: 3), onTimeout: (_) => BluetoothAdapterState.unknown);
+      if (adapterState != BluetoothAdapterState.on) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Bluetooth esta APAGADO! Activa Bluetooth en los ajustes del telefono.'),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 5),
+            ),
+          );
+        }
+        return;
+      }
+    } catch (_) {}
+
     _results.clear();
     setState(() => _scanning = true);
+    _scanSeconds = 0;
+    _scanTimer?.cancel();
+    _scanTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() => _scanSeconds++);
+    });
+
     try {
+      // CRITICAL FIX: Scan WITHOUT withServices filter
+      // Many OPPO/ColorOS devices don't properly match 128-bit UUID filters
+      // Instead, we scan ALL devices and filter manually in the results
       await FlutterBluePlus.startScan(
-        timeout: const Duration(seconds: 30),
-        withServices: [Guid(lessnetServiceUuid)],
+        timeout: const Duration(seconds: 60), // Extended from 30 to 60 seconds
+        androidUsesFineLocation: true,
       );
+
       _scanSub = FlutterBluePlus.scanResults.listen((results) {
-        if (mounted) setState(() { _results..clear()..addAll(results); });
+        if (mounted) {
+          setState(() {
+            _results.clear();
+            _results.addAll(results);
+          });
+        }
       });
+
       _scanningSub = FlutterBluePlus.isScanning.listen((scanning) {
-        if (!scanning && mounted) setState(() => _scanning = false);
+        if (!scanning && mounted) {
+          setState(() => _scanning = false);
+          _scanTimer?.cancel();
+          _scanTimer = null;
+        }
       });
     } catch (e) {
-      if (mounted) { setState(() => _scanning = false); }
+      if (mounted) {
+        setState(() => _scanning = false);
+        _scanTimer?.cancel();
+        _scanTimer = null;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al escanear: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
+  }
+
+  Future<void> _stopScan() async {
+    await FlutterBluePlus.stopScan();
+    _scanSub?.cancel();
+    _scanningSub?.cancel();
+    _scanTimer?.cancel();
+    _scanTimer = null;
+    if (mounted) setState(() => _scanning = false);
   }
 
   Future<void> _startAdvertising() async {
     // Stop scan first if active
     if (_scanning) {
-      await FlutterBluePlus.stopScan();
-      _scanSub?.cancel();
-      _scanningSub?.cancel();
-      _scanning = false;
+      await _stopScan();
     }
 
     final statuses = await [
       Permission.bluetoothAdvertise,
       Permission.bluetoothConnect,
     ].request();
-    if (!statuses.values.every((s) => s.isGranted)) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Concede los permisos de Advertise primero'), backgroundColor: Colors.red),
-        );
-      }
-      return;
-    }
+
+    // BLUETOOTH_ADVERTISE is a normal permission on Android 12+ (auto-granted)
+    // Don't block if it's denied - it might still work
+    final advGranted = statuses[Permission.bluetoothAdvertise]?.isGranted ?? false;
 
     try {
       await bt.startAdvertising();
@@ -664,10 +800,23 @@ class _ScanPageState extends State<ScanPage> {
         );
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al hacer visible: $e'), backgroundColor: Colors.red),
-        );
+      final errMsg = e.toString();
+      if (errMsg.contains('ADV_ERROR') || errMsg.contains('no soporta') || errMsg.contains('advertising')) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Este celular NO soporta BLE advertising. Usa ESTE celular para BUSCAR y el OTRO para hacerse visible.'),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 8),
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error al hacer visible: $e'), backgroundColor: Colors.red),
+          );
+        }
       }
     }
   }
@@ -686,15 +835,17 @@ class _ScanPageState extends State<ScanPage> {
         const SnackBar(content: Text('Conectando...'), backgroundColor: Colors.blue),
       );
       await bt.connectToDevice(device);
+      // Stop scanning after connecting
+      await _stopScan();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Conectado a ${device.platformName}'), backgroundColor: Colors.green),
+          SnackBar(content: Text('Conectado a ${device.platformName.isEmpty ? "Dispositivo" : device.platformName}'), backgroundColor: Colors.green),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Error al conectar: $e'), backgroundColor: Colors.red, duration: Duration(seconds: 5)),
         );
       }
     }
@@ -714,6 +865,7 @@ class _ScanPageState extends State<ScanPage> {
     _advSub?.cancel();
     _periphConnSub?.cancel();
     _advertiseTimer?.cancel();
+    _scanTimer?.cancel();
     FlutterBluePlus.stopScan();
     super.dispose();
   }
@@ -721,6 +873,19 @@ class _ScanPageState extends State<ScanPage> {
   @override
   Widget build(BuildContext context) {
     final isConnected = bt.isConnected;
+
+    // Sort results: LessNet devices first, then by RSSI (signal strength)
+    final sortedResults = List<ScanResult>.from(_results);
+    sortedResults.sort((a, b) {
+      final aIsLessNet = a.advertisementData.serviceUuids
+          .any((uuid) => uuid.str128.toLowerCase() == lessnetServiceUuid.toLowerCase());
+      final bIsLessNet = b.advertisementData.serviceUuids
+          .any((uuid) => uuid.str128.toLowerCase() == lessnetServiceUuid.toLowerCase());
+      if (aIsLessNet && !bIsLessNet) return -1;
+      if (!aIsLessNet && bIsLessNet) return 1;
+      return b.rssi.compareTo(a.rssi); // Stronger signal first
+    });
+
     return SafeArea(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -774,6 +939,29 @@ class _ScanPageState extends State<ScanPage> {
                 ]),
               ),
 
+            // ─── Advertising error ───
+            if (bt.advertisingError.isNotEmpty && !bt.isAdvertising)
+              Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(color: Colors.orange.withOpacity(0.1), borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.orange.withOpacity(0.3))),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [
+                    const Icon(Icons.warning, color: Colors.orangeAccent, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text('Advertising no disponible',
+                        style: TextStyle(color: Colors.orangeAccent, fontWeight: FontWeight.w600, fontSize: 13))),
+                  ]),
+                  const SizedBox(height: 6),
+                  Text(bt.advertisingError,
+                      style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 12)),
+                  const SizedBox(height: 6),
+                  Text('Solucion: Usa ESTE celular para BUSCAR dispositivos y el OTRO celular para Hacerse Visible.',
+                      style: TextStyle(color: Colors.amber.withOpacity(0.9), fontSize: 12, fontWeight: FontWeight.w500)),
+                ]),
+              ),
+
             // ─── Two mode buttons ───
             Row(children: [
               Expanded(
@@ -781,9 +969,13 @@ class _ScanPageState extends State<ScanPage> {
                   icon: _scanning
                       ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                       : const Icon(Icons.search),
-                  label: Text(_scanning ? 'Buscando...' : 'Buscar', style: const TextStyle(fontSize: 13)),
-                  onPressed: _scanning || bt.isAdvertising ? null : _startScan,
-                  style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12)),
+                  label: Text(_scanning ? 'Buscando ${_fmtDuration(_scanSeconds)}' : 'Buscar',
+                      style: const TextStyle(fontSize: 13)),
+                  onPressed: _scanning ? _stopScan : (bt.isAdvertising ? null : _startScan),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    backgroundColor: _scanning ? Colors.orange : null,
+                  ),
                 ),
               ),
               const SizedBox(width: 10),
@@ -792,7 +984,7 @@ class _ScanPageState extends State<ScanPage> {
                   icon: bt.isAdvertising
                       ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                       : const Icon(Icons.broadcast_on_personal),
-                  label: Text(bt.isAdvertising ? 'Visible' : 'Hacerme Visible', style: const TextStyle(fontSize: 13)),
+                  label: Text(bt.isAdvertising ? 'Visible ${_fmtDuration(_advertiseSeconds)}' : 'Hacerme Visible', style: const TextStyle(fontSize: 13)),
                   onPressed: isConnected ? null : (bt.isAdvertising ? _stopAdvertising : _startAdvertising),
                   style: FilledButton.styleFrom(
                     backgroundColor: bt.isAdvertising ? Colors.orange : const Color(0xFF3B82F6),
@@ -838,6 +1030,28 @@ class _ScanPageState extends State<ScanPage> {
                         style: TextStyle(color: Colors.amber.withOpacity(0.9), fontSize: 11))),
                   ]),
                 ),
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: Colors.orange.withOpacity(0.1), borderRadius: BorderRadius.circular(6)),
+                  child: Row(children: [
+                    const Icon(Icons.phone_android, color: Colors.orangeAccent, size: 14),
+                    const SizedBox(width: 6),
+                    Expanded(child: Text('Algunos celulares (OPPO, Realme, etc.) NO soportan "Hacerse Visible". En ese caso, usa ese celular para BUSCAR.',
+                        style: TextStyle(color: Colors.orangeAccent.withOpacity(0.9), fontSize: 11))),
+                  ]),
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: Colors.red.withOpacity(0.1), borderRadius: BorderRadius.circular(6)),
+                  child: Row(children: [
+                    const Icon(Icons.gps_fixed, color: Colors.redAccent, size: 14),
+                    const SizedBox(width: 6),
+                    Expanded(child: Text('IMPORTANTE: La UBICACION debe estar ACTIVADA en el telefono para buscar dispositivos BLE!',
+                        style: TextStyle(color: Colors.redAccent.withOpacity(0.9), fontSize: 11))),
+                  ]),
+                ),
               ]),
             ),
 
@@ -845,15 +1059,21 @@ class _ScanPageState extends State<ScanPage> {
 
             // ─── Scan results list ───
             if (_scanning || _results.isNotEmpty) ...[
-              Text('Dispositivos encontrados (${_results.length})',
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14)),
+              Row(children: [
+                Text('Dispositivos encontrados (${_results.length})',
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14)),
+                const SizedBox(width: 8),
+                if (_scanning)
+                  const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF60A5FA))),
+              ]),
               const SizedBox(height: 8),
-              ..._results.map((r) {
+              ...sortedResults.map((r) {
                 final isConn = bt.connectedDevice?.remoteId == r.device.remoteId;
                 final rssi = r.rssi;
                 final sig = rssi > -60 ? Colors.greenAccent : rssi > -80 ? Colors.orangeAccent : Colors.redAccent;
                 final isLessNet = r.advertisementData.serviceUuids
                     .any((uuid) => uuid.str128.toLowerCase() == lessnetServiceUuid.toLowerCase());
+                final deviceName = r.device.platformName.isNotEmpty ? r.device.platformName : 'Desconocido';
                 return Container(
                   margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
@@ -866,7 +1086,7 @@ class _ScanPageState extends State<ScanPage> {
                     const SizedBox(width: 12),
                     Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Row(children: [
-                        Expanded(child: Text(r.device.platformName.isEmpty ? 'Desconocido' : r.device.platformName,
+                        Expanded(child: Text(deviceName,
                             style: TextStyle(color: isConn ? Colors.greenAccent : isLessNet ? const Color(0xFF60A5FA) : Colors.white, fontWeight: FontWeight.w600, fontSize: 14))),
                         if (isLessNet)
                           Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -874,6 +1094,8 @@ class _ScanPageState extends State<ScanPage> {
                             child: const Text('LessNet', style: TextStyle(color: Color(0xFF60A5FA), fontSize: 9, fontWeight: FontWeight.w700))),
                       ]),
                       Text(r.device.remoteId.toString(), style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11)),
+                      if (isLessNet)
+                        Text('Toca Conectar para chatear', style: TextStyle(color: const Color(0xFF60A5FA).withOpacity(0.7), fontSize: 10)),
                     ])),
                     Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(color: sig.withOpacity(0.15), borderRadius: BorderRadius.circular(6)),
@@ -1020,12 +1242,22 @@ class _ChatPageState extends State<ChatPage> {
               decoration: InputDecoration(hintText: _connected ? 'Escribe un mensaje...' : 'Sin conexion',
                 hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
                 filled: true, fillColor: Colors.white.withOpacity(0.07),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12)),
-              onSubmitted: _connected ? (_) => _send() : null)),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: const Color(0xFF3B82F6)))),
+              onSubmitted: (_) => _send(),
+            )),
             const SizedBox(width: 8),
-            IconButton.filled(icon: const Icon(Icons.send_rounded), onPressed: _connected ? _send : null),
-          ])),
+            FilledButton(
+              onPressed: _connected ? _send : null,
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.all(14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Icon(Icons.send, size: 20),
+            ),
+          ]),
+        ),
       ]),
     );
   }
@@ -1041,164 +1273,153 @@ class FirstAidPage extends StatefulWidget {
 }
 
 class _FirstAidPageState extends State<FirstAidPage> {
-  List<dynamic> _protocols = [];
+  List<dynamic> _items = [];
   bool _loading = true;
-  String _search = '';
 
   @override
-  void initState() { super.initState(); _loadData(); }
+  void initState() {
+    super.initState();
+    _loadData();
+  }
 
   Future<void> _loadData() async {
     try {
       final jsonStr = await rootBundle.loadString('assets/vault/first_aid/primeros_auxilios.json');
       final data = json.decode(jsonStr);
-      setState(() { _protocols = data['protocolos'] ?? []; _loading = false; });
-    } catch (e) { setState(() => _loading = false); }
+      final List<dynamic> items = data is List ? data : (data['items'] ?? data['protocolos'] ?? []);
+      if (mounted) setState(() { _items = items; _loading = false; });
+    } catch (e) {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
-  List<dynamic> get _filtered {
-    if (_search.isEmpty) return _protocols;
-    return _protocols.where((p) =>
-      p['titulo'].toString().toLowerCase().contains(_search.toLowerCase()) ||
-      p['categoria'].toString().toLowerCase().contains(_search.toLowerCase())
-    ).toList();
+  Color _priorityColor(String? priority) {
+    switch (priority?.toLowerCase()) {
+      case 'critica': return Colors.redAccent;
+      case 'alta': return Colors.orangeAccent;
+      case 'media': return Colors.amber;
+      default: return const Color(0xFF60A5FA);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      child: Column(children: [
-        Padding(padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-          child: const _Header('Primeros Auxilios', Icons.local_hospital, '12 protocolos de emergencia')),
-        Padding(padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-          child: TextField(style: const TextStyle(color: Colors.white),
-            decoration: InputDecoration(hintText: 'Buscar protocolo...',
-              hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
-              prefixIcon: Icon(Icons.search, color: Colors.white.withOpacity(0.4)),
-              filled: true, fillColor: Colors.white.withOpacity(0.07),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none)),
-            onChanged: (v) => setState(() => _search = v))),
-        const SizedBox(height: 12),
-        Expanded(
-          child: _loading
-              ? const Center(child: CircularProgressIndicator())
-              : _filtered.isEmpty
-                  ? Center(child: Text('Sin resultados', style: TextStyle(color: Colors.white.withOpacity(0.4))))
-                  : ListView.builder(padding: const EdgeInsets.symmetric(horizontal: 20),
-                      itemCount: _filtered.length,
-                      itemBuilder: (_, i) => _ProtocolCard(_filtered[i])),
-        ),
-      ]),
-    );
-  }
-}
-
-class _ProtocolCard extends StatelessWidget {
-  final Map<String, dynamic> protocol;
-  const _ProtocolCard(this.protocol);
-
-  Color _priorityColor(String? p) {
-    if (p == 'critica') return Colors.redAccent;
-    if (p == 'alta') return Colors.orangeAccent;
-    return Colors.blueAccent;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final color = _priorityColor(protocol['prioridad']);
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      child: Card(
-        color: Colors.white.withOpacity(0.05),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: color.withOpacity(0.3))),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: () => Navigator.push(context, MaterialPageRoute(
-            builder: (_) => _ProtocolDetailPage(protocol))),
-          child: Padding(padding: const EdgeInsets.all(14),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(color: color.withOpacity(0.15), borderRadius: BorderRadius.circular(6)),
-                  child: Text(protocol['prioridad']?.toString().toUpperCase() ?? '',
-                      style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w700))),
-                const SizedBox(width: 8),
-                Expanded(child: Text(protocol['titulo'] ?? '',
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 15))),
-              ]),
-              const SizedBox(height: 6),
-              Text(protocol['resumen'] ?? '', style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12),
-                maxLines: 2, overflow: TextOverflow.ellipsis),
-              const SizedBox(height: 6),
-              Text('${(protocol['pasos'] as List?)?.length ?? 0} pasos',
-                  style: TextStyle(color: color.withOpacity(0.7), fontSize: 11, fontWeight: FontWeight.w600)),
-            ]),
-          ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _Header('Primeros Auxilios', Icons.local_hospital, 'Protocolos de emergencia'),
+            const SizedBox(height: 16),
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _items.isEmpty
+                      ? Center(child: Text('No hay datos disponibles', style: TextStyle(color: Colors.white.withOpacity(0.4))))
+                      : ListView.builder(
+                          itemCount: _items.length,
+                          itemBuilder: (_, i) {
+                            final item = _items[i] as Map<String, dynamic>;
+                            final title = item['titulo'] ?? item['title'] ?? 'Sin titulo';
+                            final desc = item['descripcion'] ?? item['description'] ?? '';
+                            final priority = item['prioridad'] ?? item['priority'] ?? '';
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 10),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.05),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.white.withOpacity(0.08)),
+                              ),
+                              child: ListTile(
+                                leading: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: _priorityColor(priority).withOpacity(0.15),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Icon(Icons.local_hospital, color: _priorityColor(priority), size: 20),
+                                ),
+                                title: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                                subtitle: desc.isNotEmpty ? Text(desc, style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12), maxLines: 2, overflow: TextOverflow.ellipsis) : null,
+                                trailing: priority.isNotEmpty
+                                    ? Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(color: _priorityColor(priority).withOpacity(0.2), borderRadius: BorderRadius.circular(4)),
+                                        child: Text(priority.toUpperCase(), style: TextStyle(color: _priorityColor(priority), fontSize: 9, fontWeight: FontWeight.w700)))
+                                    : null,
+                                onTap: () {
+                                  Navigator.push(context, MaterialPageRoute(builder: (_) => _FirstAidDetailPage(item: item)));
+                                },
+                              ),
+                            );
+                          },
+                        ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-class _ProtocolDetailPage extends StatelessWidget {
-  final Map<String, dynamic> protocol;
-  const _ProtocolDetailPage(this.protocol);
+class _FirstAidDetailPage extends StatelessWidget {
+  final Map<String, dynamic> item;
+  const _FirstAidDetailPage({required this.item});
 
   @override
   Widget build(BuildContext context) {
-    final pasos = (protocol['pasos'] as List?) ?? [];
-    final advertencias = (protocol['advertencias'] as List?) ?? [];
-    final referencias = (protocol['referencias'] as List?) ?? [];
+    final title = item['titulo'] ?? item['title'] ?? 'Detalle';
+    final desc = item['descripcion'] ?? item['description'] ?? '';
+    final steps = item['pasos'] ?? item['steps'] ?? [];
+    final warnings = item['advertencias'] ?? item['warnings'] ?? [];
+
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A),
-      appBar: AppBar(backgroundColor: const Color(0xFF1E293B), title: Text(protocol['titulo'] ?? '', style: const TextStyle(fontSize: 16))),
-      body: ListView(padding: const EdgeInsets.all(20), children: [
-        Text(protocol['resumen'] ?? '', style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14)),
-        const SizedBox(height: 20),
-        const Text('PASOS', style: TextStyle(color: Color(0xFF60A5FA), fontWeight: FontWeight.w700, fontSize: 14)),
-        const SizedBox(height: 8),
-        ...pasos.map((p) => Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(10)),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              CircleAvatar(radius: 14, backgroundColor: const Color(0xFF3B82F6),
-                child: Text('${p['numero']}', style: const TextStyle(color: Colors.white, fontSize: 12))),
-              const SizedBox(width: 10),
-              Expanded(child: Text(p['titulo'] ?? '', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14))),
-            ]),
-            const SizedBox(height: 8),
-            Text(p['descripcion'] ?? '', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 13)),
-            if (p['advertencia'] != null) ...[
-              const SizedBox(height: 6),
-              Container(padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: Colors.amber.withOpacity(0.1), borderRadius: BorderRadius.circular(6)),
-                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Icon(Icons.warning_amber, color: Colors.amber, size: 16),
-                  const SizedBox(width: 6),
-                  Expanded(child: Text(p['advertencia'], style: const TextStyle(color: Colors.amber, fontSize: 11))),
-                ])),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF1E293B),
+        title: Text(title, style: const TextStyle(color: Colors.white, fontSize: 16)),
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (desc.isNotEmpty) ...[
+              Text(desc, style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14)),
+              const SizedBox(height: 16),
             ],
-          ]),
-        )),
-        if (advertencias.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          const Text('ADVERTENCIAS', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w700, fontSize: 14)),
-          const SizedBox(height: 8),
-          ...advertencias.map((a) => Padding(padding: const EdgeInsets.only(bottom: 6),
-            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('  \u2022 ', style: TextStyle(color: Colors.redAccent)),
-              Expanded(child: Text(a.toString(), style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 12))),
-            ]))),
-        ],
-        if (referencias.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          const Text('REFERENCIAS', style: TextStyle(color: Colors.white38, fontWeight: FontWeight.w700, fontSize: 12)),
-          ...referencias.map((r) => Text('  \u2022 $r', style: const TextStyle(color: Colors.white38, fontSize: 11))),
-        ],
-      ]),
+            if (steps.isNotEmpty) ...[
+              const Text('Pasos:', style: TextStyle(color: Color(0xFF60A5FA), fontWeight: FontWeight.w700, fontSize: 14)),
+              const SizedBox(height: 8),
+              ...(steps as List).asMap().entries.map((e) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Container(width: 24, height: 24, margin: const EdgeInsets.only(right: 10),
+                    decoration: BoxDecoration(color: const Color(0xFF3B82F6).withOpacity(0.2), borderRadius: BorderRadius.circular(12)),
+                    child: Center(child: Text('${e.key + 1}', style: const TextStyle(color: Color(0xFF60A5FA), fontSize: 11, fontWeight: FontWeight.w700)))),
+                  Expanded(child: Text(e.value.toString(), style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 13))),
+                ]),
+              )),
+            ],
+            if (warnings.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              const Text('Advertencias:', style: TextStyle(color: Colors.orangeAccent, fontWeight: FontWeight.w700, fontSize: 14)),
+              const SizedBox(height: 8),
+              ...(warnings as List).map((w) => Container(
+                margin: const EdgeInsets.only(bottom: 6),
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(color: Colors.orange.withOpacity(0.08), borderRadius: BorderRadius.circular(8)),
+                child: Row(children: [
+                  const Icon(Icons.warning, color: Colors.orangeAccent, size: 16),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(w.toString(), style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 12))),
+                ]),
+              )),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }
@@ -1213,139 +1434,155 @@ class GuidesPage extends StatefulWidget {
 }
 
 class _GuidesPageState extends State<GuidesPage> {
-  List<dynamic> _guides = [];
+  List<dynamic> _items = [];
   bool _loading = true;
-  String _search = '';
 
   @override
-  void initState() { super.initState(); _loadData(); }
+  void initState() {
+    super.initState();
+    _loadData();
+  }
 
   Future<void> _loadData() async {
     try {
       final jsonStr = await rootBundle.loadString('assets/vault/guides/supervivencia.json');
       final data = json.decode(jsonStr);
-      setState(() { _guides = data['guias'] ?? []; _loading = false; });
-    } catch (e) { setState(() => _loading = false); }
+      final List<dynamic> items = data is List ? data : (data['items'] ?? data['guias'] ?? []);
+      if (mounted) setState(() { _items = items; _loading = false; });
+    } catch (e) {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
-  List<dynamic> get _filtered {
-    if (_search.isEmpty) return _guides;
-    return _guides.where((g) =>
-      g['titulo'].toString().toLowerCase().contains(_search.toLowerCase()) ||
-      g['categoria'].toString().toLowerCase().contains(_search.toLowerCase())
-    ).toList();
+  Color _categoryColor(String? cat) {
+    switch (cat?.toLowerCase()) {
+      case 'agua': return Colors.blue;
+      case 'fuego': return Colors.orangeAccent;
+      case 'refugio': return Colors.brown;
+      case 'senal': return Colors.greenAccent;
+      case 'comida': return Colors.amber;
+      default: return const Color(0xFF60A5FA);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      child: Column(children: [
-        Padding(padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-          child: const _Header('Guias de Supervivencia', Icons.terrain, '15 guias para emergencias')),
-        Padding(padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-          child: TextField(style: const TextStyle(color: Colors.white),
-            decoration: InputDecoration(hintText: 'Buscar guia...',
-              hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
-              prefixIcon: Icon(Icons.search, color: Colors.white.withOpacity(0.4)),
-              filled: true, fillColor: Colors.white.withOpacity(0.07),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none)),
-            onChanged: (v) => setState(() => _search = v))),
-        const SizedBox(height: 12),
-        Expanded(
-          child: _loading
-              ? const Center(child: CircularProgressIndicator())
-              : _filtered.isEmpty
-                  ? Center(child: Text('Sin resultados', style: TextStyle(color: Colors.white.withOpacity(0.4))))
-                  : ListView.builder(padding: const EdgeInsets.symmetric(horizontal: 20),
-                      itemCount: _filtered.length,
-                      itemBuilder: (_, i) {
-                        final g = _filtered[i];
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 10),
-                          child: Card(
-                            color: Colors.white.withOpacity(0.05),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12),
-                              side: BorderSide(color: Colors.orange.withOpacity(0.2))),
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(12),
-                              onTap: () => Navigator.push(context, MaterialPageRoute(
-                                builder: (_) => _GuideDetailPage(g))),
-                              child: Padding(padding: const EdgeInsets.all(14),
-                                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                  Row(children: [
-                                    Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                      decoration: BoxDecoration(color: Colors.orange.withOpacity(0.15), borderRadius: BorderRadius.circular(6)),
-                                      child: Text(g['categoria']?.toString().toUpperCase() ?? '',
-                                          style: const TextStyle(color: Colors.orangeAccent, fontSize: 10, fontWeight: FontWeight.w700))),
-                                    const SizedBox(width: 8),
-                                    Expanded(child: Text(g['titulo'] ?? '',
-                                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 15))),
-                                  ]),
-                                  const SizedBox(height: 6),
-                                  Text(g['resumen'] ?? '', style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12),
-                                    maxLines: 2, overflow: TextOverflow.ellipsis),
-                                ]),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _Header('Guias de Supervivencia', Icons.terrain, 'Conocimiento esencial offline'),
+            const SizedBox(height: 16),
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _items.isEmpty
+                      ? Center(child: Text('No hay datos disponibles', style: TextStyle(color: Colors.white.withOpacity(0.4))))
+                      : ListView.builder(
+                          itemCount: _items.length,
+                          itemBuilder: (_, i) {
+                            final item = _items[i] as Map<String, dynamic>;
+                            final title = item['titulo'] ?? item['title'] ?? 'Sin titulo';
+                            final desc = item['descripcion'] ?? item['description'] ?? '';
+                            final cat = item['categoria'] ?? item['category'] ?? '';
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 10),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.05),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.white.withOpacity(0.08)),
                               ),
-                            ),
-                          ),
-                        );
-                      }),
+                              child: ListTile(
+                                leading: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: _categoryColor(cat).withOpacity(0.15),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Icon(Icons.terrain, color: _categoryColor(cat), size: 20),
+                                ),
+                                title: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                                subtitle: desc.isNotEmpty ? Text(desc, style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12), maxLines: 2, overflow: TextOverflow.ellipsis) : null,
+                                trailing: cat.isNotEmpty
+                                    ? Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(color: _categoryColor(cat).withOpacity(0.2), borderRadius: BorderRadius.circular(4)),
+                                        child: Text(cat.toUpperCase(), style: TextStyle(color: _categoryColor(cat), fontSize: 9, fontWeight: FontWeight.w700)))
+                                    : null,
+                                onTap: () {
+                                  Navigator.push(context, MaterialPageRoute(builder: (_) => _GuideDetailPage(item: item)));
+                                },
+                              ),
+                            );
+                          },
+                        ),
+            ),
+          ],
         ),
-      ]),
+      ),
     );
   }
 }
 
 class _GuideDetailPage extends StatelessWidget {
-  final Map<String, dynamic> guide;
-  const _GuideDetailPage(this.guide);
+  final Map<String, dynamic> item;
+  const _GuideDetailPage({required this.item});
 
   @override
   Widget build(BuildContext context) {
-    final pasos = (guide['pasos'] as List?) ?? [];
-    final advertencias = (guide['advertencias'] as List?) ?? [];
+    final title = item['titulo'] ?? item['title'] ?? 'Detalle';
+    final desc = item['descripcion'] ?? item['description'] ?? '';
+    final steps = item['pasos'] ?? item['steps'] ?? [];
+    final tips = item['consejos'] ?? item['tips'] ?? [];
+
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A),
-      appBar: AppBar(backgroundColor: const Color(0xFF1E293B), title: Text(guide['titulo'] ?? '', style: const TextStyle(fontSize: 16))),
-      body: ListView(padding: const EdgeInsets.all(20), children: [
-        Text(guide['resumen'] ?? '', style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14)),
-        const SizedBox(height: 20),
-        ...pasos.map((p) => Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(10)),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              CircleAvatar(radius: 14, backgroundColor: Colors.orange,
-                child: Text('${p['numero']}', style: const TextStyle(color: Colors.white, fontSize: 12))),
-              const SizedBox(width: 10),
-              Expanded(child: Text(p['titulo'] ?? '', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14))),
-            ]),
-            const SizedBox(height: 8),
-            Text(p['descripcion'] ?? '', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 13)),
-            if (p['advertencia'] != null) ...[
-              const SizedBox(height: 6),
-              Container(padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: Colors.amber.withOpacity(0.1), borderRadius: BorderRadius.circular(6)),
-                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Icon(Icons.warning_amber, color: Colors.amber, size: 16),
-                  const SizedBox(width: 6),
-                  Expanded(child: Text(p['advertencia'], style: const TextStyle(color: Colors.amber, fontSize: 11))),
-                ])),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF1E293B),
+        title: Text(title, style: const TextStyle(color: Colors.white, fontSize: 16)),
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (desc.isNotEmpty) ...[
+              Text(desc, style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14)),
+              const SizedBox(height: 16),
             ],
-          ]),
-        )),
-        if (advertencias.isNotEmpty) ...[
-          const SizedBox(height: 12),
-          const Text('ADVERTENCIAS', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w700, fontSize: 14)),
-          const SizedBox(height: 8),
-          ...advertencias.map((a) => Padding(padding: const EdgeInsets.only(bottom: 6),
-            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('  \u2022 ', style: TextStyle(color: Colors.redAccent)),
-              Expanded(child: Text(a.toString(), style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 12))),
-            ]))),
-        ],
-      ]),
+            if (steps.isNotEmpty) ...[
+              const Text('Pasos:', style: TextStyle(color: Color(0xFF60A5FA), fontWeight: FontWeight.w700, fontSize: 14)),
+              const SizedBox(height: 8),
+              ...(steps as List).asMap().entries.map((e) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Container(width: 24, height: 24, margin: const EdgeInsets.only(right: 10),
+                    decoration: BoxDecoration(color: const Color(0xFF3B82F6).withOpacity(0.2), borderRadius: BorderRadius.circular(12)),
+                    child: Center(child: Text('${e.key + 1}', style: const TextStyle(color: Color(0xFF60A5FA), fontSize: 11, fontWeight: FontWeight.w700)))),
+                  Expanded(child: Text(e.value.toString(), style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 13))),
+                ]),
+              )),
+            ],
+            if (tips.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              const Text('Consejos:', style: TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.w700, fontSize: 14)),
+              const SizedBox(height: 8),
+              ...(tips as List).map((t) => Container(
+                margin: const EdgeInsets.only(bottom: 6),
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(color: Colors.green.withOpacity(0.08), borderRadius: BorderRadius.circular(8)),
+                child: Row(children: [
+                  const Icon(Icons.lightbulb, color: Colors.greenAccent, size: 16),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(t.toString(), style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 12))),
+                ]),
+              )),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }
@@ -1360,264 +1597,272 @@ class VaultPage extends StatefulWidget {
 }
 
 class _VaultPageState extends State<VaultPage> {
-  String _search = '';
-  List<_VaultResult> _results = [];
-  bool _searching = false;
-
-  List<dynamic> _firstAid = [];
-  List<dynamic> _guides = [];
-  List<dynamic> _wiki = [];
-  List<dynamic> _dict = [];
+  final _searchController = TextEditingController();
+  List<Map<String, dynamic>> _results = [];
+  bool _searched = false;
 
   @override
-  void initState() { super.initState(); _loadAll(); }
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
-  Future<void> _loadAll() async {
+  Future<void> _search(String query) async {
+    if (query.trim().isEmpty) {
+      setState(() { _results = []; _searched = false; });
+      return;
+    }
+    final q = query.toLowerCase();
+    final List<Map<String, dynamic>> found = [];
+
+    // Search first aid
     try {
-      final faStr = await rootBundle.loadString('assets/vault/first_aid/primeros_auxilios.json');
-      _firstAid = (json.decode(faStr)['protocolos'] as List?) ?? [];
-    } catch (_) {}
-    try {
-      final gStr = await rootBundle.loadString('assets/vault/guides/supervivencia.json');
-      _guides = (json.decode(gStr)['guias'] as List?) ?? [];
-    } catch (_) {}
-    try {
-      final wStr = await rootBundle.loadString('assets/vault/wikipedia/wikipedia_offline.json');
-      final wData = json.decode(wStr);
-      _wiki = [];
-      for (final cat in (wData['categorias'] as Map?)?.values ?? []) {
-        if (cat is Map && cat.containsKey('articulos')) {
-          _wiki.addAll(cat['articulos'] as List);
+      final jsonStr = await rootBundle.loadString('assets/vault/first_aid/primeros_auxilios.json');
+      final data = json.decode(jsonStr);
+      final items = data is List ? data : (data['items'] ?? data['protocolos'] ?? []);
+      for (final item in items) {
+        final m = item as Map<String, dynamic>;
+        final text = (m['titulo'] ?? m['title'] ?? '').toString().toLowerCase() +
+            (m['descripcion'] ?? m['description'] ?? '').toString().toLowerCase();
+        if (text.contains(q)) {
+          found.add({...m, '_type': 'first_aid'});
         }
       }
     } catch (_) {}
+
+    // Search guides
     try {
-      final dStr = await rootBundle.loadString('assets/vault/dictionary/diccionario_index.json');
-      _dict = (json.decode(dStr) as List?) ?? [];
+      final jsonStr = await rootBundle.loadString('assets/vault/guides/supervivencia.json');
+      final data = json.decode(jsonStr);
+      final items = data is List ? data : (data['items'] ?? data['guias'] ?? []);
+      for (final item in items) {
+        final m = item as Map<String, dynamic>;
+        final text = (m['titulo'] ?? m['title'] ?? '').toString().toLowerCase() +
+            (m['descripcion'] ?? m['description'] ?? '').toString().toLowerCase();
+        if (text.contains(q)) {
+          found.add({...m, '_type': 'guide'});
+        }
+      }
     } catch (_) {}
+
+    // Search dictionary
+    try {
+      final jsonStr = await rootBundle.loadString('assets/vault/dictionary/diccionario.json');
+      final data = json.decode(jsonStr);
+      final items = data is List ? data : (data['items'] ?? data['palabras'] ?? []);
+      for (final item in items) {
+        final m = item as Map<String, dynamic>;
+        final text = (m['palabra'] ?? m['word'] ?? '').toString().toLowerCase() +
+            (m['definicion'] ?? m['definition'] ?? '').toString().toLowerCase();
+        if (text.contains(q)) {
+          found.add({...m, '_type': 'dictionary'});
+        }
+      }
+    } catch (_) {}
+
+    // Search wikipedia
+    try {
+      final jsonStr = await rootBundle.loadString('assets/vault/wikipedia/wikipedia.json');
+      final data = json.decode(jsonStr);
+      final items = data is List ? data : (data['items'] ?? data['articulos'] ?? []);
+      for (final item in items) {
+        final m = item as Map<String, dynamic>;
+        final text = (m['titulo'] ?? m['title'] ?? '').toString().toLowerCase() +
+            (m['resumen'] ?? m['summary'] ?? '').toString().toLowerCase();
+        if (text.contains(q)) {
+          found.add({...m, '_type': 'wikipedia'});
+        }
+      }
+    } catch (_) {}
+
+    if (mounted) setState(() { _results = found; _searched = true; });
   }
 
-  void _doSearch(String q) {
-    if (q.length < 2) { setState(() { _results = []; _searching = false; }); return; }
-    setState(() => _searching = true);
-    final qLower = q.toLowerCase();
-    final results = <_VaultResult>[];
-
-    for (final p in _firstAid) {
-      if (_match(p, qLower, ['titulo', 'resumen', 'categoria'])) {
-        results.add(_VaultResult(type: 'Primeros Auxilios', title: p['titulo'] ?? '', subtitle: p['resumen'] ?? '',
-          icon: Icons.local_hospital, color: Colors.redAccent, data: p, pageType: 'first_aid'));
-      }
+  IconData _typeIcon(String type) {
+    switch (type) {
+      case 'first_aid': return Icons.local_hospital;
+      case 'guide': return Icons.terrain;
+      case 'dictionary': return Icons.book;
+      case 'wikipedia': return Icons.article;
+      default: return Icons.folder;
     }
-    for (final g in _guides) {
-      if (_match(g, qLower, ['titulo', 'resumen', 'categoria'])) {
-        results.add(_VaultResult(type: 'Supervivencia', title: g['titulo'] ?? '', subtitle: g['resumen'] ?? '',
-          icon: Icons.terrain, color: Colors.orangeAccent, data: g, pageType: 'guide'));
-      }
-    }
-    for (final w in _wiki) {
-      if (_match(w, qLower, ['titulo', 'resumen'])) {
-        results.add(_VaultResult(type: 'Wikipedia', title: w['titulo'] ?? '', subtitle: w['resumen'] ?? '',
-          icon: Icons.book, color: Colors.blueAccent, data: w, pageType: 'wiki'));
-      }
-    }
-    for (final d in _dict) {
-      if (_match(d, qLower, ['termino', 'definicion', 'categoria'])) {
-        results.add(_VaultResult(type: 'Diccionario', title: d['termino'] ?? '', subtitle: d['definicion'] ?? '',
-          icon: Icons.translate, color: Colors.purpleAccent, data: d, pageType: 'dict'));
-      }
-    }
-
-    setState(() { _results = results; _searching = false; });
   }
 
-  bool _match(Map<String, dynamic> item, String q, List<String> fields) {
-    for (final f in fields) {
-      if (item[f]?.toString().toLowerCase().contains(q) ?? false) return true;
+  Color _typeColor(String type) {
+    switch (type) {
+      case 'first_aid': return Colors.redAccent;
+      case 'guide': return Colors.amber;
+      case 'dictionary': return Colors.purpleAccent;
+      case 'wikipedia': return Colors.tealAccent;
+      default: return const Color(0xFF60A5FA);
     }
-    return false;
+  }
+
+  String _typeLabel(String type) {
+    switch (type) {
+      case 'first_aid': return 'Auxilio';
+      case 'guide': return 'Guia';
+      case 'dictionary': return 'Diccionario';
+      case 'wikipedia': return 'Wiki';
+      default: return 'Otro';
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      child: Column(children: [
-        Padding(padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-          child: _Header('Vault', Icons.search, 'Busqueda offline en todo el contenido')),
-        Padding(padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-          child: TextField(style: const TextStyle(color: Colors.white),
-            decoration: InputDecoration(hintText: 'Buscar en todo el vault...',
-              hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
-              prefixIcon: Icon(Icons.search, color: Colors.white.withOpacity(0.4)),
-              filled: true, fillColor: Colors.white.withOpacity(0.07),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none)),
-            onChanged: (v) { _search = v; _doSearch(v); })),
-        const SizedBox(height: 12),
-        Padding(padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Row(children: [
-            _vaultChip('Primeros Auxilios', '${_firstAid.length}', Icons.local_hospital, Colors.redAccent),
-            const SizedBox(width: 8),
-            _vaultChip('Guias', '${_guides.length}', Icons.terrain, Colors.orangeAccent),
-            const SizedBox(width: 8),
-            _vaultChip('Wiki', '${_wiki.length}', Icons.book, Colors.blueAccent),
-            const SizedBox(width: 8),
-            _vaultChip('Dict', '${_dict.length}', Icons.translate, Colors.purpleAccent),
-          ])),
-        const SizedBox(height: 12),
-        Expanded(
-          child: _searching
-              ? const Center(child: CircularProgressIndicator())
-              : _search.length < 2
-                  ? Center(child: Text('Escribe al menos 2 letras para buscar',
-                      style: TextStyle(color: Colors.white.withOpacity(0.4))))
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _Header('Vault', Icons.search, 'Busqueda global offline'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _searchController,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: 'Buscar en primeros auxilios, guias, diccionario...',
+                hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
+                prefixIcon: const Icon(Icons.search, color: Color(0xFF60A5FA)),
+                filled: true,
+                fillColor: Colors.white.withOpacity(0.07),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Color(0xFF3B82F6))),
+              ),
+              onSubmitted: _search,
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              children: _results.map((r) {
+                final type = r['_type'] as String? ?? '';
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(color: _typeColor(type).withOpacity(0.15), borderRadius: BorderRadius.circular(4)),
+                  child: Text(_typeLabel(type), style: TextStyle(color: _typeColor(type), fontSize: 10, fontWeight: FontWeight.w600)),
+                );
+              }).toSet().toList(),
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: !_searched
+                  ? Center(child: Text('Escribe algo para buscar', style: TextStyle(color: Colors.white.withOpacity(0.3))))
                   : _results.isEmpty
-                      ? Center(child: Text('Sin resultados para "$_search"',
-                          style: TextStyle(color: Colors.white.withOpacity(0.4))))
-                      : ListView.builder(padding: const EdgeInsets.symmetric(horizontal: 20),
+                      ? Center(child: Text('No se encontraron resultados', style: TextStyle(color: Colors.white.withOpacity(0.3))))
+                      : ListView.builder(
                           itemCount: _results.length,
-                          itemBuilder: (_, i) => _VaultResultCard(_results[i], context)),
-        ),
-      ]),
-    );
-  }
-
-  Widget _vaultChip(String label, String count, IconData icon, Color color) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-        decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-        child: Column(children: [
-          Icon(icon, color: color, size: 16),
-          Text(count, style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w700)),
-          Text(label, style: TextStyle(color: color.withOpacity(0.7), fontSize: 8), textAlign: TextAlign.center),
-        ]),
-      ),
-    );
-  }
-}
-
-class _VaultResult {
-  final String type;
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final Color color;
-  final Map<String, dynamic> data;
-  final String pageType;
-  _VaultResult({required this.type, required this.title, required this.subtitle,
-    required this.icon, required this.color, required this.data, required this.pageType});
-}
-
-class _VaultResultCard extends StatelessWidget {
-  final _VaultResult r;
-  final BuildContext ctx;
-  const _VaultResultCard(this.r, this.ctx);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: Card(
-        color: Colors.white.withOpacity(0.05),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10),
-          side: BorderSide(color: r.color.withOpacity(0.2))),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(10),
-          onTap: () {
-            if (r.pageType == 'first_aid') {
-              Navigator.push(ctx, MaterialPageRoute(builder: (_) => _ProtocolDetailPage(r.data)));
-            } else if (r.pageType == 'guide') {
-              Navigator.push(ctx, MaterialPageRoute(builder: (_) => _GuideDetailPage(r.data)));
-            } else if (r.pageType == 'wiki') {
-              Navigator.push(ctx, MaterialPageRoute(builder: (_) => _WikiDetailPage(r.data)));
-            } else if (r.pageType == 'dict') {
-              Navigator.push(ctx, MaterialPageRoute(builder: (_) => _DictDetailPage(r.data)));
-            }
-          },
-          child: Padding(padding: const EdgeInsets.all(12),
-            child: Row(children: [
-              Icon(r.icon, color: r.color, size: 20),
-              const SizedBox(width: 10),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(r.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13)),
-                Text(r.subtitle, style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11),
-                  maxLines: 1, overflow: TextOverflow.ellipsis),
-              ])),
-              Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(color: r.color.withOpacity(0.15), borderRadius: BorderRadius.circular(4)),
-                child: Text(r.type, style: TextStyle(color: r.color, fontSize: 9, fontWeight: FontWeight.w600))),
-            ]),
-          ),
+                          itemBuilder: (_, i) {
+                            final r = _results[i];
+                            final type = r['_type'] as String? ?? '';
+                            final title = r['titulo'] ?? r['title'] ?? r['palabra'] ?? r['word'] ?? 'Sin titulo';
+                            final desc = r['descripcion'] ?? r['description'] ?? r['definicion'] ?? r['definition'] ?? r['resumen'] ?? r['summary'] ?? '';
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.05),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: Colors.white.withOpacity(0.08)),
+                              ),
+                              child: ListTile(
+                                leading: Icon(_typeIcon(type), color: _typeColor(type), size: 20),
+                                title: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13)),
+                                subtitle: desc.isNotEmpty ? Text(desc, style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11), maxLines: 2, overflow: TextOverflow.ellipsis) : null,
+                                trailing: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(color: _typeColor(type).withOpacity(0.2), borderRadius: BorderRadius.circular(4)),
+                                  child: Text(_typeLabel(type), style: TextStyle(color: _typeColor(type), fontSize: 9, fontWeight: FontWeight.w700)),
+                                ),
+                                onTap: () {
+                                  if (type == 'wikipedia') {
+                                    Navigator.push(context, MaterialPageRoute(builder: (_) => _WikiDetailPage(item: r)));
+                                  } else if (type == 'dictionary') {
+                                    Navigator.push(context, MaterialPageRoute(builder: (_) => _DictDetailPage(item: r)));
+                                  } else if (type == 'first_aid') {
+                                    Navigator.push(context, MaterialPageRoute(builder: (_) => _FirstAidDetailPage(item: r)));
+                                  } else if (type == 'guide') {
+                                    Navigator.push(context, MaterialPageRoute(builder: (_) => _GuideDetailPage(item: r)));
+                                  }
+                                },
+                              ),
+                            );
+                          },
+                        ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-// Wikipedia detail
 class _WikiDetailPage extends StatelessWidget {
-  final Map<String, dynamic> article;
-  const _WikiDetailPage(this.article);
+  final Map<String, dynamic> item;
+  const _WikiDetailPage({required this.item});
 
   @override
   Widget build(BuildContext context) {
-    final sections = (article['secciones'] as List?) ?? [];
+    final title = item['titulo'] ?? item['title'] ?? 'Articulo';
+    final content = item['contenido'] ?? item['content'] ?? item['resumen'] ?? item['summary'] ?? '';
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A),
-      appBar: AppBar(backgroundColor: const Color(0xFF1E293B), title: Text(article['titulo'] ?? '', style: const TextStyle(fontSize: 16))),
-      body: ListView(padding: const EdgeInsets.all(20), children: [
-        Text(article['resumen'] ?? '', style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14)),
-        const SizedBox(height: 16),
-        ...sections.map((s) => Container(
-          margin: const EdgeInsets.only(bottom: 16),
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(10)),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(s['titulo'] ?? '', style: const TextStyle(color: Color(0xFF60A5FA), fontWeight: FontWeight.w600, fontSize: 14)),
-            const SizedBox(height: 6),
-            Text(s['contenido'] ?? '', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 13)),
-          ]),
-        )),
-      ]),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF1E293B),
+        title: Text(title, style: const TextStyle(color: Colors.white, fontSize: 16)),
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Text(content, style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14, height: 1.6)),
+      ),
     );
   }
 }
 
-// Dictionary detail
 class _DictDetailPage extends StatelessWidget {
-  final Map<String, dynamic> entry;
-  const _DictDetailPage(this.entry);
+  final Map<String, dynamic> item;
+  const _DictDetailPage({required this.item});
 
   @override
   Widget build(BuildContext context) {
+    final word = item['palabra'] ?? item['word'] ?? 'Palabra';
+    final def = item['definicion'] ?? item['definition'] ?? '';
+    final example = item['ejemplo'] ?? item['example'] ?? '';
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A),
-      appBar: AppBar(backgroundColor: const Color(0xFF1E293B), title: Text(entry['termino'] ?? '', style: const TextStyle(fontSize: 16))),
-      body: ListView(padding: const EdgeInsets.all(20), children: [
-        if (entry['categoria'] != null)
-          Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(color: Colors.purple.withOpacity(0.15), borderRadius: BorderRadius.circular(6)),
-            child: Text(entry['categoria'], style: const TextStyle(color: Colors.purpleAccent, fontSize: 12))),
-        const SizedBox(height: 16),
-        Text(entry['definicion'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 15)),
-        if (entry['ejemplo'] != null) ...[
-          const SizedBox(height: 16),
-          const Text('EJEMPLO', style: TextStyle(color: Colors.amber, fontWeight: FontWeight.w700, fontSize: 12)),
-          const SizedBox(height: 4),
-          Text(entry['ejemplo'], style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 13, fontStyle: FontStyle.italic)),
-        ],
-        if (entry['sinonimos'] != null) ...[
-          const SizedBox(height: 16),
-          const Text('SINONIMOS', style: TextStyle(color: Colors.white38, fontWeight: FontWeight.w700, fontSize: 12)),
-          Text(entry['sinonimos'].toString(), style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 13)),
-        ],
-      ]),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF1E293B),
+        title: Text(word, style: const TextStyle(color: Colors.white, fontSize: 16)),
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(word, style: const TextStyle(color: Color(0xFF60A5FA), fontSize: 22, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 12),
+            Text(def, style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14, height: 1.6)),
+            if (example.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              const Text('Ejemplo:', style: TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 4),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: Colors.green.withOpacity(0.08), borderRadius: BorderRadius.circular(8)),
+                child: Text(example, style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 13, fontStyle: FontStyle.italic)),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }
 
 // ─────────────────────────────────────────────
-// WIDGET REUTILIZABLE: HEADER
+// REUSABLE HEADER
 // ─────────────────────────────────────────────
 class _Header extends StatelessWidget {
   final String title;
@@ -1628,12 +1873,20 @@ class _Header extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(children: [
-      Icon(icon, color: const Color(0xFF60A5FA), size: 28),
-      const SizedBox(width: 10),
-      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(title, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700)),
-        Text(subtitle, style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12)),
-      ]),
+      Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: const Color(0xFF3B82F6).withOpacity(0.15),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Icon(icon, color: const Color(0xFF60A5FA), size: 24),
+      ),
+      const SizedBox(width: 14),
+      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(title, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 2),
+        Text(subtitle, style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12)),
+      ])),
     ]);
   }
 }
