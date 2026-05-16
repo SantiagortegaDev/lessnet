@@ -541,7 +541,7 @@ class _ChatPageState extends State<ChatPage> {
                           Text(m.text, style: const TextStyle(color: Colors.white, fontSize: 14)),
                           const SizedBox(height: 4),
                           Text(_fmt(m.time), style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 10)),
-                        ]));
+                        ])));
                   }),
         ),
         Padding(padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
