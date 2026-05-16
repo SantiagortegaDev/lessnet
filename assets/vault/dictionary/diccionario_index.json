@@ -1,0 +1,1797 @@
+{
+  "version": "1.0",
+  "fecha": "2026-05-16",
+  "total_terminos": 250,
+  "idioma": "es-CO",
+  "descripcion": "Diccionario offline de términos relevantes para emergencias, supervivencia, tecnología mesh, comunicaciones y medicina.",
+  "terminos": [
+    {
+      "palabra": "RCP",
+      "definicion": "Reanimación Cardiopulmonar. Técnica de emergencia para restaurar la respiración y circulación en personas en paro cardíaco, combinando compresiones torácicas con ventilaciones artificiales.",
+      "sinonimos": ["resucitación cardiopulmonar", "masaje cardíaco", "CPR"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Maniobra de Heimlich",
+      "definicion": "Procedimiento de emergencia para desobstruir las vías respiratorias cuando un objeto bloquea la tráquea, mediante compresiones abdominales hacia arriba.",
+      "sinonimos": ["compresión abdominal", "desobstrucción de vía aérea"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Shock",
+      "definicion": "Condición potencialmente mortal donde los órganos no reciben suficiente sangre debido a circulación inadequada. Tipos: hipovolémico, cardiogénico, distributivo, obstructivo.",
+      "sinonimos": ["colapso circulatorio", "insuficiencia circulatoria"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Hemorragia",
+      "definicion": "Pérdida de sangre significativa que puede ser externa o interna. Clasificada por tipo de vaso: arterial (spraying brillante), venosa (flujo continuo oscuro), capilar (goteo).",
+      "sinonimos": ["sangrado", "hemorragia", "sangría"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Quemadura",
+      "definicion": "Lesión en tejidos causada por calor, chemicals, electricidad, radiación o fricción. Grados: primer grado (epidermis), segundo grado (dermis), tercer grado (tejido subcutáneo).",
+      "sinonimos": ["lesión térmica", "scald"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Fractura",
+      "definicion": "Ruptura o quebradura de un hueso. Tipos: cerrada (piel intacta), abierta (hueso expuesto), con desplazamiento, espiral,impactada. Requiere inmovilización y evaluación médica.",
+      "sinonimos": ["quebradura", "rotura de hueso", "break"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Hipotermia",
+      "definicion": "Condición donde la temperatura corporal central cae por debajo de 35°C. Síntomas: escalofríos, confusión, piel fría. Severa: cesación de escalofríos, inconsciencia, pulso débil.",
+      "sinonimos": ["baja temperatura corporal", "enfriamiento"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Golpe de calor",
+      "definicion": "Emergencia por hipertermia donde el cuerpo no puede regular su temperatura, superando los 40°C. Síntomas: piel roja y caliente, confusión, pérdida de consciencia.",
+      "sinonimos": ["hipertermia", "insolación", "heat stroke"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Convulsión",
+      "definicion": "Contracción muscular involuntaria causada por actividad eléctrica anormal en el cerebro. Puede ser generalizada o focal. Epilepsia es la causa más común.",
+      "sinonimos": ["ataque", "crisis epiléptica", "seizure"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Envenenamiento",
+      "definicion": "Exposición a sustancia tóxica que causa daño orgánico o funcional. Rutas: ingestion, inhalación, absorción cutánea, inyección. requiere atención inmediata.",
+      "sinonimos": ["intoxicación", "toxicidad", "poisoning"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Mordedura de serpiente",
+      "definicion": "Lesión por inoculación de veneno de serpiente. En Colombia: Bothrops (mapaná), Crotalus (cascabel), Lachesis (busmaster). Tratamiento: antídoto específico.",
+      "sinonimos": ["mordedura ofídica", "ofidismo", "snakebite"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Intoxicación por CO",
+      "definicion": "Envenenamiento por monóxido de carbono, gas invisible e inodoro. Síntomas: dolor de cabeza, mareo, náuseas. Causas: vehículos en garaje, estufas de gas, braseros.",
+      "sinonimos": ["envenenamiento por monóxido", "CO poisoning"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Torniquete",
+      "definicion": "Dispositivo para controlar hemorragias severas en extremidades. Se coloca 5-7 cm por encima de la herida. Último recurso cuando la presión directa falla.",
+      "sinonimos": ["compresión arterial", "tourniquet"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Férula",
+      "definicion": "Dispositivo para inmovilizar fracturas y prevenir movimiento de la zona lesionada. Puede ser rígida o blanda, comercial o improvisada.",
+      "sinonimos": ["inmovilizador", "splint"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Desfibrilador",
+      "definicion": "Aparato que administra descarga eléctrica al corazón para恢复正常 ritmo en casos de fibrilación. AED (DESA) es automatizado para uso no profesional.",
+      "sinonimos": ["DEA", "DESA", "AED", "defibrillator"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Agua potable",
+      "definicion": "Agua segura para consumo humano, libre de pathogenos y contaminantes químicos. Debe cumplir estándares de calidad para uso doméstico.",
+      "sinonimos": ["agua segura", "agua potable", "drinking water"],
+      "categoria": "supervivencia"
+    },
+    {
+      "palabra": "Purificar agua",
+      "definicion": "Proceso de eliminar pathogenos del agua mediante métodos como hervir (1-3 min), tabletas de cloración, radiación UV, o filtros.",
+      "sinonimos": ["descontaminación de agua", "water purification"],
+      "categoria": "supervivencia"
+    },
+    {
+      "palabra": "Refugio",
+      "definicion": "Estructura que proporciona protección contra elementos naturales (lluvia, viento, frío, calor). Tipos: tienda, cobertizo, cueva, debris hut.",
+      "sinonimos": ["alojamiento", "albergue", "shelter"],
+      "categoria": "supervivencia"
+    },
+    {
+      "palabra": "Yesca",
+      "definicion": "Material altamente inflamable usado para encender fuego: algodón, papel, musgo seco, corteza de abedul,羽毛. Debe estar completamente seco.",
+      "sinonimos": ["material para encender", "tinder"],
+      "categoria": "supervivencia"
+    },
+    {
+      "palabra": "Supervivencia",
+      "definicion": "Estado de continuar viviendo pese a condiciones adversas. Incluye habilidades para satisfacer necesidades básicas: agua, alimento, refugio, seguridad.",
+      "sinonimos": ["supervivencia urbana", "wilderness survival"],
+      "categoria": "supervivencia"
+    },
+    {
+      "palabra": "Desastre natural",
+      "definicion": "Evento natural de gran magnitud que causa destrucción masiva: terremotos, inundaciones, huracanes, tsunamis, deslizamientos, sequías.",
+      "sinonimos": ["catástrofe natural", "natural disaster"],
+      "categoria": "supervivencia"
+    },
+    {
+      "palabra": "Terremoto",
+      "definicion": "Movimientobrusco de la tierra causado por liberación de energía en la corteza. En Colombia zona de alta actividad sísmica. Preparación: asegurar muebles, tener kit de emergencia.",
+      "sinonimos": ["sismo", "temblor", "earthquake"],
+      "categoria": "supervivencia"
+    },
+    {
+      "palabra": "Inundación",
+      "definicion": "Exceso de agua en zonas normalmente secas. Causas: lluvias intensas, deshielo, ruptura de represas. Puede ser flash flood (rápida) o gradual.",
+      "sinonimos": ["aguacero", "desbordamiento", "flood"],
+      "categoria": "supervivencia"
+    },
+    {
+      "palabra": "Evacuación",
+      "definicion": "Acción de abandonar una zona de peligro hacia un lugar seguro. Incluye planificación previa, rutas de escape, punto de reunión, kit de emergencia.",
+      "sinonimos": ["reubicación", "evacuation"],
+      "categoria": "supervivencia"
+    },
+    {
+      "palabra": "Kit de emergencia",
+      "definicion": "Conjunto de suministros esenciales para sobrevivir 72 horas. Incluye: agua (3L/persona/día), alimentos, linterna, botiquín, documentos, baterías, radio.",
+      "sinonimos": ["go bag", "bug out bag", "emergency kit"],
+      "categoria": "supervivencia"
+    },
+    {
+      "palabra": "Deshidratación",
+      "definicion": "Estado de deficit de agua corporal, puede ser leve, moderada o severa. Síntomas: sed, orina oscura, mareo, confusión. Severa puede ser fatal.",
+      "sinonimos": ["falta de agua", "dehydration"],
+      "categoria": "supervivencia"
+    },
+    {
+      "palabra": "Navegación",
+      "definicion": "Arte y ciencia de determinar posición y dirigir movimiento. Incluye uso de mapas, brújula, GPS, y técnicas naturales (sol, estrellas).",
+      "sinonimos": ["orientación", "navigation"],
+      "categoria": "supervivencia"
+    },
+    {
+      "palabra": "Brújula",
+      "definicion": "Instrumento de navegación que indica dirección usando campo magnético terrestre. Partes: aguja magnética, escala de grados, limbo giratorio.",
+      "sinonimos": ["compass"],
+      "categoria": "supervivencia"
+    },
+    {
+      "palabra": "Orientación por estrellas",
+      "definicion": "Técnica de navegación usando astros. En hemisferio norte, Polaris (Estrella Polar) indica norte. En sur, Cruz del Sur indica sur.",
+      "sinonimos": ["navegación celeste", "stellar navigation"],
+      "categoria": "supervivencia"
+    },
+    {
+      "palabra": "Procedimiento STOP",
+      "definicion": "Acronym: Stop, Think, Observe, Plan. Método de toma de decisiones en supervivencia para evaluar situación antes de actuar.",
+      "sinonimos": ["STOP technique"],
+      "categoria": "supervivencia"
+    },
+    {
+      "palabra": "Triaje",
+      "definicion": "Sistema para clasificar víctimas según urgencia de atención médica. Categorías: rojo (crítico), amarillo (urgente), verde (menor), negro (fallecido).",
+      "sinonimos": ["triage"],
+      "categoria": "supervivencia"
+    },
+    {
+      "palabra": "Alerta roja",
+      "definicion": "Nivel máximo de emergencia que indica peligro inminente o situación de extrema urgencia. Requiere acción inmediata y evacuación.",
+      "sinonimos": ["emergency alert", "red alert"],
+      "categoria": "supervivencia"
+    },
+    {
+      "palabra": "Red mesh",
+      "definicion": "Red de comunicación descentralizada donde cada nodo funciona como repetidor, extendiendo el alcance sin depender de infraestructura central.",
+      "sinonimos": ["mesh network", "malla wireless"],
+      "categoria": "tecnologia"
+    },
+    {
+      "palabra": "Nodo",
+      "definicion": "Dispositivo conectado a la red mesh que puede recibir, transmitir y repetir mensajes. Cada nodo extiende la cobertura de la red.",
+      "sinonimos": ["node", "peer"],
+      "categoria": "tecnologia"
+    },
+    {
+      "palabra": "WiFi Direct",
+      "definicion": "Protocolo de comunicación que permite conexión directa entre dispositivos sin punto de acceso. Base para comunicación mesh punto a punto.",
+      "sinonimos": ["WiFi P2P"],
+      "categoria": "tecnologia"
+    },
+    {
+      "palabra": "Bluetooth",
+      "definicion": "Tecnología de comunicación inalámbrica de corto alcance (10-100m). Usado en mesh para descubrimiento y conexión inicial entre dispositivos.",
+      "sinonimos": ["BT"],
+      "categoria": "tecnologia"
+    },
+    {
+      "palabra": "Cifrado E2E",
+      "definicion": "Cifrado de extremo a extremo. Los mensajes se cifran en el dispositivo del emisor y solo se descifran en el receptor, garantizando privacidad.",
+      "sinonimos": ["end-to-end encryption", "E2EE"],
+      "categoria": "tecnologia"
+    },
+    {
+      "palabra": "Ancho de banda",
+      "definicion": "Capacidad de transmisión de datos de una red. En mesh, limitado por número de nodos y distancia. Prioriza mensajes críticos.",
+      "sinonimos": ["bandwidth", "capacity"],
+      "categoria": "tecnologia"
+    },
+    {
+      "palabra": "Broadcast",
+      "definicion": "Mensaje enviado a todos los nodos de la red. En emergencia, broadcast de distress informa a toda la comunidad mesh.",
+      "sinonimos": ["difusión", "broadcast"],
+      "categoria": "tecnologia"
+    },
+    {
+      "palabra": "Cobertura",
+      "definicion": "Área geográfica donde la señal mesh puede ser recibida. Factores: altura de antenas, terreno, obstáculos, número de nodos.",
+      "sinonimos": ["range", "coverage area"],
+      "categoria": "tecnologia"
+    },
+    {
+      "palabra": "Latencia",
+      "definicion": "Tiempo que tarda un mensaje en viajar de un nodo a otro. En mesh, aumenta con más nodos intermedios. Buscar mínima latencia.",
+      "sinonimos": ["delay", "latency"],
+      "categoria": "tecnologia"
+    },
+    {
+      "palabra": "Firmware",
+      "definicion": "Software básico que controla el hardware del dispositivo. Actualizaciones mejoran seguridad, estabilidad y rendimiento.",
+      "sinonimos": ["firmware"],
+      "categoria": "tecnologia"
+    },
+    {
+      "palabra": "Batería externa",
+      "definicion": "Dispositivo portátil de almacenamiento de energía para cargar dispositivos electrónicos. Essential para comunicación mesh prolongada.",
+      "sinonimos": ["power bank", "cargador portátil"],
+      "categoria": "tecnologia"
+    },
+    {
+      "palabra": "Antena externa",
+      "definicion": "Accesorio que mejora la recepción y transmisión de señal mesh. Puede duplicar o quadruplicar el alcance efectivo.",
+      "sinonimos": ["external antenna"],
+      "categoria": "tecnologia"
+    },
+    {
+      "palabra": "GPS",
+      "definicion": "Sistema de posicionamiento global por satélite. Proporciona coordenadas exactas (latitud, longitud). Consume batería rápidamente.",
+      "sinonimos": ["Global Positioning System"],
+      "categoria": "tecnologia"
+    },
+    {
+      "palabra": "Coordenadas",
+      "definicion": "Posición geográfica expresada en latitud y longitud. Usadas para compartir ubicación exacta en emergencias. Formato: XX.XXXXX, XX.XXXXX.",
+      "sinonimos": ["coordinates", "ubicación"],
+      "categoria": "tecnologia"
+    },
+    {
+      "palabra": "Modo de bajo consumo",
+      "definicion": "Configuración que reduce el consumo de energía del dispositivo, extendiendo duración de batería a costa de funcionalidades no esenciales.",
+      "sinonimos": ["power saving mode", "low power"],
+      "categoria": "tecnologia"
+    },
+    {
+      "palabra": "Actualización OTA",
+      "definicion": "Actualización Over-The-Air. Instalación de software remotamente a través de conexión de red. Puede requerir internet temporal.",
+      "sinonimos": ["OTA update"],
+      "categoria": "tecnologia"
+    },
+    {
+      "palabra": "Protocolo",
+      "definicion": "Conjunto de reglas estandarizadas para comunicación en red. Define formato de mensajes, prioridades, y comportamiento de nodos.",
+      "sinonimos": ["protocol"],
+      "categoria": "tecnologia"
+    },
+    {
+      "palabra": "Almacenamiento offline",
+      "definicion": "Datos guardados localmente en el dispositivo, accesibles sin conexión a internet. Incluye mapas, artículos, diccionarios, guías.",
+      "sinonimos": ["local storage", "offline data"],
+      "categoria": "tecnologia"
+    },
+    {
+      "palabra": "Base de datos SQLite",
+      "definicion": "Sistema de gestión de datos relacional que funciona sin servidor. Almacena estructura de datos en archivos locales. Soporta búsqueda full-text (FTS).",
+      "sinonimos": ["SQLite database"],
+      "categoria": "tecnologia"
+    },
+    {
+      "palabra": "FTS5",
+      "definicion": "Full-Text Search 5. Extensión de SQLite para búsqueda de texto completo. Permite buscar palabras y frases eficientemente en grandes volúmenes de texto.",
+      "sinonimos": ["Full Text Search"],
+      "categoria": "tecnologia"
+    },
+    {
+      "palabra": "JSON",
+      "definicion": "JavaScript Object Notation. Formato de texto ligero para intercambio de datos. Estructura jerárquica con pares clave-valor y arrays.",
+      "sinonimos": ["JavaScript Object Notation"],
+      "categoria": "tecnologia"
+    },
+    {
+      "palabra": "GeoJSON",
+      "definicion": "Formato para codificar estructuras geoespaciales en JSON. Soporta puntos, líneas, polígonos con propiedades y coordenadas.",
+      "sinonimos": ["Geographic JSON"],
+      "categoria": "tecnologia"
+    },
+    {
+      "palabra": "Gzip",
+      "definicion": "Formato de compresión que reduce tamaño de archivos. Versiones .gz de JSON permiten ahorro de espacio significativo (50-80%).",
+      "sinonimos": ["GNU zip", "compressed"],
+      "categoria": "tecnologia"
+    },
+    {
+      "palabra": "ZIM",
+      "definicion": "Formato de archivo para contenido offline de Wikipedia. Contiene artículos, imágenes y metadatos comprimidos para acceso sin internet.",
+      "sinonimos": ["Kiwix archive"],
+      "categoria": "tecnologia"
+    },
+    {
+      "palabra": "MapLibre",
+      "definicion": "Biblioteca open source para mapas offline. Renderiza mapas desde archivos vectoriales locales sin necesidad de conexión.",
+      "sinonimos": ["MapLibre GL"],
+      "categoria": "tecnologia"
+    },
+    {
+      "palabra": "Kiwix",
+      "definicion": "Aplicación para leer contenido ZIM offline. Incluye visor de Wikipedia, búsqueda integrada, y navegación por categorías.",
+      "sinonimos": ["offline reader"],
+      "categoria": "tecnologia"
+    },
+    {
+      "palabra": "Señales de emergencia",
+      "definicion": "Métodos para comunicar necesidad de ayuda cuando no hay comunicación convencional. Incluyen fuego, espejo, silbato, señales en suelo.",
+      "sinonimos": ["distress signals", "SOS"],
+      "categoria": "comunicacion"
+    },
+    {
+      "palabra": "SOS",
+      "definicion": "Código Morse: tres puntos, tres rayas, tres puntos (... --- ...). Señal internacional de emergencia. También se usa en visual (tres de cada).",
+      "sinonimos": ["Mayday", "emergency signal"],
+      "categoria": "comunicacion"
+    },
+    {
+      "palabra": "Silbato de emergencia",
+      "definicion": "Dispositivo que emite sonido de alta frecuencia (>110 dB) audible a grandes distancias. Tres silbidos = señal de emergencia.",
+      "sinonimos": ["emergency whistle"],
+      "categoria": "comunicacion"
+    },
+    {
+      "palabra": "Espejo de señales",
+      "definicion": "Dispositivo reflector para enviar destellos de luz visibles hasta 50 km. Técnica: apuntar con espejo frente al ojo, dirigir hacia objetivo.",
+      "sinonimos": ["signal mirror", "heliograph"],
+      "categoria": "comunicacion"
+    },
+    {
+      "palabra": "Radioaficionado",
+      "definicion": "Usuario autorizado de frecuencias de radio para comunicación no comercial. Pueden ser recurso vital cuando fallan sistemas convencionales.",
+      "sinonimos": ["ham radio", "amateur radio"],
+      "categoria": "comunicacion"
+    },
+    {
+      "palabra": "Frecuencia",
+      "definicion": "Número de oscilaciones por segundo de una onda. Medida en Hertz. Cada frecuencia tiene propiedades de propagación diferentes.",
+      "sinonimos": ["frequency", "Hz"],
+      "categoria": "comunicacion"
+    },
+    {
+      "palabra": "Distrés",
+      "definicion": "Estado de emergencia o peligro grave. Mensaje de distress comunica: ubicación, número de personas, tipo de emergencia, nivel de urgencia.",
+      "sinonimos": ["emergency", "grave danger"],
+      "categoria": "comunicacion"
+    },
+    {
+      "palabra": "Código Q",
+      "definicion": "Sistema de abreviaturas de tres letras para comunicación por radio. QRU: sin mensajes, QTH: ubicación, QST: llamada general.",
+      "sinonimos": ["Q codes"],
+      "categoria": "comunicacion"
+    },
+    {
+      "palabra": "Prefijo internacional",
+      "definicion": "Código de país para comunicaciones internacionales. Colombia: +57. Usado para identificar origen de transmisiones.",
+      "sinonimos": ["country code", "calling code"],
+      "categoria": "comunicacion"
+    },
+    {
+      "palabra": "Vox",
+      "definicion": "Transmisión activada por voz. Permite comunicación sin presionar botón. Ahorra tiempo pero puede transmitir inadvertidamente.",
+      "sinonimos": ["voice activation"],
+      "categoria": "comunicacion"
+    },
+    {
+      "palabra": "Squawkhack",
+      "definicion": "Canal de comunicación alternativo cuando el primario está congestionado. En mesh, usar canal secundario si primario no responde.",
+      "sinonimos": ["alternate channel", "backup channel"],
+      "categoria": "comunicacion"
+    },
+    {
+      "palabra": "Alerta pública",
+      "definicion": "Sistema de notificación masiva para emergencias. Incluye mensajes de evacuación, advertencias meteorológicas, alertas de seguridad.",
+      "sinonimos": ["PAAS", "public alert"],
+      "categoria": "comunicacion"
+    },
+    {
+      "palabra": "Red de emergencia",
+      "definicion": "Sistema de comunicación reservado para servicios de emergencia (policía, bomberos, médica). Acceso limitado en situaciones de crisis.",
+      "sinonimos": ["emergency network"],
+      "categoria": "comunicacion"
+    },
+    {
+      "palabra": "Hospital de campaña",
+      "definicion": "Instalación médica temporal establecida en emergencias para proporcionar atención cuando hospitales regulares están saturados.",
+      "sinonimos": ["field hospital", "MASH"],
+      "categoria": "comunicacion"
+    },
+    {
+      "palabra": "Estación de bomberos",
+      "definicion": "Instalación de servicios de emergencia para atención de incendios, rescates y desastres. Incluye equipos especializados y personal entrenado.",
+      "sinonimos": ["fire station"],
+      "categoria": "comunicacion"
+    },
+    {
+      "palabra": "Punto de reunión",
+      "definicion": "Ubicación preestablecida donde miembros de familia o grupo se encuentran después de una emergencia si no pueden comunicarse.",
+      "sinonimos": ["rally point", "meeting point"],
+      "categoria": "comunicacion"
+    },
+    {
+      "palabra": "Albergue temporal",
+      "definicion": "Lugar de refugio para personas desplazadas por emergencia. Proporciona techo, agua, alimentos básicos y servicios de asistencia.",
+      "sinonimos": ["shelter", "refuge"],
+      "categoria": "comunicacion"
+    },
+    {
+      "palabra": "Torres de comunicación",
+      "definicion": "Estructuras que sustentan antenas para transmisión de señales de comunicación celular, radio y TV. Puntos estratégicos en infraestructura.",
+      "sinonimos": ["communication towers", "cell towers"],
+      "categoria": "comunicacion"
+    },
+    {
+      "palabra": "OPSEC",
+      "definicion": "Seguridad de operaciones. Prácticas para proteger información sensible de敌人 o competidores. Incluye gestión de información y comunicaciones.",
+      "sinonimos": ["operational security"],
+      "categoria": "seguridad"
+    },
+    {
+      "palabra": "Censura",
+      "definicion": "Supresión de información por parte de autoridades. En crisis políticas, comunicación mesh puede绕过 censorship.",
+      "sinonimos": ["censorship", "supresión"],
+      "categoria": "seguridad"
+    },
+    {
+      "palabra": "Encriptación",
+      "definicion": "Conversión de información a formato ilegible para non autorizados. Protege privacidad en comunicaciones digitales.",
+      "sinonimos": ["encryption", "cifrado"],
+      "categoria": "seguridad"
+    },
+    {
+      "palabra": "Clave privada",
+      "definicion": "Serie de caracteres que descifra mensajes en criptografía asimétrica. Debe mantenerse en secreto y secure.",
+      "sinonimos": ["private key"],
+      "categoria": "seguridad"
+    },
+    {
+      "palabra": "Clave pública",
+      "definicion": "Componente de par de claves asimétricas que puede compartirse libremente. Se usa para cifrar mensajes dirigidos al propietario.",
+      "sinonimos": ["public key"],
+      "categoria": "seguridad"
+    },
+    {
+      "palabra": "Hash",
+      "definicion": "Función que convierte datos a valor fijo. Usado para verificar integridad de archivos y contraseñas almacenadas.",
+      "sinonimos": ["hash function"],
+      "categoria": "seguridad"
+    },
+    {
+      "palabra": "Autenticación",
+      "definicion": "Proceso de verificar identidad de usuario o dispositivo. Métodos: contraseña, PIN, huella, token.",
+      "sinonimos": ["authentication", "verification"],
+      "categoria": "seguridad"
+    },
+    {
+      "palabra": "Amenaza",
+      "definicion": "Peligro potencial que puede causar daño a personas, sistemas o información. Clasificadas por tipo: física, digital, humana.",
+      "sinonimos": ["threat", "risk"],
+      "categoria": "seguridad"
+    },
+    {
+      "palabra": "Vulnerabilidad",
+      "definicion": "Debilidad en sistema que puede ser explotada por amenazas. Descubrir y corregir vulnerabilidades es crucial para seguridad.",
+      "sinonimos": ["vulnerability", "weakness"],
+      "categoria": "seguridad"
+    },
+    {
+      "palabra": "Phishing",
+      "definicion": "Ataque de ingeniería social que busca obtener información confidencial suplantando identidad de entidad trusted.",
+      "sinonimos": ["phishing", "pesca"],
+      "categoria": "seguridad"
+    },
+    {
+      "palabra": "VPN",
+      "definicion": "Red privada virtual. Crea conexión encriptada a través de red pública, protegiendo tráfico de intercepción.",
+      "sinonimos": ["Virtual Private Network"],
+      "categoria": "seguridad"
+    },
+    {
+      "palabra": "Firewall",
+      "definicion": "Sistema que monitorea y controla tráfico de red según reglas de seguridad. Primera línea de defensa contra accesos no autorizados.",
+      "sinonimos": ["firewall"],
+      "categoria": "seguridad"
+    },
+    {
+      "palabra": "Antivirus",
+      "definicion": "Software que detecta y elimina software malicioso. Actualizaciones regulares son esenciales contra nuevas amenazas.",
+      "sinonimos": ["antimalware", "security software"],
+      "categoria": "seguridad"
+    },
+    {
+      "palabra": "Respaldo",
+      "definicion": "Copia de seguridad de datos importantes. Debe almacenarse en ubicación separada y verificarse periódicamente.",
+      "sinonimos": ["backup", "backup copy"],
+      "categoria": "seguridad"
+    },
+    {
+      "palabra": "Biometría",
+      "definicion": "Autenticación usando características físicas: huella, iris, rostro. Más seguro que contraseñas pero raise privacidad concerns.",
+      "sinonimos": ["biometrics"],
+      "categoria": "seguridad"
+    },
+    {
+      "palabra": "Token",
+      "definicion": "Dispositivo físico o digital que genera códigos temporales para autenticación. Añade capa adicional de seguridad.",
+      "sinonimos": ["security token", "OTP"],
+      "categoria": "seguridad"
+    },
+    {
+      "palabra": "Interceptación",
+      "definicion": "Captura no autorizada de comunicaciones. En mesh, el cifrado E2E previene que nodos intermedios lean mensajes.",
+      "sinonimos": ["interception", "eavesdropping"],
+      "categoria": "seguridad"
+    },
+    {
+      "palabra": "Metadatos",
+      "definicion": "Datos sobre datos. En comunicaciones, incluye: emisor, receptor, hora, duración. Puede revelar información sensible incluso si contenido está cifrado.",
+      "sinonimos": ["metadata", "data about data"],
+      "categoria": "seguridad"
+    },
+    {
+      "palabra": "Desaparecido",
+      "definicion": "Persona cuya ubicación se desconoce después de desastre o incidente. Búsqueda requiere coordinación entre equipos y comunicación mesh.",
+      "sinonimos": ["missing person", "desaparecido"],
+      "categoria": "seguridad"
+    },
+    {
+      "palabra": "Disturbios civiles",
+      "definicion": "Interrupción del orden público por grupos organizados o no. Puede incluir protestas, saqueos, violencia. Preparación y comunicación son clave.",
+      "sinonimos": ["civil unrest", "riots"],
+      "categoria": "seguridad"
+    },
+    {
+      "palabra": "Gas lacrimógeno",
+      "definicion": "Agente químico que causa irritación temporal de ojos y piel. Usado en control de multitudes. Efectos: lagrimeo, ardor, tos.",
+      "sinonimos": ["tear gas", "CS gas"],
+      "categoria": "seguridad"
+    },
+    {
+      "palabra": "Apagón",
+      "definicion": "Fallo generalizado del suministro eléctrico. Puede durar horas o días. Requiere preparación para iluminación, conservación de alimentos, comunicación.",
+      "sinonimos": ["blackout", "corte de energía"],
+      "categoria": "seguridad"
+    },
+    {
+      "palabra": "Generador",
+      "definicion": "Dispositivo que convierte energía mecánica o química en electricidad. Essential para mantener equipos críticos durante apagones.",
+      "sinonimos": ["generator"],
+      "categoria": "seguridad"
+    },
+    {
+      "palabra": "Batería de respaldo",
+      "definicion": "Sistema de alimentación secundaria que entra en funcionamiento automáticamente cuando falla la alimentación principal.",
+      "sinonimos": ["UPS", "backup power"],
+      "categoria": "seguridad"
+    },
+    {
+      "palabra": "Panel solar",
+      "definicion": "Dispositivo que convierte luz solar en electricidad. Fuente de energía renovable para cargar dispositivos en áreas remotas.",
+      "sinonimos": ["solar panel", "photovoltaic"],
+      "categoria": "seguridad"
+    },
+    {
+      "palabra": "Primeros auxilios psicológicos",
+      "definicion": "Apoyo emocional inicial a personas en crisis. Incluye escuchar, validar emociones, proporcionar información y conectar con recursos.",
+      "sinonimos": ["PFA", "psychological first aid"],
+      "categoria": "salud_mental"
+    },
+    {
+      "palabra": "Trauma",
+      "definicion": "Experiencia emocional dañina que puede causar efectos psicológicos duraderos. Incluye PTSD, ansiedad, depresión.",
+      "sinonimos": ["psychological trauma"],
+      "categoria": "salud_mental"
+    },
+    {
+      "palabra": "PTSD",
+      "definicion": "Trastorno de estrés postraumático. Condición que puede desarrollar después de evento traumático. Síntomas: flashbacks, pesadillas, hipervigilancia.",
+      "sinonimos": ["post-traumatic stress"],
+      "categoria": "salud_mental"
+    },
+    {
+      "palabra": "Resiliencia",
+      "definicion": "Capacidad de adaptarse y recuperarse de adversidad. En comunidades, incluye redes de apoyo, recursos compartidos, y liderazgo efectivo.",
+      "sinonimos": ["resilience", "fortaleza"],
+      "categoria": "salud_mental"
+    },
+    {
+      "palabra": "Fatiga por compasión",
+      "definicion": "Agotamiento emocional experimentador por cuidadores. Síntomas: irritabilidad, insomnio, falta de empatía. Auto-cuidado es esencial.",
+      "sinonimos": ["compassion fatigue", "burnout"],
+      "categoria": "salud_mental"
+    },
+    {
+      "palabra": "Estrategia de supervivencia",
+      "definicion": "Plan de acción para mantener vida en condiciones adversas. Incluye priorización de necesidades: seguridad, agua, alimento, refugio.",
+      "sinonimos": ["survival strategy"],
+      "categoria": "supervivencia"
+    },
+    {
+      "palabra": "Escalada de conflicto",
+      "definicion": "Aumento progresivo de intensidad de confrontación. Reconocer señales tempranas permite evitar escalada a violencia.",
+      "sinonimos": ["conflict escalation"],
+      "categoria": "supervivencia"
+    },
+    {
+      "palabra": "Cuevas",
+      "definicion": "Refugio natural formado en roca. Proporciona protección pero requiere verificar seguridad (gases, animales, inundación).",
+      "sinonimos": ["cave", "cavern"],
+      "categoria": "supervivencia"
+    },
+    {
+      "palabra": "Trampa",
+      "definicion": "Dispositivo para capturar animales con fines de alimentación. Tipos: lazo, caja, pegajosa. requiere conocimiento de especies locales.",
+      "sinonimos": ["trap", "snare"],
+      "categoria": "supervivencia"
+    },
+    {
+      "palabra": "Forraje",
+      "definicion": "Búsqueda de alimentos silvestres comestibles. Requiere conocimiento de plantas locales y distingue entre comestibles y venenosas.",
+      "sinonimos": ["foraging", "recolección"],
+      "categoria": "supervivencia"
+    },
+    {
+      "palabra": "Senalización",
+      "definicion": "Comunicación de información mediante símbolos, colores, códigos. En emergencias, señalización de rutas de evacuación y peligros.",
+      "sinonimos": ["signaling", "marking"],
+      "categoria": "comunicacion"
+    },
+    {
+      "palabra": "Alerta temprana",
+      "definicion": "Sistema de notificación anticipada sobre amenazas inminentes. Permite tiempo para preparación y evacuación.",
+      "sinonimos": ["early warning", "advance notice"],
+      "categoria": "comunicacion"
+    },
+    {
+      "palabra": "Boya de emergencia",
+      "definicion": "Dispositivo flotante que indica posición de naufragio o accidente marítimo. Funciona con luz, radio o satélite.",
+      "sinonimos": ["emergency beacon", "EPIRB"],
+      "categoria": "comunicacion"
+    },
+    {
+      "palabra": "Brazalete de identificación",
+      "definicion": "Dispositivo wearable con información médica y de contacto de emergencia. Crucial para personas con condiciones de salud.",
+      "sinonimos": ["medical ID bracelet"],
+      "categoria": "comunicacion"
+    },
+    {
+      "palabra": "Plan de emergencia",
+      "definicion": "Documento que establece procedimientos, roles y recursos para responder a emergencias específicas. Debe practicarse regularmente.",
+      "sinonimos": ["emergency plan", "contingency plan"],
+      "categoria": "supervivencia"
+    },
+    {
+      "palabra": "Comando de incidentes",
+      "definicion": "Sistema de gestión unificada para emergencias, definiendo estructura de mando, comunicación y coordinación de recursos.",
+      "sinonimos": ["ICS", "Incident Command System"],
+      "categoria": "supervivencia"
+    },
+    {
+      "palabra": "Equipo de búsqueda y rescate",
+      "definicion": "Grupo entrenado para localizar y extraer víctimas de sitios de desastre o espacios confinados. Incluye equipos especializados.",
+      "sinonimos": ["SAR team", "search and rescue"],
+      "categoria": "supervivencia"
+    },
+    {
+      "palabra": "Unidad de crisis",
+      "definicion": "Equipo dedicado a manejar situaciones de emergencia, coordinando recursos y decisiones críticas. Incluye liderazgo médico y operativo.",
+      "sinonimos": ["crisis unit", "emergency team"],
+      "categoria": "supervivencia"
+    },
+    {
+      "palabra": "Estrategia de comunicación de crisis",
+      "definicion": "Plan para mantener comunicación efectiva durante emergencias, incluyendo mensajes clave, canales y portavoces.",
+      "sinonimos": ["crisis communication"],
+      "categoria": "comunicacion"
+    },
+    {
+      "palabra": "Zona de desastre",
+      "definicion": "Área afectada por evento catastrófico. Puede estar sujeta a restricciones de acceso y requiere coordinación para ayuda.",
+      "sinonimos": ["disaster zone", "affected area"],
+      "categoria": "supervivencia"
+    },
+    {
+      "palabra": "Punto de triaje",
+      "definicion": "Ubicación donde víctimas son evaluadas y clasificadas según urgencia de atención médica. Designado por equipo médico.",
+      "sinonimos": ["triage point", "casualty clearing"],
+      "categoria": "supervivencia"
+    },
+    {
+      "palabra": "Cadena de mando",
+      "definicion": "Jerarquía de autoridad que define quién toma decisiones en diferentes niveles de una organización de emergencia.",
+      "sinonimos": ["chain of command"],
+      "categoria": "supervivencia"
+    },
+    {
+      "palabra": "Recurso crítico",
+      "definicion": "Material, equipo o personal esencial para respuesta a emergencia que puede ser limitado. Planificación anticipada es clave.",
+      "sinonimos": ["critical resource"],
+      "categoria": "supervivencia"
+    },
+    {
+      "palabra": "Protocolo de comunicación de emergencia",
+      "definicion": "Conjunto de reglas para передача información durante crisis: qué decir, a quién, por qué canal, con qué prioridad.",
+      "sinonimos": ["emergency comm protocol"],
+      "categoria": "comunicacion"
+    },
+    {
+      "palabra": "Estación de transferencia",
+      "definicion": "Punto de concentración para coordinación de recursos y pessoal antes de deployment a zona de desastre.",
+      "sinonimos": ["staging area", "marshalling point"],
+      "categoria": "supervivencia"
+    },
+    {
+      "palabra": "Alerta naranja",
+      "definicion": "Nivel de peligro alto que indica probabilidad de evento adverso significativo. Requiere preparación activa.",
+      "sinonimos": ["orange alert", "high alert"],
+      "categoria": "supervivencia"
+    },
+    {
+      "palabra": "Alerta amarilla",
+      "definicion": "Nivel de vigilancia que indica potencial riesgo. Población debe mantenerse informada y preparada.",
+      "sinonimos": ["yellow alert", "watch"],
+      "categoria": "supervivencia"
+    },
+    {
+      "palabra": "Ciclón",
+      "definicion": "Sistema de tormentas caracterizado por vientos circulares que giran alrededor de un centro de baja presión. Huracán en Atlántico.",
+      "sinonimos": ["huracán", "tropical cyclone"],
+      "categoria": "supervivencia"
+    },
+    {
+      "palabra": "Tornado",
+      "definicion": "Columna de aire que gira violentamente en contacto con suelo y nube de cumulonimbus. Vientos pueden superar 400 km/h.",
+      "sinonimos": ["tornado", "twister"],
+      "categoria": "supervivencia"
+    },
+    {
+      "palabra": "Tsunami",
+      "definicion": "Ola marina de gran altura causada por perturbación submarina (terremoto, deslizamiento). Puede viajar a 800 km/h.",
+      "sinonimos": ["maremoto", "tidal wave"],
+      "categoria": "supervivencia"
+    },
+    {
+      "palabra": "Erupción volcánica",
+      "definicion": "Liberación de magma, gases y ceniza desde un volcano. Puede causar Lahares, caída de ceniza, y flujos piroclásticos.",
+      "sinonimos": ["volcanic eruption"],
+      "categoria": "supervivencia"
+    },
+    {
+      "palabra": "Sequía",
+      "definicion": "Período prolongado de deficiencia de precipitación. Causa escasez de agua, fallas de cultivos, y hambruna.",
+      "sinonimos": ["drought", "aridez"],
+      "categoria": "supervivencia"
+    },
+    {
+      "palabra": "Incendio forestal",
+      "definicion": "Fuego no controlado que destruye vegetación, fauna y estructuras. Puede ser natural o causado por humanos.",
+      "sinonimos": ["wildfire", "forest fire"],
+      "categoria": "supervivencia"
+    },
+    {
+      "palabra": "Deslizamiento",
+      "definicion": "Movimiento de masa de tierra ladera abajo por gravedad. Causas: lluvia, sismos, disturbios. Frecuente en zonas montañosas.",
+      "sinonimos": ["landslide", "mudslide"],
+      "categoria": "supervivencia"
+    },
+    {
+      "palabra": "Tormenta eléctrica",
+      "definicion": "Fenómeno meteorológico con rayos, truenos, lluvia intensa ypossible granizo. Posee riesgo de electrocución e inundaciones.",
+      "sinonimos": ["thunderstorm", "electrical storm"],
+      "categoria": "supervivencia"
+    },
+    {
+      "palabra": "La Niña",
+      "definicion": "Fenómeno climático de enfriamiento anormal del océano Pacífico. Causa lluvias intensas en Colombia y región andina.",
+      "sinonimos": ["La Niña phenomenon"],
+      "categoria": "supervivencia"
+    },
+    {
+      "palabra": "El Niño",
+      "definicion": "Fenómeno climático de calentamiento anormal del océano Pacífico. Causa sequías e incendios en Colombia.",
+      "sinonimos": ["El Niño phenomenon"],
+      "categoria": "supervivencia"
+    },
+    {
+      "palabra": "Bioseguridad",
+      "definicion": "Conjunto de prácticas para prevenir exposición a agentes biológicos патогенicos. Incluye equipo de protección y protocolos.",
+      "sinonimos": ["biosafety", "biohazard"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Cuarentena",
+      "definicion": "Restricción de movimiento de personas expuestas a enfermedad contagiosa para prevenir propagación.",
+      "sinonimos": ["quarantine", "isolation"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Distanciamiento social",
+      "definicion": "Práctica de mantener distancia física entre personas para reducir transmisión de enfermedades. Mínimo 1-2 metros.",
+      "sinonimos": ["social distancing"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "EPI",
+      "definicion": "Equipo de Protección Individual. Dispositivos como máscaras, guantes, gafas que protegen contra exposición a патогенос y químicos.",
+      "sinonimos": ["PPE", "personal protective equipment"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Antiséptico",
+      "definicion": "Sustancia que mata o inhibe microorganismos en tejido vivo. Ejemplos: alcohol, yodo, peróxido de hidrógeno.",
+      "sinonimos": ["antiseptic", "disinfectant"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Sutura",
+      "definicion": "Punto o costuras para cerrar heridas quirúrgicamente o traumáticas. Material puede ser absorbible o no.",
+      "sinonimos": ["stitches", "surgical suture"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Tourniquet",
+      "definicion": "Versión en inglés de torniquete. Ver해당 término.",
+      "sinonimos": ["tourniquet"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Desfibrilación",
+      "definicion": "Aplicación de corriente eléctrica al corazón para corregir arritmias letales. Procedimiento salvavidas en parada cardíaca.",
+      "sinonimos": ["defibrillation"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Estatus epiléptico",
+      "definicion": "Estado prolongado o repetido de convulsiones sin recuperación entre episodios. Emergencia médica que requiere intervención agresiva.",
+      "sinonimos": ["status epilepticus"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Anafilaxia",
+      "definicion": "Reacción alérgica severa y potencialmente mortal que afecta múltiples sistemas del cuerpo. Requiere epinefrina inmediata.",
+      "sinonimos": ["anaphylaxis", "shock anafiláctico"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Neumotórax",
+      "definicion": "Presencia de aire en espacio pleural que colapsa el pulmón. Puede ser espontáneo o traumático.",
+      "sinonimos": ["pneumothorax"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Hemorragia subaracnoidea",
+      "definicion": "Sangrado en espacio subaracnoideo del cerebro, típicamente por ruptura de aneurisma. Cefalea súbita 'en trueno' es señal clásica.",
+      "sinonimos": ["SAH", "subarachnoid hemorrhage"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Edema pulmonar",
+      "definicion": "Acumulación de líquido en pulmones que dificulta respiración. Causado por insuficiencia cardíaca izquierda.",
+      "sinonimos": ["pulmonary edema"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Sepsis",
+      "definicion": "Respuesta inflamatoria sistémica a infección que puede llevar a falla orgánica y muerte. Emergencia médica.",
+      "sinonimos": ["sepsis", "blood poisoning"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Incontinencia",
+      "definicion": "Incapacidad de controlar esfínteres. Puede ocurrir por trauma espinal, accidente cerebrovascular, o vejiga neurogénica.",
+      "sinonimos": ["incontinence"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Coma",
+      "definicion": "Estado de inconsciencia profunda donde la persona no puede ser despertada. Causas: trauma, ACV, intoxicación, falla orgánica.",
+      "sinonimos": ["coma", "unconsciousness"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Shock anafiláctico",
+      "definicion": "Ver anafilaxia. Reacción alérgica sistémica severa con compromiso cardiovascular y respiratorio.",
+      "sinonimos": ["anaphylactic shock"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Arritmia",
+      "definicion": "Ritmo cardíaco anormal, ya sea demasiado rápido, lento, o irregular. Algunas son letales (fibrilación ventricular).",
+      "sinonimos": ["arrhythmia", "dysrhythmia"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Isquemia",
+      "definicion": "Flujo sanguíneo inadecuado a un tejido u órgano. Puede causar infarto si no se corrige rápidamente.",
+      "sinonimos": ["ischemia"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Infarto",
+      "definicion": "Muerte de tejido por falta de suministro de sangre (isquemia). Término común: infarto agudo de miocardio (IAM).",
+      "sinonimos": ["infarction", "heart attack"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "ACV",
+      "definicion": "Accidente cerebrovascular. Interrupción del flujo sanguíneo al cerebro. Tipos: isquémico (trombo) y hemorrágico (sangrado).",
+      "sinonimos": ["stroke", "derrame cerebral"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "DEA",
+      "definicion": "DesfibriladorExterno Automático. Dispositivo que diagnostica arritmias y administra descarga automáticamente. Uso por no profesionales.",
+      "sinonimos": ["AED", "automated external defibrillator"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "SV",
+      "definicion": "Signos vitales. Parámetros básicos que indican estado fisiológico: frecuencia cardíaca, respiratoria, presión arterial, temperatura.",
+      "sinonimos": ["vital signs", "VS"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "LPM",
+      "definicion": "Latidos por minuto. Medida de frecuencia cardíaca. Normal en reposo: 60-100 LPM en adultos.",
+      "sinonimos": ["BPM", "beats per minute"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "FR",
+      "definicion": "Frecuencia respiratoria. Número de respiraciones por minuto. Normal: 12-20 en adultos.",
+      "sinonimos": ["respiratory rate", "RR"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "PA",
+      "definicion": "Presión arterial. Fuerza de sangre contra paredes arteriales. Medida en mmHg. Normal: 120/80.",
+      "sinonimos": ["blood pressure", "BP"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Tos",
+      "definicion": "Reflejo protector de vías aéreas que expulsa objetos o secreciones. Puede ser seca o productiva.",
+      "sinonimos": ["cough", "tos productiva"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Disfagia",
+      "definicion": "Dificultad para tragar. Puede indicar obstrucción, daño neurológico, o enfermedad neuromuscular.",
+      "sinonimos": ["swallowing difficulty"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Epistaxis",
+      "definicion": "Sangrado nasal. Causas comunes: trauma, sequedad, presión alta. Generalmente controllable con presión directa.",
+      "sinonimos": ["nosebleed", "hemorragia nasal"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Hematoma",
+      "definicion": "Acumulación de sangre fuera de vasos, generalmente por trauma. Puede ser subcutáneo (moratón) o intramuscular.",
+      "sinonimos": ["bruise", "contusion"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Contusión",
+      "definicion": "Lesión de tejido sin ruptura de piel. Causa dolor, hinchazón y moratón. Tratamiento: hielo, descanso, compresión.",
+      "sinonimos": ["bruise", "contusion"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Luxación",
+      "definicion": "Desplazamiento de hueso fuera de articulación. Requiere reducción por profesional y posterior inmovilización.",
+      "sinonimos": ["dislocation", "dislocated joint"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Esguince",
+      "definicion": "Lesión de ligamentos por estiramiento o desgarro. Síntomas: dolor, hinchazón, ограничение de movimiento.",
+      "sinonimos": ["sprain"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Desgarro muscular",
+      "definicion": "Ruptura de fibras musculares. Síntomas: dolor agudo, hematoma, pérdida de fuerza. Tratamiento: descanso, hielo, compresión.",
+      "sinonimos": ["muscle tear", "strain"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Amputación",
+      "definicion": "Pérdida de extremidades o parte del cuerpo, traumática o quirúrgica. Requiere control de hemorragia y cuidado del muñón.",
+      "sinonimos": ["amputation"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Trauma craneal",
+      "definicion": "Lesión en cabeza que puede afectar cerebro. Desde concussion leve hasta hematoma epidural potencialmente mortal.",
+      "sinonimos": ["head trauma", "TBI"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Conmoción cerebral",
+      "definicion": "Lesión cerebral traumática leve que causa síntomas temporales: confusión, cefalea, náusea, visión borrosa.",
+      "sinonimos": ["concussion", "mild TBI"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Shock hipovolémico",
+      "definicion": "Shock causado por pérdida significativa de volumen sanguíneo. Tratamiento: control de hemorragia y líquidos IV.",
+      "sinonimos": ["hypovolemic shock"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Shock cardiogénico",
+      "definicion": "Shock por falla de bomba cardíaca. Tratamiento complejo que puede requerir soporte mecánico.",
+      "sinonimos": ["cardiogenic shock"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Shock séptico",
+      "definicion": "Shock causado por respuesta inflamatoria sistémica a infección. Mortalidad alta sin tratamiento agresivo.",
+      "sinonimos": ["septic shock"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Hemorragia interna",
+      "definicion": "Sangrado dentro del cuerpo (cavidades, órganos). Difícil de detectar. Signos: shock, dolor, hematomas distantes.",
+      "sinonimos": ["internal bleeding"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Peritonitis",
+      "definicion": "Inflamación del peritoneo por infección (通常 por órgano perforado). Emergencia quirúrgica.",
+      "sinonimos": ["peritonitis"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Neumonía",
+      "definicion": "Infección pulmonar que inflama alvéolos, llenándolos de líquido o pus. Causas: bacteria, virus, hongo.",
+      "sinonimos": ["pneumonia", "lung infection"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Broncoaspiración",
+      "definicion": "Ingreso de alimentos, líquido o vómito a vías respiratorias. Puede causar asfixia o neumonía por aspiración.",
+      "sinonimos": ["aspiration"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Asma",
+      "definicion": "Enfermedad crónica con inflamación y estrechamiento de vías aéreas. Episodios agudos (broncoespasmo) responden a inhaladores.",
+      "sinonimos": ["asthma", "bronchial asthma"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "EPOC",
+      "definicion": "Enfermedad pulmonar obstructiva crónica. Limitación irreversible del flujo de aire. Causa principal: tabaquismo.",
+      "sinonimos": ["COPD", "chronic obstructive pulmonary disease"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Hiperglucemia",
+      "definicion": "Nivel excesivamente alto de glucosa en sangre. En diabéticos puede llevar a cetoacidosis. Síntomas: sed, micción frecuente, confusión.",
+      "sinonimos": ["high blood sugar", "hyperglycemia"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Hipoglucemia",
+      "definicion": "Nivel peligrosamente bajo de glucosa en sangre. Síntomas: temblor, sudoración, confusión, inconsciencia. Tratamiento: azúcar oral o IV.",
+      "sinonimos": ["low blood sugar", "hypoglycemia"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Diabetes",
+      "definicion": "Enfermedad metabólica con elevados niveles de glucosa por defecto en producción o uso de insulina.",
+      "sinonimos": ["diabetes mellitus"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Reacción alérgica",
+      "definicion": "Respuesta exagerada del sistema inmunológico a sustancia normally inofensiva. Desde urticaria hasta anafilaxia.",
+      "sinonimos": ["allergic reaction", "allergy"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Urticaria",
+      "definicion": "Erupción cutánea con habones pruriginosos. Generalmente por аллергия. Puede ser controlada con antihistamínicos.",
+      "sinonimos": ["hives", "rash"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Edema",
+      "definicion": "Acumulación de líquido en tejidos. Puede ser local (por травма) o sistémico (por falla cardíaca o renal).",
+      "sinonimos": ["swelling", "edema"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Cianosis",
+      "definicion": "Coloración azulada de piel por недостаточное oxígeno en sangre. Señal de hipoxia severa.",
+      "sinonimos": ["cyanosis", "bluish discoloration"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Palidez",
+      "definicion": "Coloración clara de piel que indica недостаточное perfusión sanguínea o anemia. Signo de shock.",
+      "sinonimos": ["pallor", "paleness"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Ictericia",
+      "definicion": "Coloración amarilla de piel y ojos por excesso de bilirrubina. Indica проблемы hepáticos o de conductos biliares.",
+      "sinonimos": ["jaundice"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Petequias",
+      "definicion": "Pequeñas manchas rojas en piel por sangrado capillary. Pueden indicar trastorno de coagulación o infección severa.",
+      "sinonimos": ["petechiae"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Acidosis",
+      "definicion": "Estado donde sangre y tejidos tienen pH demasiado bajo (<7.35). Puede ser metabólica o respiratoria.",
+      "sinonimos": ["acidosis"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Alcalosis",
+      "definicion": "Estado donde sangre y tejidos tienen pH demasiado alto (>7.45). Puede ser metabólica o respiratoria.",
+      "sinonimos": ["alkalosis"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Hipoxemia",
+      "definicion": "Nivel bajo de oxígeno en sangre arterial. Síntomas: cianosis, confusión, taquipnea. Puede llevar a hipoxia tisular.",
+      "sinonimos": ["low blood oxygen"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Apnea",
+      "definicion": "Ausencia temporal de respiración. Puede ser obstructiva (apnea del sueño) o central (falla del centro respiratorio).",
+      "sinonimos": ["apnea", "breathing cessation"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Taquipnea",
+      "definicion": "Frecuencia respiratoria elevada (>20 por minuto en adultos). Puede indicar distress respiratorio o fisiológico.",
+      "sinonimos": ["rapid breathing", "tachypnea"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Bradipnea",
+      "definicion": "Frecuencia respiratoria abnormally baja (<12 por minuto). Puede indicar intoxicación, trauma craneal, o falla orgánica.",
+      "sinonimos": ["slow breathing", "bradypnea"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Taquicardia",
+      "definicion": "Frecuencia cardíaca elevada (>100 LPM en reposo). Puede ser respuesta compensatoria a shock, fiebre, o arritmia.",
+      "sinonimos": ["rapid heart rate", "tachycardia"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Bradicardia",
+      "definicion": "Frecuencia cardíaca abnormally baja (<60 LPM). Puede ser normal en atletas o indicar проблемы cardíacos o drog эффекты.",
+      "sinonimos": ["slow heart rate", "bradycardia"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Fibrilación",
+      "definicion": "Contracciones rápidas e descoordinadas de músculo, generalmente cardíacas. Fibrilación ventricular es causa de muerte súbita.",
+      "sinonimos": ["fibrillation"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Presincope",
+      "definicion": "Sensación de desmayo inminente sin pérdida real de consciencia. Generalmente por hipotensión ortostática.",
+      "sinonimos": ["near-fainting", "presyncope"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Sincope",
+      "definicion": "Pérdida breve de consciencia por недостаточное flujo sanguíneo cerebral. Generalmente reversible spontaneously.",
+      "sinonimos": ["fainting", "syncope", "desmayo"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Desorientación",
+      "definicion": "Confusión sobre tiempo, lugar o identidad personal. Signo de проблемы neurológicos, metabólicos, o trauma.",
+      "sinonimos": ["disorientation", "confusion"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Agitación",
+      "definicion": "Estado de inquietud y actividad física excesiva. Puede indicar dolor, distress psicológico, o condición médica.",
+      "sinonimos": ["agitation", "restlessness"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Alucinación",
+      "definicion": "Percepción de algo que no existe real. Puede ser visual, auditiva, оlfatoria. Causas: drog, fiebre, enfermedad mental.",
+      "sinonimos": ["hallucination"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Delirio",
+      "definicion": "Estado de confusión aguda con atención alterada y percepción. Generalmente reversible pero indica condición médica grave.",
+      "sinonimos": ["delirium"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Paresia",
+      "definicion": "Debilidad parcial de músculo o grupo muscular. Puede indicar проблемы neurológicos o neuromusculares.",
+      "sinonimos": ["paresis", "partial paralysis"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Parálisis",
+      "definicion": "Pérdida completa de función muscular por daño neurológico. Puede ser local, segmentaria, o generalizada.",
+      "sinonimos": ["paralysis", "plegia"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Parestesia",
+      "definicion": "Sensación anormal de hormigueo, adormecimiento o quemazón. Generalmente por presión nerviosa o проблема neurológico.",
+      "sinonimos": ["paresthesia", "tingling"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Ataxia",
+      "definicion": "Falta de coordinación muscular que causa movimientos torpes o inestabilidad. Puede ser cerebelar o sensorial.",
+      "sinonimos": ["ataxia", "lack of coordination"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Disfasia",
+      "definicion": "Dificultad para producir o comprender lenguaje. Difícil de distinguir de disartria (problema motor del habla).",
+      "sinonimos": ["dysphasia", "aphasia"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Disnea",
+      "definicion": "Dificultad para respirar percibida por el paciente. Puede ser de origen respiratorio, cardíaco, o psicológico.",
+      "sinonimos": ["dyspnea", "breathlessness"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Ortopnea",
+      "definicion": "Dificultad para respirar en posición horizontal. Síntoma clásico de insuficiencia cardíaca.",
+      "sinonimos": ["orthopnea", "shortness of breath lying down"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Dolor torácico",
+      "definicion": "Dolor o molestia en área torácica. Puede indicar проблемы cardíacos, pulmonares, musculoesqueléticos, o gastrointestinales.",
+      "sinonimos": ["chest pain", "thoracic pain"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Abdomen agudo",
+      "definicion": "Condición abdominal que requiere evaluación quirúrgica urgente. Incluye apendicitis, obstrucción, perforación, sangrado.",
+      "sinonimos": ["acute abdomen", "surgical abdomen"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Náusea",
+      "definicion": "Sensación de ganas de vomitar. Puede preceder al vómito o ocurrir sin él. Causas múltiples: gastrointestinal, neurológico, fármacos.",
+      "sinonimos": ["nausea", "queasiness"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Emesis",
+      "definicion": "Expulsión activa del contenido gástrico por la boca. Puede ser produtiva de bilis (verde) o sangue (roja/negra).",
+      "sinonimos": ["vomiting", "vómito"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Diarrea",
+      "definicion": "Deposiciones líquidas o blandas frecuentes. Puede causar deshidratación severa, especialmente en niños y ancianos.",
+      "sinonimos": ["diarrhea", "diarrea"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Constipación",
+      "definicion": "Deposiciones infrecuentes o difíciles. Puede indicar obstrucción intestinal o efectos secundarios de fármacos.",
+      "sinonimos": ["constipation", "estreñimiento"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Melena",
+      "definicion": "Deposición oscura, alquitranada por sangre digerida en tracto gastrointestinal superior. Indica sangrado GI significativo.",
+      "sinonimos": ["melena", "black stool"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Hematemesis",
+      "definicion": "Vómito con sangre. Puede ser rojo brillante (sangrado activo) o café molido (sangre digerida).",
+      "sinonimos": ["hematemesis", "vomiting blood"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Hematuria",
+      "definicion": "Presencia de sangre en orina. Puede ser visible (macroscópica) o solo detectable (microscópica).",
+      "sinonimos": ["hematuria", "blood in urine"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Glucosuria",
+      "definicion": "Presencia de glucosa en orina. Generalmente indica diabetes mellitus no controlada.",
+      "sinonimos": ["glucosuria", "glucose in urine"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Proteinuria",
+      "definicion": "Presencia excesiva de proteína en orina. Puede indicar enfermedad renal o cardiovascular.",
+      "sinonimos": ["proteinuria", "protein in urine"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Cetonuria",
+      "definicion": "Presencia de cetonas en orina. Indica que el cuerpo está usando grasas en lugar de glucosa para energía (cetoacidosis).",
+      "sinonimos": ["ketonuria", "ketones in urine"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Piel de naranja",
+      "definicion": "Textura de piel con hoyuelos como piel de naranja. Puede indicar linfedema o infección (celulitis).",
+      "sinonimos": ["peau d'orange", "orange peel skin"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Signo de Murphy",
+      "definicion": "Dolor al palpar hipocondrio derecho que se acentúa con la inspiración. Sugiere colecistitis aguda.",
+      "sinonimos": ["Murphy's sign"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Signo de McBurney",
+      "definicion": "Punto de dolor máximo en fosa ilíaca derecha. Sugiere apendicitis. Ubicado en tercio externo de línea ilio-umbilical.",
+      "sinonimos": ["McBurney's point"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Pulsos periféricos",
+      "definicion": "Pulsos en extremidades (radial, cubital, femoral, poplíteo, pedio, tibial posterior). Ausencia indica проблема vascular.",
+      "sinonimos": ["peripheral pulses"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Pulsos centrales",
+      "definicion": "Pulsos en grandes vasos (carotídeo, femoral, aorta). Evalúan perfusión central y estado cardiovascular.",
+      "sinonimos": ["central pulses"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Glasgow",
+      "definicion": "Escala de coma de Glasgow. Evalúa nivel de consciencia con puntuación de 3 (coma profundo) a 15 (normal).",
+      "sinonimos": ["GCS", "Glasgow Coma Scale"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "ABCDE",
+      "definicion": "Evaluación primaria de emergencia: Airway, Breathing, Circulation, Disability, Exposure. Estándar internacional de triaje.",
+      "sinonimos": ["primary survey"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Mendoza",
+      "definicion": "Sistema de clasificación de quemados por área corporal. Cada región representa 9% (regla de los 9).",
+      "sinonimos": ["rule of nines", "burns assessment"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Ampicilina",
+      "definicion": "Antibiótico betalactámico de amplio espectro. Primera elección para muchas infecciones bacterianas.",
+      "sinonimos": ["ampicillin"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Amoxicilina",
+      "definicion": "Antibiótico derivado de ampicilina, común para infecciones respiratorias y urinarias.",
+      "sinonimos": ["amoxicillin"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Ciprofloxacina",
+      "definicion": "Antibiótico fluoroquinolona de amplio espectro. Usado para infecciones urinarias, gastrointestinales, y osteoarticulares.",
+      "sinonimos": ["ciprofloxacin"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Metronidazol",
+      "definicion": "Antiparasitario y antibacteriano. Eficaz contra anaerobic y ciertos protozoos. Usado en infecciones GI y ginecológicas.",
+      "sinonimos": ["metronidazole"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Dexametasona",
+      "definicion": "Corticosteroide potente. Antiinflamatorio e inmunosupresor. Usado en shock, edema cerebral, reacciones alérgicas severas.",
+      "sinonimos": ["dexamethasone"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Epinefrina",
+      "definicion": "Hormona y medicamento vasopresor. Primera línea en anafilaxia y parada cardíaca. Estimula corazón y contrae vasos.",
+      "sinonimos": ["epinephrine", "adrenalina"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Atropina",
+      "definicion": "Anticolinérgico que aumenta frecuencia cardíaca y reduce secreciones. Usado en bradicardia y exposición a organofosforados.",
+      "sinonimos": ["atropine"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Morfina",
+      "definicion": "Analgésico opioide potente. Usado para dolor severo. Efectos secundarios: depresión respiratoria, náusea, hipotensión.",
+      "sinonimos": ["morphine"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Naloxona",
+      "definicion": "Antagonista de opioides que revierte depresión respiratoria por overdose. Admin IV, IM, o intranasal.",
+      "sinonimos": ["naloxone", "Narcan"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Diazepam",
+      "definicion": "Benzodiacepina con efectos ansiolíticos, sedantes, anticonvulsivos y miorrelajantes. Usado en estatus epiléptico y delirium.",
+      "sinonimos": ["diazepam", "Valium"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Midazolam",
+      "definicion": "Benzodiacepina de acción corta. Usado para sedación y convulsiones. Puede administrarse IM, sublingual, intranasal.",
+      "sinonimos": ["midazolam", "Versed"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Adenosina",
+      "definicion": "Fármaco antiarrítmico que pausa brevemente el nodo SA para diagnosticar y tratar ciertas arritmias.",
+      "sinonimos": ["adenosine"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Nitroglicerina",
+      "definicion": "Vasodilatador coronario usado en angina de pecho. Alivia dolor al reducir pré-carga cardíaca.",
+      "sinonimos": ["nitroglycerin", "nitroglicerina"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Aspirina",
+      "definicion": "Antiinflamatorio no esteroideo (AINE) con efecto antiagregante plaquetario. Primera línea en sospecha de IAM.",
+      "sinonimos": ["aspirin", "ASA"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Clopidogrel",
+      "definicion": "Antiagregante plaquetario que previene formación de coágulos. Usado junto con aspirina en syndromes coronarios.",
+      "sinonimos": ["clopidogrel", "Plavix"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Heparina",
+      "definicion": "Anticoagulante que inhibe formación de coágulos. Administración IV o subcutánea. Requiere monitoreo de TTPa.",
+      "sinonimos": ["heparin"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Warfarina",
+      "definicion": "Anticoagulante oral que bloquea factores de coagulación vitamina K-dependientes. Requiere monitoreo de INR.",
+      "sinonimos": ["warfarin", "Coumadin"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Diltiazem",
+      "definicion": "Bloqueador de canales de calcio con efectos antianginoso y antiarrítmico. Reduce frecuencia cardíaca y pré-carga.",
+      "sinonimos": ["diltiazem"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Metoprolol",
+      "definicion": "Betabloqueador selectivo que reduce frecuencia cardíaca y contractilidad. Usado en hipertensión, angina, falla cardíaca.",
+      "sinonimos": ["metoprolol", "Lopressor"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Amiodarona",
+      "definicion": "Antiarrítmico de amplio espectro usado en arritmias potencialmente mortales y fibrilación ventricular.",
+      "sinonimos": ["amiodarone"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Furosemida",
+      "definicion": "Diurético de asa que elimina agua y electrolitos. Usado en edema pulmonar, falla cardíaca, hipertensión.",
+      "sinonimos": ["furosemide", "Lasix"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Prednisona",
+      "definicion": "Corticosteroide sistémico con efectos antiinflamatorios e inmunosupresores. Usado en asma, reacciones alérgicas, enfermedades autoinmunes.",
+      "sinonimos": ["prednisone"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Omeprazol",
+      "definicion": "Inhibidor de bomba de protones que reduce producción de ácido gástrico. Usado en úlcera péptica, ERGE.",
+      "sinonimos": ["omeprazole", "Losec"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Ondansetrón",
+      "definicion": "Antiemético que bloquea receptores de serotonina. Eficaz contra náusea y vómito de diversas causas.",
+      "sinonimos": ["ondansetron", "Zofran"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Tramadol",
+      "definicion": "Analgésico opioide de acción mixta. Usado para dolor moderado a severo. Riesgo de convulsiones y dependencia.",
+      "sinonimos": ["tramadol", "Ultram"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Ketorolaco",
+      "definicion": "AINE potente con efecto analgésico significativo. Usado para dolor agudo. No usar más de 5 días por riesgo GI y renal.",
+      "sinonimos": ["ketorolac", "Toradol"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Paracetamol",
+      "definicion": "Analgésico y antipirético seguro. Primera elección para fiebre y dolor leve a moderado. Riesgo hepático en dosis altas.",
+      "sinonimos": ["acetaminophen", "tylenol"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Ibuprofeno",
+      "definicion": "AINE de venta libre para dolor, fiebre, inflamación. Contraindicado en úlcera, falla renal, allergies a AINEs.",
+      "sinonimos": ["ibuprofen", "Advil"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Diclofenaco",
+      "definicion": "AINE potente con propiedades antiinflamatorias y analgésicas. Disponible en formas oral, topical, e inyectable.",
+      "sinonimos": ["diclofenac", "Voltaren"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Ranitidina",
+      "definicion": "Antagonista H2 que reduce producción de ácido gástrico. Retirado del mercado por contaminación con NDMA.",
+      "sinonimos": ["ranitidine", "Zantac"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Sulbutamida",
+      "definicion": "Sulfonilurea antidiabético oral que estimula producción de insulina. Usado en diabetes tipo 2.",
+      "sinonimos": ["glibenclamida", "glyburide"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Insulina",
+      "definicion": "Hormona que regula glucosa sanguínea. En diabetes se administra exógenamente por inyección o bomba.",
+      "sinonimos": ["insulin"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Glucagón",
+      "definicion": "Hormona que eleva glucosa en sangre. Usado en emergencias para tratar hipoglucemia severa cuando no hay acceso IV.",
+      "sinonimos": ["glucagon"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Cromo",
+      "definicion": "Elemento usado en preparación de soluciones IV para nutrición parenteral. Corrección de deficiencias electrolíticas.",
+      "sinonimos": ["potassium chloride", "KCl"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Suero oral",
+      "definicion": "Solución de rehidratación oral (SRO) con glucosa y electrolitos. Vital para tratar deshidratación por diarrea.",
+      "sinonimos": ["ORS", "oral rehydration solution"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Sueroterapia",
+      "definicion": "Administración de líquidos IV para rehidratar, administrar medicamentos, o mantener vía permeable.",
+      "sinonimos": ["IV fluids", "fluid therapy"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Solución salina",
+      "definicion": "Solución de cloruro de sodio 0.9% (SF) para reanimación y mantenimiento. Solución isotónica con plasma.",
+      "sinonimos": ["saline", "NaCl 0.9%", "NS"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Ringer lactato",
+      "definicion": "Solución cristaloide con electrolites que incluye lactato (buffer). Preferred en reanimación con quemaduras.",
+      "sinonimos": ["Ringer's lactate", "RL", "LR"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Hemoderivados",
+      "definicion": "Productos derivados de sangre: concentrados de eritrocitos, plasma fresco congelado, plaquetas, криопреципитат.",
+      "sinonimos": ["blood products", "hemoderivatives"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Crossmatch",
+      "definicion": "Prueba de compatibilidad sanguínea entre donante y receptor antes de transfundir. Garantiza seguridad transfusional.",
+      "sinonimos": ["blood crossmatch"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Goteo",
+      "definicion": "Infusión lenta de líquido IV controlada por gotas. Calcular rate según gotas por minuto según tipo de equipo.",
+      "sinonimos": ["drip", "IV drip"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Vía peripheral",
+      "definicion": "Catéter en vena periférica (generalmente antecubital) para administración de líquidos y medicamentos IV.",
+      "sinonimos": ["peripheral IV", "IV line"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Vía central",
+      "definicion": "Catéter en vena grande (subclavia, yugular, femoral) para infusiones de alto volumen o medicamentos irritantes.",
+      "sinonimos": ["central line", "central venous catheter"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Intraósea",
+      "definicion": "Vía de administración en hueso (generalmente tibia o húmero) cuando acceso IV no es posible. Permite cualquier líquido IV.",
+      "sinonimos": ["IO", "intraosseous"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Mascarilla",
+      "definicion": "Dispositivo para administrar oxígeno o medicamentos inhalados. Tipos: simple, Venturi, reinhalación parcial, no reinhalación.",
+      "sinonimos": ["mask", "oxygen mask"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Nebulización",
+      "definicion": "Administración de medicamento aerosolizado para inhaleación directa a pulmones. Usado para asma y broncoespasmo.",
+      "sinonimos": ["nebulization", "aerosol therapy"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Cánula nasal",
+      "definicion": "Tubo que proporciona oxígeno por fosas nasales. Flujos de 1-6 L/min. Más cómodo que mascarilla.",
+      "sinonimos": ["nasal cannula", "nasal prongs"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Ambu",
+      "definicion": "Dispositivo manual de ventilación (resucitador) que proporciona aire u oxígeno con presión positiva.",
+      "sinonimos": ["bag-valve-mask", "BVM", "manual resuscitator"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Laringoscopia",
+      "definicion": "Visualización de cuerdas vocales con laringoscopio para intubación endotraqueal. Requiere sedación y relajante muscular.",
+      "sinonimos": ["laryngoscopy"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Intubación",
+      "definicion": "Colocación de tubo endotraqueal en tráquea para ventilación mecánica.黄金 estándar para vía aérea definitiva.",
+      "sinonimos": ["intubation", "endotracheal tube"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Cricotiroidotomía",
+      "definicion": "Procedimiento de emergencia para crear vía aérea quirúrgica a través de membrana cricotiroidea cuando intubación falla.",
+      "sinonimos": ["cricothyrotomy", "emergency airway"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Drenaje pleural",
+      "definicion": "Tubo en espacio pleural para evacuar aire (neumotórax) o líquido (derrame). Conectar a sello de agua.",
+      "sinonimos": ["chest tube", "thoracostomy"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Sello de agua",
+      "definicion": "Sistema de drenaje que permite salida unidireccional de fluidos desde cavidad pleural, evitando entrada de aire.",
+      "sinonimos": ["water seal", "Pleur-evac"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Paracentesis",
+      "definicion": "Extracción de líquido de cavidad corporal (generalmente peritoneal) con aguja. Para diagnóstico o alivio sintomático.",
+      "sinonimos": ["paracentesis"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Toracocentesis",
+      "definicion": "Extracción de líquido o aire del espacio pleural con aguja. Alivia derrame o neumotórax a tensión.",
+      "sinonimos": ["thoracentesis", "pleural tap"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Lavado peritoneal",
+      "definicion": "Técnica diagnóstica para detectar hemorragia intraabdominal Insertando solución estéril y retrevándola para análisis.",
+      "sinonimos": ["peritoneal lavage"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "FAST",
+      "definicion": "Focused Assessment with Sonography in Trauma. Ecografía rápida para detectar sangre libre en abdomen, pericardio, torax.",
+      "sinonimos": ["FAST ultrasound"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "ECG",
+      "definicion": "Electrocardiograma. Registro de actividad eléctrica del corazón. Diagnostica arritmias, isquemia, hipertrofia.",
+      "sinonimos": ["EKG", "electrocardiogram"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Pulsioximetría",
+      "definicion": "Medición no invasiva de saturación de oxígeno en sangre (SpO2). Normal >94%. Valor bajo indica hipoxemia.",
+      "sinonimos": ["pulse oximetry", "SpO2"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Capnografía",
+      "definicion": "Medición de CO2 al final de la espiración (EtCO2). Indica ventilación y puede detectar estado circulatorio.",
+      "sinonimos": ["capnography", "EtCO2"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Glucometría",
+      "definicion": "Medición de glucosa en sangre con dispositivo portátil. Esencial para manejo de diabetes y altered mental status.",
+      "sinonimos": ["blood glucose", "glucose meter"],
+      "categoria": "medicina"
+    },
+    {
+      "palabra": "Gasometría",
+      "definicion": "Medición de pH, pCO2, pO2, bicarbonato en sangre arterial. Evalúa estado ácido-base y oxigenación.",
+      "sinonimos": ["ABG", "arterial blood gas"],
+      "categoria": "medicina"
+    }
+  ]
+}
