@@ -1,5 +1,4 @@
 name: Build Android APK
-
 on:
   push:
     branches:
@@ -9,7 +8,6 @@ on:
 jobs:
   build-apk:
     runs-on: ubuntu-latest
-
     steps:
       - name: Clonar repositorio
         uses: actions/checkout@v4
@@ -30,13 +28,25 @@ jobs:
         with:
           channel: stable
 
-      - name: Instalar Flet
+      - name: Instalar Flet y dependencias
         run: |
-          pip install flet==0.85.1
+          pip install flet==0.85.1 flet-permission-handler
 
       - name: Build APK
         run: |
-          flet build apk
+          flet build apk \
+            --android-permissions BLUETOOTH \
+            --android-permissions BLUETOOTH_ADMIN \
+            --android-permissions BLUETOOTH_SCAN \
+            --android-permissions BLUETOOTH_CONNECT \
+            --android-permissions BLUETOOTH_ADVERTISE \
+            --android-permissions ACCESS_FINE_LOCATION \
+            --android-permissions ACCESS_COARSE_LOCATION \
+            --android-permissions NEARBY_WIFI_DEVICES \
+            --android-permissions ACCESS_WIFI_STATE \
+            --android-permissions CHANGE_WIFI_STATE \
+            --android-permissions INTERNET \
+            --android-permissions ACCESS_NETWORK_STATE
 
       - name: Subir APK
         uses: actions/upload-artifact@v4
