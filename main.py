@@ -18,21 +18,38 @@ async def main(page: ft.Page):
         visual_density=ft.VisualDensity.COMFORTABLE,
     )
 
-    # Permission Handler - Usamos el paquete separado flet-permission-handler
-    from flet_permission_handler import PermissionHandler, Permission
-    ph = PermissionHandler()
-    page.overlay.append(ph)
-
     # Configuración de permisos
     perms_data = [
-        {"id": "camera", "name": "Cámara", "icon": ft.Icons.CAMERA_ALT_ROUNDED, "type": Permission.CAMERA},
-        {"id": "location", "name": "Ubicación", "icon": ft.Icons.LOCATION_ON_ROUNDED, "type": Permission.LOCATION},
-        {"id": "mic", "name": "Micrófono", "icon": ft.Icons.MIC_ROUNDED, "type": Permission.MICROPHONE},
-        {"id": "storage", "name": "Almacenamiento", "icon": ft.Icons.STORAGE_ROUNDED, "type": Permission.STORAGE},
+        {"id": "camera", "name": "Cámara", "icon": ft.Icons.CAMERA_ALT_ROUNDED, "type": "CAMERA"},
+        {"id": "location", "name": "Ubicación", "icon": ft.Icons.LOCATION_ON_ROUNDED, "type": "LOCATION"},
+        {"id": "mic", "name": "Micrófono", "icon": ft.Icons.MIC_ROUNDED, "type": "MICROPHONE"},
+        {"id": "storage", "name": "Almacenamiento", "icon": ft.Icons.STORAGE_ROUNDED, "type": "STORAGE"},
     ]
 
     # Estado de los permisos (almacenamos los controles de la lista)
     permission_items = ft.Column(spacing=12, animate_opacity=300)
+
+    # Permission Handler - Solo lo inicializamos si estamos en móvil
+    # Usamos lazy import para evitar problemas
+    ph = None
+    is_mobile = page.platform in [ft.PagePlatform.IOS, ft.PagePlatform.ANDROID]
+    
+    if is_mobile:
+        try:
+            from flet_permission_handler import PermissionHandler, Permission
+            ph = PermissionHandler()
+            # En móviles, el PermissionHandler se añade al overlay para manejar diálogos del sistema
+            page.overlay.append(ph)
+            # Actualizamos los tipos de permisos para usar el enum de Permission
+            perms_data = [
+                {"id": "camera", "name": "Cámara", "icon": ft.Icons.CAMERA_ALT_ROUNDED, "type": Permission.CAMERA},
+                {"id": "location", "name": "Ubicación", "icon": ft.Icons.LOCATION_ON_ROUNDED, "type": Permission.LOCATION},
+                {"id": "mic", "name": "Micrófono", "icon": ft.Icons.MIC_ROUNDED, "type": Permission.MICROPHONE},
+                {"id": "storage", "name": "Almacenamiento", "icon": ft.Icons.STORAGE_ROUNDED, "type": Permission.STORAGE},
+            ]
+        except Exception as e:
+            print(f"Error initializing PermissionHandler: {e}")
+            ph = None
 
     def get_status_ui(status):
         """Devuelve el icono y color según el estado del permiso"""
@@ -46,18 +63,29 @@ async def main(page: ft.Page):
         else:
             return ft.Icon(ft.Icons.HELP_OUTLINE_ROUNDED, color=ft.Colors.GREY_600, size=24)
 
+    def get_status_text(status):
+        """Devuelve el texto del estado del permiso"""
+        status_str = str(status).split(".")[-1].replace("_", " ").capitalize()
+        if "unknown" in status_str.lower(): status_str = "Pendiente"
+        return status_str
+
+    def check_permission_status(p_type):
+        """Verifica el estado de un permiso de forma segura"""
+        if ph is None:
+            return "unknown"
+        try:
+            return ph.check_permission(p_type)
+        except Exception as e:
+            print(f"Error checking permission: {e}")
+            return "unknown"
+
     def update_permissions_status():
         """Actualiza la lista de permisos en la UI"""
         permission_items.controls.clear()
         for p in perms_data:
             # Verificamos el estado actual
-            try:
-                status = ph.check_permission(p["type"])
-            except:
-                status = "unknown"
-            
-            status_str = str(status).split(".")[-1].replace("_", " ").capitalize()
-            if "unknown" in status_str.lower(): status_str = "Pendiente"
+            status = check_permission_status(p["type"])
+            status_str = get_status_text(status)
             
             permission_items.controls.append(
                 ft.Container(
@@ -98,24 +126,41 @@ async def main(page: ft.Page):
 
     async def request_all_permissions(e):
         """Solicita permisos uno por uno secuencialmente"""
+        if ph is None:
+            # En desktop, mostrar mensaje de que no hay permisos disponibles
+            btn_request.content.value = "No disponible en desktop"
+            page.update()
+            await asyncio.sleep(2)
+            btn_request.content.value = "Activar Permisos"
+            page.update()
+            return
+            
         btn_request.disabled = True
         btn_request.content.value = "Solicitando..."
         progress_bar.visible = True
         page.update()
 
         for i, p in enumerate(perms_data):
-            # Solicitamos el permiso actual
-            await ph.request_permission_async(p["type"])
-            # Actualizamos la UI inmediatamente después de cada respuesta
-            update_permissions_status()
-            # Pequeña pausa para que el usuario vea el cambio
-            await asyncio.sleep(0.5)
+            try:
+                # Solicitamos el permiso actual
+                await ph.request_permission_async(p["type"])
+                # Actualizamos la UI inmediatamente después de cada respuesta
+                update_permissions_status()
+                # Pequeña pausa para que el usuario vea el cambio
+                await asyncio.sleep(0.5)
+            except Exception as ex:
+                print(f"Error requesting permission {p['id']}: {ex}")
             progress_bar.value = (i + 1) / len(perms_data)
             page.update()
         
         btn_request.disabled = False
         btn_request.content.value = "Permisos Completados"
         progress_bar.visible = False
+        page.update()
+        
+        # Resetear texto después de 2 segundos
+        await asyncio.sleep(2)
+        btn_request.content.value = "Activar Permisos"
         page.update()
 
     async def refresh_all(e):
@@ -145,12 +190,13 @@ async def main(page: ft.Page):
     )
 
     btn_request = ft.Button(
-        content=ft.Text("Activar Permisos"),
+        content=ft.Text("Activar Permisos" if is_mobile else "Permisos no disponibles"),
         icon=ft.Icons.SHIELD_OUTLINED,
         on_click=request_all_permissions,
+        disabled=not is_mobile,
         style=ft.ButtonStyle(
             color=ft.Colors.WHITE,
-            bgcolor={"": ft.Colors.BLUE_600, "hovered": ft.Colors.BLUE_500},
+            bgcolor={"": ft.Colors.BLUE_600 if is_mobile else ft.Colors.GREY_700, "hovered": ft.Colors.BLUE_500 if is_mobile else ft.Colors.GREY_600},
             padding=22,
             shape=ft.RoundedRectangleBorder(radius=18),
             elevation={"pressed": 0, "": 5},
