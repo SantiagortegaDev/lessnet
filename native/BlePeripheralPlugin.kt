@@ -319,19 +319,39 @@ class BlePeripheralPlugin(private val context: Context) : MethodChannel.MethodCa
         }
         try {
             val bytes = data.toByteArray(Charsets.UTF_8)
-            // Send in chunks of 20 bytes (standard BLE MTU - 3 overhead)
-            var i = 0
-            while (i < bytes.size) {
-                val end = minOf(i + 20, bytes.size)
-                val chunk = bytes.copyOfRange(i, end)
-                txCharacteristic?.value = chunk
-                gattServer?.notifyCharacteristicChanged(connectedDevice, txCharacteristic, false)
-                i = end
-            }
-            // Send null terminator as end-of-message marker
-            txCharacteristic?.value = byteArrayOf(0x00)
-            gattServer?.notifyCharacteristicChanged(connectedDevice, txCharacteristic, false)
-            result.success(true)
+            // Send in chunks of 20 bytes with small delays between them
+            // FIX: The delay prevents BLE notification loss on the receiver side
+            // Without delays, rapid notifications can be dropped or merged
+            Thread {
+                try {
+                    var i = 0
+                    while (i < bytes.size) {
+                        val end = minOf(i + 20, bytes.size)
+                        val chunk = bytes.copyOfRange(i, end)
+                        mainHandler.post {
+                            txCharacteristic?.value = chunk
+                            gattServer?.notifyCharacteristicChanged(connectedDevice, txCharacteristic, false)
+                        }
+                        i = end
+                        // Small delay between chunks to prevent data loss
+                        if (i < bytes.size) {
+                            Thread.sleep(15)
+                        }
+                    }
+                    // Send null terminator as end-of-message marker
+                    mainHandler.post {
+                        txCharacteristic?.value = byteArrayOf(0x00)
+                        gattServer?.notifyCharacteristicChanged(connectedDevice, txCharacteristic, false)
+                    }
+                    mainHandler.post {
+                        result.success(true)
+                    }
+                } catch (e: Exception) {
+                    mainHandler.post {
+                        result.error("SEND_ERROR", e.message, null)
+                    }
+                }
+            }.start()
         } catch (e: Exception) {
             result.error("SEND_ERROR", e.message, null)
         }

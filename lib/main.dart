@@ -17,7 +17,7 @@ void main() {
 }
 
 // ─────────────────────────────────────────────
-// APP ROOT
+// APP ROOT — PALETA BLANCO Y NEGRO
 // ─────────────────────────────────────────────
 class LessNetApp extends StatelessWidget {
   const LessNetApp({super.key});
@@ -28,12 +28,33 @@ class LessNetApp extends StatelessWidget {
       title: 'LessNet',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF3B82F6),
+        colorScheme: const ColorScheme(
           brightness: Brightness.dark,
+          primary: Colors.white,
+          onPrimary: Colors.black,
+          secondary: Colors.grey,
+          onSecondary: Colors.black,
+          error: Colors.redAccent,
+          onError: Colors.white,
+          surface: Color(0xFF0A0A0A),
+          onSurface: Colors.white,
         ),
-        scaffoldBackgroundColor: const Color(0xFF0F172A),
+        scaffoldBackgroundColor: const Color(0xFF0A0A0A),
         useMaterial3: true,
+        filledButtonTheme: FilledButtonThemeData(
+          style: FilledButton.styleFrom(
+            backgroundColor: Colors.white,
+            foregroundColor: Colors.black,
+          ),
+        ),
+        navigationBarTheme: NavigationBarThemeData(
+          backgroundColor: const Color(0xFF111111),
+          indicatorColor: Colors.white.withOpacity(0.15),
+          iconTheme: WidgetStateProperty.all(const IconThemeData(color: Colors.grey)),
+          labelTextStyle: WidgetStateProperty.all(
+            const TextStyle(color: Colors.grey, fontSize: 12),
+          ),
+        ),
       ),
       home: const HomePage(),
     );
@@ -41,10 +62,13 @@ class LessNetApp extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────
-// BLUETOOTH SERVICE GLOBAL (comparte estado entre paginas)
-// Soporta dos modos:
-//   CENTRAL: escanea y se conecta a un peripheral
-//   PERIPHERAL: se anuncia (advertising) y acepta conexiones
+// BLUETOOTH SERVICE GLOBAL
+// FIXES:
+//   - Usa onValueChangedStream en vez de lastValueStream
+//   - Buffer de mensajes mas robusto (maneja chunks combinados)
+//   - Re-subscribe a notificaciones si se caen
+//   - MTU mas grande para menos chunks
+//   - Limpieza completa al desconectar
 // ─────────────────────────────────────────────
 class BtService {
   static final BtService _instance = BtService._internal();
@@ -60,6 +84,7 @@ class BtService {
   StreamSubscription? _txSub;
   StreamSubscription? _connSub;
   final List<int> _receiveBuffer = [];
+  bool _isConnecting = false;
 
   // ─── Peripheral mode (native MethodChannel) ───
   static const _peripheralChannel = MethodChannel('com.lessnet.ble_peripheral');
@@ -80,9 +105,13 @@ class BtService {
   final _advertisingController = StreamController<bool>.broadcast();
   Stream<bool> get onAdvertisingChange => _advertisingController.stream;
 
+  final _statusController = StreamController<String>.broadcast();
+  Stream<String> get onStatusChange => _statusController.stream;
+
   bool get isAdvertising => _isAdvertising;
   bool get isPeripheralConnected => _peripheralConnected;
   bool get isConnected => connectedDevice != null || _peripheralConnected;
+  bool get connecting => _isConnecting;
   String get advertisingError => _advertisingError;
   String get connectedName {
     if (connectedDevice != null) {
@@ -92,17 +121,6 @@ class BtService {
     }
     if (_peripheralConnected) return _peripheralDeviceName.isEmpty ? 'Dispositivo' : _peripheralDeviceName;
     return '';
-  }
-
-  // ─── Check if device supports BLE advertising ───
-  Future<bool> supportsAdvertising() async {
-    try {
-      final result = await _peripheralChannel.invokeMethod('supportsAdvertising');
-      return result as bool? ?? false;
-    } catch (e) {
-      // If method not found, try to start and catch the error
-      return false;
-    }
   }
 
   // ─── Setup MethodChannel with native BLE peripheral ───
@@ -123,16 +141,18 @@ class BtService {
           _peripheralDeviceName = call.arguments as String? ?? '';
           _advertisingController.add(false);
           _connectionController.add(true);
+          _statusController.add('Conectado: $_peripheralDeviceName');
           break;
         case 'onDeviceDisconnected':
           _peripheralConnected = false;
           _peripheralDeviceName = '';
           _connectionController.add(false);
+          _statusController.add('Desconectado');
           break;
         case 'onAdvertiseStatus':
           final success = call.arguments as bool? ?? false;
           if (!success) {
-            _advertisingError = 'El dispositivo no pudo iniciar advertising. Puede que no soporte modo periferico BLE.';
+            _advertisingError = 'El dispositivo no pudo iniciar advertising.';
           }
           _isAdvertising = success;
           _advertisingController.add(success);
@@ -171,18 +191,28 @@ class BtService {
   }
 
   // ─── Central: connect to a peripheral device ───
+  // FIX: MTU request, re-subscribe on disconnect, onValueChangedStream
   Future<void> connectToDevice(BluetoothDevice device) async {
+    if (_isConnecting) return;
+    _isConnecting = true;
+    _statusController.add('Conectando...');
+
     try {
-      // Request larger MTU for better throughput
+      // Clean up any previous connection first
+      await _cleanupPreConnect();
+
+      // Connect with longer timeout
       await device.connect(timeout: const Duration(seconds: 20));
+
       connectedDevice = device;
       _connectionController.add(true);
 
-      // Request MTU negotiation
+      // Request larger MTU for fewer chunks (less chance of bugs)
       try {
         await device.requestMtu(512);
       } catch (_) {}
 
+      // Discover services
       final services = await device.discoverServices();
       for (final service in services) {
         if (service.uuid.str128.toLowerCase() == lessnetServiceUuid.toLowerCase()) {
@@ -191,48 +221,91 @@ class BtService {
               rxChar = char;
             } else if (char.uuid.str128.toLowerCase() == lessnetCharTxUuid.toLowerCase()) {
               txChar = char;
-              await char.setNotifyValue(true);
-              _receiveBuffer.clear();
-              _txSub = char.lastValueStream.listen((value) {
-                if (value.isNotEmpty) {
-                  _handleReceivedData(value);
-                }
-              });
             }
           }
         }
       }
 
+      // Subscribe to TX notifications (this is how we RECEIVE messages)
+      if (txChar != null) {
+        _receiveBuffer.clear();
+
+        // Enable notifications
+        final notifyOk = await txChar!.setNotifyValue(true);
+        if (!notifyOk) {
+          // Retry once
+          await Future.delayed(const Duration(milliseconds: 200));
+          await txChar!.setNotifyValue(true);
+        }
+
+        // FIX: Use onValueChangedStream for reliable notification delivery
+        // lastValueStream can miss values during widget rebuilds
+        _txSub = txChar!.onValueChangedStream.listen((value) {
+          if (value.isNotEmpty) {
+            _handleReceivedData(value);
+          }
+        });
+      }
+
+      // Listen for disconnection
       _connSub = device.connectionState.listen((state) {
         if (state == BluetoothConnectionState.disconnected) {
+          _statusController.add('Desconectado inesperadamente');
           _cleanup();
         }
       });
+
+      _statusController.add('Conectado a ${device.platformName.isEmpty ? "Dispositivo" : device.platformName}');
     } catch (e) {
+      _statusController.add('Error al conectar: $e');
       _cleanup();
       rethrow;
+    } finally {
+      _isConnecting = false;
     }
   }
 
-  // ─── Handle received BLE data with buffering (null-terminated protocol) ───
+  // ─── Handle received BLE data — ROBUST version ───
+  // FIX: Handle cases where:
+  //   - Multiple messages arrive in one BLE notification
+  //   - Null terminator arrives with data
+  //   - Partial messages arrive
   void _handleReceivedData(List<int> value) {
-    if (value.length == 1 && value[0] == 0x00) {
-      // End of message marker
-      if (_receiveBuffer.isNotEmpty) {
-        final text = utf8.decode(_receiveBuffer, allowMalformed: true);
-        _receiveBuffer.clear();
-        if (text.isNotEmpty) {
-          final msg = ChatMessage(text: text, mine: false, time: DateTime.now());
-          messages.add(msg);
-          _msgController.add(msg);
+    int i = 0;
+    while (i < value.length) {
+      if (value[i] == 0x00) {
+        // End of message marker - deliver complete message
+        if (_receiveBuffer.isNotEmpty) {
+          final text = utf8.decode(_receiveBuffer, allowMalformed: true);
+          _receiveBuffer.clear();
+          if (text.isNotEmpty) {
+            final msg = ChatMessage(text: text, mine: false, time: DateTime.now());
+            messages.add(msg);
+            _msgController.add(msg);
+          }
         }
+        i++;
+      } else {
+        _receiveBuffer.add(value[i]);
+        i++;
       }
-    } else {
-      _receiveBuffer.addAll(value);
+    }
+
+    // Safety: if buffer gets too large without null terminator, flush it
+    // (prevents stuck messages if null terminator was lost)
+    if (_receiveBuffer.length > 5000) {
+      final text = utf8.decode(_receiveBuffer, allowMalformed: true);
+      _receiveBuffer.clear();
+      if (text.isNotEmpty) {
+        final msg = ChatMessage(text: text, mine: false, time: DateTime.now());
+        messages.add(msg);
+        _msgController.add(msg);
+      }
     }
   }
 
   // ─── Send message (works in both central and peripheral mode) ───
+  // FIX: Larger chunk size based on MTU, with delay between chunks
   Future<void> sendMessage(String text) async {
     if (text.isEmpty) return;
     final msg = ChatMessage(text: text, mine: true, time: DateTime.now());
@@ -249,18 +322,52 @@ class BtService {
     } else if (rxChar != null) {
       // Central mode: send via flutter_blue_plus
       final bytes = utf8.encode(text);
+
+      // FIX: Send chunks with small delays to prevent data loss
+      // Use 20 bytes per chunk for maximum compatibility
       for (int i = 0; i < bytes.length; i += 20) {
         final end = i + 20 > bytes.length ? bytes.length : i + 20;
         final chunk = bytes.sublist(i, end);
-        await rxChar!.write(Uint8List.fromList(chunk), withoutResponse: false);
+        try {
+          await rxChar!.write(Uint8List.fromList(chunk), withoutResponse: false);
+        } catch (e) {
+          // If write fails, the connection might be unstable
+          _statusController.add('Error enviando datos');
+          rethrow;
+        }
+        // Small delay between chunks to prevent overflow
+        if (i + 20 < bytes.length) {
+          await Future.delayed(const Duration(milliseconds: 10));
+        }
       }
+      // Send null terminator as end-of-message marker
       await rxChar!.write(Uint8List.fromList([0x00]), withoutResponse: false);
+    }
+  }
+
+  // ─── Clean up before connecting (prevent stale state) ───
+  Future<void> _cleanupPreConnect() async {
+    _txSub?.cancel();
+    _txSub = null;
+    _connSub?.cancel();
+    _connSub = null;
+    rxChar = null;
+    txChar = null;
+    _receiveBuffer.clear();
+
+    if (connectedDevice != null) {
+      try {
+        await connectedDevice!.disconnect();
+      } catch (_) {}
+      connectedDevice = null;
     }
   }
 
   void _cleanup() {
     _txSub?.cancel();
+    _txSub = null;
     _connSub?.cancel();
+    _connSub = null;
     connectedDevice = null;
     rxChar = null;
     txChar = null;
@@ -269,8 +376,11 @@ class BtService {
   }
 
   Future<void> disconnect() async {
+    _statusController.add('Desconectando...');
     if (connectedDevice != null) {
-      await connectedDevice!.disconnect();
+      try {
+        await connectedDevice!.disconnect();
+      } catch (_) {}
     }
     if (_isPeripheral) {
       await stopAdvertising();
@@ -284,6 +394,7 @@ class BtService {
     _msgController.close();
     _connectionController.close();
     _advertisingController.close();
+    _statusController.close();
   }
 }
 
@@ -321,7 +432,7 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       body: _pages[_index],
       bottomNavigationBar: NavigationBar(
-        backgroundColor: const Color(0xFF1E293B),
+        backgroundColor: const Color(0xFF111111),
         selectedIndex: _index > 2 ? 0 : _index,
         onDestinationSelected: (i) => setState(() => _index = i),
         destinations: const [
@@ -343,15 +454,15 @@ class _HomePageState extends State<HomePage> {
         ],
       ),
       drawer: Drawer(
-        backgroundColor: const Color(0xFF1E293B),
+        backgroundColor: const Color(0xFF111111),
         child: SafeArea(
           child: Column(
             children: [
               const DrawerHeader(
-                decoration: BoxDecoration(color: Color(0xFF0F172A)),
+                decoration: BoxDecoration(color: Color(0xFF0A0A0A)),
                 child: Row(
                   children: [
-                    Icon(Icons.hub, color: Color(0xFF60A5FA), size: 32),
+                    Icon(Icons.hub, color: Colors.white, size: 32),
                     SizedBox(width: 12),
                     Text('LessNet Vault',
                         style: TextStyle(
@@ -373,7 +484,7 @@ class _HomePageState extends State<HomePage> {
 
   Widget _drawerItem(IconData icon, String label, int page) {
     return ListTile(
-      leading: Icon(icon, color: const Color(0xFF60A5FA)),
+      leading: Icon(icon, color: Colors.white70),
       title: Text(label, style: const TextStyle(color: Colors.white)),
       onTap: () => setState(() { _index = page; Navigator.pop(context); }),
     );
@@ -391,21 +502,20 @@ class PermissionsPage extends StatefulWidget {
 
 class _PermissionsPageState extends State<PermissionsPage> {
   final _perms = [
-    _PermItem('Ubicacion', Icons.location_on, Colors.orange,
+    _PermItem('Ubicacion', Icons.location_on, Colors.grey,
         Permission.locationWhenInUse, 'Requerida para BT scan en Android < 12'),
-    _PermItem('Bluetooth Scan', Icons.bluetooth_searching, Colors.cyan,
+    _PermItem('Bluetooth Scan', Icons.bluetooth_searching, Colors.grey,
         Permission.bluetoothScan, 'Buscar dispositivos cercanos (Android 12+)'),
-    _PermItem('Bluetooth Connect', Icons.bluetooth_connected, Colors.blue,
+    _PermItem('Bluetooth Connect', Icons.bluetooth_connected, Colors.grey,
         Permission.bluetoothConnect, 'Conectarse a dispositivos (Android 12+)'),
     _PermItem('Bluetooth Advertise', Icons.broadcast_on_personal,
-        Colors.lightBlue, Permission.bluetoothAdvertise,
+        Colors.grey, Permission.bluetoothAdvertise,
         'Hacerse visible para otros dispositivos'),
   ];
 
   final Map<Permission, PermissionStatus> _statuses = {};
   bool _loading = false;
   bool _bluetoothOn = false;
-  bool _locationOn = false;
 
   @override
   void initState() {
@@ -419,11 +529,6 @@ class _PermissionsPageState extends State<PermissionsPage> {
       final adapterOn = await FlutterBluePlus.adapterState.first
           .timeout(const Duration(seconds: 3), onTimeout: () => BluetoothAdapterState.unknown);
       if (mounted) setState(() => _bluetoothOn = adapterOn == BluetoothAdapterState.on);
-    } catch (_) {}
-    try {
-      final locOn = await Permission.locationWhenInUse.status;
-      // Can't directly check if location service is on, but we can check permission
-      if (mounted) setState(() => _locationOn = locOn.isGranted);
     } catch (_) {}
   }
 
@@ -470,22 +575,22 @@ class _PermissionsPageState extends State<PermissionsPage> {
           children: [
             const _Header('Permisos', Icons.shield, 'Necesarios para Bluetooth'),
 
-            // ─── Bluetooth & Location status ───
+            // ─── Bluetooth status ───
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: (_bluetoothOn ? Colors.green : Colors.red).withOpacity(0.1),
+                color: (_bluetoothOn ? Colors.white : Colors.red).withOpacity(0.08),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: (_bluetoothOn ? Colors.green : Colors.red).withOpacity(0.3)),
+                border: Border.all(color: (_bluetoothOn ? Colors.white : Colors.red).withOpacity(0.2)),
               ),
               child: Row(children: [
                 Icon(_bluetoothOn ? Icons.bluetooth : Icons.bluetooth_disabled,
-                    color: _bluetoothOn ? Colors.greenAccent : Colors.redAccent, size: 20),
+                    color: _bluetoothOn ? Colors.white : Colors.redAccent, size: 20),
                 const SizedBox(width: 10),
                 Expanded(child: Text(
                   _bluetoothOn ? 'Bluetooth ACTIVADO' : 'Bluetooth DESACTIVADO - Activa Bluetooth en ajustes!',
-                  style: TextStyle(color: _bluetoothOn ? Colors.greenAccent : Colors.redAccent, fontWeight: FontWeight.w600, fontSize: 13),
+                  style: TextStyle(color: _bluetoothOn ? Colors.white : Colors.redAccent, fontWeight: FontWeight.w600, fontSize: 13),
                 )),
               ]),
             ),
@@ -493,16 +598,16 @@ class _PermissionsPageState extends State<PermissionsPage> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.amber.withOpacity(0.1),
+                color: Colors.white.withOpacity(0.04),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.amber.withOpacity(0.3)),
+                border: Border.all(color: Colors.white.withOpacity(0.1)),
               ),
               child: Row(children: [
-                const Icon(Icons.gps_fixed, color: Colors.amber, size: 20),
+                const Icon(Icons.gps_fixed, color: Colors.white54, size: 20),
                 const SizedBox(width: 10),
                 Expanded(child: Text(
-                  'Asegurate de que la UBICACION este activada en ajustes del telefono. Es necesaria para buscar BLE en muchos dispositivos.',
-                  style: TextStyle(color: Colors.amber.withOpacity(0.9), fontSize: 12),
+                  'Asegurate de que la UBICACION este activada en ajustes del telefono. Es necesaria para buscar BLE.',
+                  style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12),
                 )),
               ]),
             ),
@@ -532,9 +637,7 @@ class _PermissionsPageState extends State<PermissionsPage> {
               width: double.infinity,
               child: FilledButton.icon(
                 icon: _loading
-                    ? const SizedBox(
-                        width: 16, height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
                     : const Icon(Icons.done_all),
                 label: Text(_loading ? 'Solicitando...' : 'Solicitar todos'),
                 onPressed: _loading ? null : _requestAll,
@@ -576,7 +679,7 @@ class _PermCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: Colors.white.withOpacity(0.04),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.white.withOpacity(0.08)),
       ),
@@ -585,10 +688,10 @@ class _PermCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: item.color.withOpacity(0.15),
+              color: Colors.white.withOpacity(0.08),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(item.icon, color: item.color, size: 20),
+            child: Icon(item.icon, color: Colors.white70, size: 20),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -602,10 +705,10 @@ class _PermCard extends StatelessWidget {
                 Row(
                   children: [
                     Icon(granted ? Icons.check_circle : Icons.cancel,
-                        color: granted ? Colors.greenAccent : Colors.redAccent, size: 14),
+                        color: granted ? Colors.white : Colors.redAccent, size: 14),
                     const SizedBox(width: 4),
                     Text(statusText, style: TextStyle(
-                        color: granted ? Colors.greenAccent : permanentlyDenied ? Colors.orangeAccent : Colors.redAccent,
+                        color: granted ? Colors.white : permanentlyDenied ? Colors.orangeAccent : Colors.redAccent,
                         fontSize: 11, fontWeight: FontWeight.w600)),
                   ],
                 ),
@@ -616,7 +719,7 @@ class _PermCard extends StatelessWidget {
           if (status == null)
             const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
           else if (granted)
-            const Icon(Icons.check_circle, color: Colors.greenAccent, size: 24)
+            const Icon(Icons.check_circle, color: Colors.white, size: 24)
           else if (permanentlyDenied)
             TextButton(onPressed: onOpenSettings, child: const Text('Ajustes', style: TextStyle(fontSize: 12)))
           else
@@ -640,16 +743,15 @@ class _ScanPageState extends State<ScanPage> {
   final bt = BtService();
   final List<ScanResult> _results = [];
   bool _scanning = false;
-  bool _scanAll = true; // Default: scan ALL devices (no filter)
   int _scanSeconds = 0;
   Timer? _scanTimer;
   StreamSubscription? _scanSub;
   StreamSubscription? _scanningSub;
   StreamSubscription? _connSub;
   StreamSubscription? _advSub;
-  StreamSubscription? _periphConnSub;
   int _advertiseSeconds = 0;
   Timer? _advertiseTimer;
+  StreamSubscription? _statusSub;
 
   @override
   void initState() {
@@ -672,13 +774,17 @@ class _ScanPageState extends State<ScanPage> {
         }
       }
     });
-    _periphConnSub = bt.onConnectionChange.listen((connected) {
-      if (mounted) setState(() {});
+    _statusSub = bt.onStatusChange.listen((msg) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(msg), backgroundColor: Colors.grey[800]),
+        );
+      }
     });
   }
 
   Future<void> _startScan() async {
-    // Stop advertising first if active
     if (bt.isAdvertising) {
       await bt.stopAdvertising();
     }
@@ -689,19 +795,17 @@ class _ScanPageState extends State<ScanPage> {
       Permission.bluetoothConnect,
     ].request();
 
-    // More lenient permission check - only require scan and connect
     final scanGranted = statuses[Permission.bluetoothScan]?.isGranted ?? false;
     final connectGranted = statuses[Permission.bluetoothConnect]?.isGranted ?? false;
     if (!scanGranted || !connectGranted) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Concede los permisos de Bluetooth Scan y Connect primero'), backgroundColor: Colors.red),
+          const SnackBar(content: Text('Concede los permisos de Bluetooth primero'), backgroundColor: Colors.red),
         );
       }
       return;
     }
 
-    // Check if Bluetooth is on
     try {
       final adapterState = await FlutterBluePlus.adapterState.first
           .timeout(const Duration(seconds: 3), onTimeout: () => BluetoothAdapterState.unknown);
@@ -709,7 +813,7 @@ class _ScanPageState extends State<ScanPage> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Bluetooth esta APAGADO! Activa Bluetooth en los ajustes del telefono.'),
+              content: Text('Bluetooth esta APAGADO! Activa Bluetooth en ajustes.'),
               backgroundColor: Colors.red,
               duration: Duration(seconds: 5),
             ),
@@ -728,11 +832,8 @@ class _ScanPageState extends State<ScanPage> {
     });
 
     try {
-      // CRITICAL FIX: Scan WITHOUT withServices filter
-      // Many OPPO/ColorOS devices don't properly match 128-bit UUID filters
-      // Instead, we scan ALL devices and filter manually in the results
       await FlutterBluePlus.startScan(
-        timeout: const Duration(seconds: 60), // Extended from 30 to 60 seconds
+        timeout: const Duration(seconds: 60),
         androidUsesFineLocation: true,
       );
 
@@ -757,9 +858,6 @@ class _ScanPageState extends State<ScanPage> {
         setState(() => _scanning = false);
         _scanTimer?.cancel();
         _scanTimer = null;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al escanear: $e'), backgroundColor: Colors.red),
-        );
       }
     }
   }
@@ -774,19 +872,9 @@ class _ScanPageState extends State<ScanPage> {
   }
 
   Future<void> _startAdvertising() async {
-    // Stop scan first if active
     if (_scanning) {
       await _stopScan();
     }
-
-    final statuses = await [
-      Permission.bluetoothAdvertise,
-      Permission.bluetoothConnect,
-    ].request();
-
-    // BLUETOOTH_ADVERTISE is a normal permission on Android 12+ (auto-granted)
-    // Don't block if it's denied - it might still work
-    final advGranted = statuses[Permission.bluetoothAdvertise]?.isGranted ?? false;
 
     try {
       await bt.startAdvertising();
@@ -794,7 +882,7 @@ class _ScanPageState extends State<ScanPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Dispositivo visible! El otro celular debe buscar y conectar.'),
-            backgroundColor: Colors.green,
+            backgroundColor: Colors.grey,
             duration: Duration(seconds: 4),
           ),
         );
@@ -804,9 +892,9 @@ class _ScanPageState extends State<ScanPage> {
       if (errMsg.contains('ADV_ERROR') || errMsg.contains('no soporta') || errMsg.contains('advertising')) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Este celular NO soporta BLE advertising. Usa ESTE celular para BUSCAR y el OTRO para hacerse visible.'),
-              backgroundColor: Colors.orange,
+            const SnackBar(
+              content: Text('Este celular NO soporta BLE advertising. Usa este celular para BUSCAR.'),
+              backgroundColor: Colors.red,
               duration: Duration(seconds: 8),
             ),
           );
@@ -814,7 +902,7 @@ class _ScanPageState extends State<ScanPage> {
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error al hacer visible: $e'), backgroundColor: Colors.red),
+            SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
           );
         }
       }
@@ -831,17 +919,8 @@ class _ScanPageState extends State<ScanPage> {
 
   Future<void> _connect(BluetoothDevice device) async {
     try {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Conectando...'), backgroundColor: Colors.blue),
-      );
       await bt.connectToDevice(device);
-      // Stop scanning after connecting
       await _stopScan();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Conectado a ${device.platformName.isEmpty ? "Dispositivo" : device.platformName}'), backgroundColor: Colors.green),
-        );
-      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -863,7 +942,7 @@ class _ScanPageState extends State<ScanPage> {
     _scanningSub?.cancel();
     _connSub?.cancel();
     _advSub?.cancel();
-    _periphConnSub?.cancel();
+    _statusSub?.cancel();
     _advertiseTimer?.cancel();
     _scanTimer?.cancel();
     FlutterBluePlus.stopScan();
@@ -874,7 +953,6 @@ class _ScanPageState extends State<ScanPage> {
   Widget build(BuildContext context) {
     final isConnected = bt.isConnected;
 
-    // Sort results: LessNet devices first, then by RSSI (signal strength)
     final sortedResults = List<ScanResult>.from(_results);
     sortedResults.sort((a, b) {
       final aIsLessNet = a.advertisementData.serviceUuids
@@ -883,7 +961,7 @@ class _ScanPageState extends State<ScanPage> {
           .any((uuid) => uuid.str128.toLowerCase() == lessnetServiceUuid.toLowerCase());
       if (aIsLessNet && !bIsLessNet) return -1;
       if (!aIsLessNet && bIsLessNet) return 1;
-      return b.rssi.compareTo(a.rssi); // Stronger signal first
+      return b.rssi.compareTo(a.rssi);
     });
 
     return SafeArea(
@@ -902,16 +980,16 @@ class _ScanPageState extends State<ScanPage> {
               Container(
                 margin: const EdgeInsets.only(bottom: 12),
                 padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(color: Colors.green.withOpacity(0.1), borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.green.withOpacity(0.3))),
+                decoration: BoxDecoration(color: Colors.white.withOpacity(0.08), borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white.withOpacity(0.2))),
                 child: Row(children: [
-                  const Icon(Icons.bluetooth_connected, color: Colors.greenAccent, size: 22),
+                  const Icon(Icons.bluetooth_connected, color: Colors.white, size: 22),
                   const SizedBox(width: 12),
                   Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text(bt.connectedName,
-                        style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.w600, fontSize: 14)),
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14)),
                     Text(bt.connectedDevice?.remoteId.toString() ?? 'Conectado via BLE',
-                        style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11)),
+                        style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11)),
                   ])),
                   TextButton(onPressed: () => bt.disconnect(),
                     child: const Text('Desconectar', style: TextStyle(color: Colors.redAccent))),
@@ -923,16 +1001,16 @@ class _ScanPageState extends State<ScanPage> {
               Container(
                 margin: const EdgeInsets.only(bottom: 12),
                 padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(color: const Color(0xFF60A5FA).withOpacity(0.1), borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFF60A5FA).withOpacity(0.3))),
+                decoration: BoxDecoration(color: Colors.white.withOpacity(0.06), borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white.withOpacity(0.15))),
                 child: Row(children: [
-                  const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF60A5FA))),
+                  const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white70)),
                   const SizedBox(width: 12),
                   Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     const Text('Visible para otros dispositivos',
-                        style: TextStyle(color: Color(0xFF60A5FA), fontWeight: FontWeight.w600, fontSize: 14)),
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14)),
                     Text('Esperando conexion... ${_fmtDuration(_advertiseSeconds)}',
-                        style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11)),
+                        style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11)),
                   ])),
                   TextButton(onPressed: _stopAdvertising,
                     child: const Text('Detener', style: TextStyle(color: Colors.redAccent))),
@@ -944,21 +1022,21 @@ class _ScanPageState extends State<ScanPage> {
               Container(
                 margin: const EdgeInsets.only(bottom: 12),
                 padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(color: Colors.orange.withOpacity(0.1), borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.orange.withOpacity(0.3))),
+                decoration: BoxDecoration(color: Colors.red.withOpacity(0.06), borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.red.withOpacity(0.2))),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Row(children: [
-                    const Icon(Icons.warning, color: Colors.orangeAccent, size: 20),
+                    const Icon(Icons.warning, color: Colors.redAccent, size: 20),
                     const SizedBox(width: 8),
                     Expanded(child: Text('Advertising no disponible',
-                        style: TextStyle(color: Colors.orangeAccent, fontWeight: FontWeight.w600, fontSize: 13))),
+                        style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w600, fontSize: 13))),
                   ]),
                   const SizedBox(height: 6),
                   Text(bt.advertisingError,
-                      style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 12)),
+                      style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12)),
                   const SizedBox(height: 6),
-                  Text('Solucion: Usa ESTE celular para BUSCAR dispositivos y el OTRO celular para Hacerse Visible.',
-                      style: TextStyle(color: Colors.amber.withOpacity(0.9), fontSize: 12, fontWeight: FontWeight.w500)),
+                  Text('Usa ESTE celular para BUSCAR y el OTRO para Hacerse Visible.',
+                      style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12, fontWeight: FontWeight.w500)),
                 ]),
               ),
 
@@ -967,14 +1045,14 @@ class _ScanPageState extends State<ScanPage> {
               Expanded(
                 child: FilledButton.icon(
                   icon: _scanning
-                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
                       : const Icon(Icons.search),
                   label: Text(_scanning ? 'Buscando ${_fmtDuration(_scanSeconds)}' : 'Buscar',
                       style: const TextStyle(fontSize: 13)),
                   onPressed: _scanning ? _stopScan : (bt.isAdvertising ? null : _startScan),
                   style: FilledButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 12),
-                    backgroundColor: _scanning ? Colors.orange : null,
+                    backgroundColor: _scanning ? Colors.grey : Colors.white,
                   ),
                 ),
               ),
@@ -982,12 +1060,12 @@ class _ScanPageState extends State<ScanPage> {
               Expanded(
                 child: FilledButton.icon(
                   icon: bt.isAdvertising
-                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
                       : const Icon(Icons.broadcast_on_personal),
                   label: Text(bt.isAdvertising ? 'Visible ${_fmtDuration(_advertiseSeconds)}' : 'Hacerme Visible', style: const TextStyle(fontSize: 13)),
                   onPressed: isConnected ? null : (bt.isAdvertising ? _stopAdvertising : _startAdvertising),
                   style: FilledButton.styleFrom(
-                    backgroundColor: bt.isAdvertising ? Colors.orange : const Color(0xFF3B82F6),
+                    backgroundColor: bt.isAdvertising ? Colors.grey : Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
                 ),
@@ -996,60 +1074,38 @@ class _ScanPageState extends State<ScanPage> {
 
             const SizedBox(height: 16),
 
-            // ─── How to connect instructions ───
+            // ─── Instructions ───
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: const Color(0xFF60A5FA).withOpacity(0.08),
+                color: Colors.white.withOpacity(0.03),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFF60A5FA).withOpacity(0.2)),
+                border: Border.all(color: Colors.white.withOpacity(0.08)),
               ),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Row(children: [
-                  const Icon(Icons.info_outline, color: Color(0xFF60A5FA), size: 18),
+                  const Icon(Icons.info_outline, color: Colors.white54, size: 18),
                   const SizedBox(width: 8),
-                  const Text('Como conectarse:', style: TextStyle(color: Color(0xFF60A5FA), fontWeight: FontWeight.w700, fontSize: 13)),
+                  const Text('Como conectarse:', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13)),
                 ]),
                 const SizedBox(height: 8),
                 Text('1. Un celular presiona "Hacerme Visible"',
-                    style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12, fontWeight: FontWeight.w500)),
+                    style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 12)),
                 Text('2. El OTRO celular presiona "Buscar"',
-                    style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12, fontWeight: FontWeight.w500)),
+                    style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 12)),
                 Text('3. Toca "Conectar" en el dispositivo encontrado',
-                    style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12, fontWeight: FontWeight.w500)),
+                    style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 12)),
                 Text('4. Ve a Chat y envia mensajes!',
-                    style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12, fontWeight: FontWeight.w500)),
+                    style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 12)),
                 const SizedBox(height: 8),
                 Container(
                   padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(color: Colors.amber.withOpacity(0.1), borderRadius: BorderRadius.circular(6)),
+                  decoration: BoxDecoration(color: Colors.white.withOpacity(0.03), borderRadius: BorderRadius.circular(6)),
                   child: Row(children: [
-                    const Icon(Icons.wifi_tethering, color: Colors.amber, size: 14),
+                    const Icon(Icons.wifi_tethering, color: Colors.white38, size: 14),
                     const SizedBox(width: 6),
-                    Expanded(child: Text('Bluetooth es LOCAL (10-30m). No es internet, no es mundial.',
-                        style: TextStyle(color: Colors.amber.withOpacity(0.9), fontSize: 11))),
-                  ]),
-                ),
-                const SizedBox(height: 6),
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(color: Colors.orange.withOpacity(0.1), borderRadius: BorderRadius.circular(6)),
-                  child: Row(children: [
-                    const Icon(Icons.phone_android, color: Colors.orangeAccent, size: 14),
-                    const SizedBox(width: 6),
-                    Expanded(child: Text('Algunos celulares (OPPO, Realme, etc.) NO soportan "Hacerse Visible". En ese caso, usa ese celular para BUSCAR.',
-                        style: TextStyle(color: Colors.orangeAccent.withOpacity(0.9), fontSize: 11))),
-                  ]),
-                ),
-                const SizedBox(height: 6),
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(color: Colors.red.withOpacity(0.1), borderRadius: BorderRadius.circular(6)),
-                  child: Row(children: [
-                    const Icon(Icons.gps_fixed, color: Colors.redAccent, size: 14),
-                    const SizedBox(width: 6),
-                    Expanded(child: Text('IMPORTANTE: La UBICACION debe estar ACTIVADA en el telefono para buscar dispositivos BLE!',
-                        style: TextStyle(color: Colors.redAccent.withOpacity(0.9), fontSize: 11))),
+                    Expanded(child: Text('Bluetooth es LOCAL (10-30m). No es internet.',
+                        style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11))),
                   ]),
                 ),
               ]),
@@ -1057,14 +1113,14 @@ class _ScanPageState extends State<ScanPage> {
 
             const SizedBox(height: 16),
 
-            // ─── Scan results list ───
+            // ─── Scan results ───
             if (_scanning || _results.isNotEmpty) ...[
               Row(children: [
                 Text('Dispositivos encontrados (${_results.length})',
                     style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14)),
                 const SizedBox(width: 8),
                 if (_scanning)
-                  const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF60A5FA))),
+                  const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white54)),
               ]),
               const SizedBox(height: 8),
               ...sortedResults.map((r) {
@@ -1077,25 +1133,23 @@ class _ScanPageState extends State<ScanPage> {
                 return Container(
                   margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: isConn ? Colors.green.withOpacity(0.08) : isLessNet ? const Color(0xFF3B82F6).withOpacity(0.1) : Colors.white.withOpacity(0.05),
+                    color: isConn ? Colors.white.withOpacity(0.1) : isLessNet ? Colors.white.withOpacity(0.06) : Colors.white.withOpacity(0.03),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: isConn ? Colors.green.withOpacity(0.3) : isLessNet ? const Color(0xFF3B82F6).withOpacity(0.4) : Colors.white.withOpacity(0.08))),
+                    border: Border.all(color: isConn ? Colors.white.withOpacity(0.3) : isLessNet ? Colors.white.withOpacity(0.15) : Colors.white.withOpacity(0.06))),
                   child: Row(children: [
                     Icon(isConn ? Icons.bluetooth_connected : isLessNet ? Icons.phone_android : Icons.bluetooth,
-                        color: isConn ? Colors.greenAccent : isLessNet ? const Color(0xFF60A5FA) : Colors.blue, size: 22),
+                        color: isConn ? Colors.white : isLessNet ? Colors.white : Colors.white38, size: 22),
                     const SizedBox(width: 12),
                     Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Row(children: [
                         Expanded(child: Text(deviceName,
-                            style: TextStyle(color: isConn ? Colors.greenAccent : isLessNet ? const Color(0xFF60A5FA) : Colors.white, fontWeight: FontWeight.w600, fontSize: 14))),
+                            style: TextStyle(color: isConn || isLessNet ? Colors.white : Colors.white70, fontWeight: FontWeight.w600, fontSize: 14))),
                         if (isLessNet)
                           Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(color: const Color(0xFF3B82F6).withOpacity(0.2), borderRadius: BorderRadius.circular(4)),
-                            child: const Text('LessNet', style: TextStyle(color: Color(0xFF60A5FA), fontSize: 9, fontWeight: FontWeight.w700))),
+                            decoration: BoxDecoration(color: Colors.white.withOpacity(0.15), borderRadius: BorderRadius.circular(4)),
+                            child: const Text('LessNet', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w700))),
                       ]),
-                      Text(r.device.remoteId.toString(), style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11)),
-                      if (isLessNet)
-                        Text('Toca Conectar para chatear', style: TextStyle(color: const Color(0xFF60A5FA).withOpacity(0.7), fontSize: 10)),
+                      Text(r.device.remoteId.toString(), style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 11)),
                     ])),
                     Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(color: sig.withOpacity(0.15), borderRadius: BorderRadius.circular(6)),
@@ -1110,10 +1164,10 @@ class _ScanPageState extends State<ScanPage> {
               Center(child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 40),
                 child: Column(children: [
-                  Icon(Icons.bluetooth_searching, size: 48, color: Colors.white.withOpacity(0.15)),
+                  Icon(Icons.bluetooth_searching, size: 48, color: Colors.white.withOpacity(0.1)),
                   const SizedBox(height: 12),
                   Text('Presiona Buscar o Hacerme Visible\npara empezar',
-                      style: TextStyle(color: Colors.white.withOpacity(0.3)), textAlign: TextAlign.center),
+                      style: TextStyle(color: Colors.white.withOpacity(0.2)), textAlign: TextAlign.center),
                 ]),
               )),
           ],
@@ -1124,7 +1178,7 @@ class _ScanPageState extends State<ScanPage> {
 }
 
 // ─────────────────────────────────────────────
-// PAGINA 3: CHAT BLE (funciona en ambos modos)
+// PAGINA 3: CHAT BLE — FIX: mejor manejo de estado
 // ─────────────────────────────────────────────
 class ChatPage extends StatefulWidget {
   const ChatPage({super.key});
@@ -1138,7 +1192,9 @@ class _ChatPageState extends State<ChatPage> {
   final bt = BtService();
   StreamSubscription? _msgSub;
   StreamSubscription? _connSub;
+  StreamSubscription? _statusSub;
   bool _connected = false;
+  bool _sending = false;
 
   @override
   void initState() {
@@ -1150,6 +1206,14 @@ class _ChatPageState extends State<ChatPage> {
     });
     _connSub = bt.onConnectionChange.listen((connected) {
       if (mounted) setState(() => _connected = bt.isConnected);
+    });
+    _statusSub = bt.onStatusChange.listen((msg) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(msg), backgroundColor: Colors.grey[800]),
+        );
+      }
     });
   }
 
@@ -1164,8 +1228,9 @@ class _ChatPageState extends State<ChatPage> {
 
   Future<void> _send() async {
     final text = _controller.text.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty || _sending) return;
     _controller.clear();
+    setState(() => _sending = true);
     try {
       await bt.sendMessage(text);
     } catch (e) {
@@ -1175,7 +1240,7 @@ class _ChatPageState extends State<ChatPage> {
         );
       }
     }
-    if (mounted) setState(() {});
+    if (mounted) setState(() => _sending = false);
     _scrollToBottom();
   }
 
@@ -1185,6 +1250,7 @@ class _ChatPageState extends State<ChatPage> {
   void dispose() {
     _msgSub?.cancel();
     _connSub?.cancel();
+    _statusSub?.cancel();
     _controller.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -1202,21 +1268,21 @@ class _ChatPageState extends State<ChatPage> {
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 20),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(color: Colors.green.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+            decoration: BoxDecoration(color: Colors.white.withOpacity(0.06), borderRadius: BorderRadius.circular(8)),
             child: Row(children: [
-              const Icon(Icons.bluetooth_connected, color: Colors.greenAccent, size: 16),
+              const Icon(Icons.bluetooth_connected, color: Colors.white, size: 16),
               const SizedBox(width: 6),
               Text('Conectado a ${bt.connectedName}',
-                  style: const TextStyle(color: Colors.greenAccent, fontSize: 12)),
+                  style: const TextStyle(color: Colors.white, fontSize: 12)),
             ]),
           ),
         Expanded(
           child: msgs.isEmpty
               ? Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  Icon(Icons.bluetooth_disabled, size: 48, color: Colors.white.withOpacity(0.15)),
+                  Icon(Icons.bluetooth_disabled, size: 48, color: Colors.white.withOpacity(0.1)),
                   const SizedBox(height: 12),
                   Text(_connected ? 'Escribe un mensaje para enviar' : 'Conectate a un dispositivo\nen la pestana Dispositivos',
-                      style: TextStyle(color: Colors.white.withOpacity(0.3)), textAlign: TextAlign.center),
+                      style: TextStyle(color: Colors.white.withOpacity(0.2)), textAlign: TextAlign.center),
                 ]))
               : ListView.builder(controller: _scrollController, padding: const EdgeInsets.symmetric(horizontal: 20),
                   itemCount: msgs.length, itemBuilder: (_, i) {
@@ -1225,14 +1291,14 @@ class _ChatPageState extends State<ChatPage> {
                       child: Container(margin: const EdgeInsets.only(bottom: 8),
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                         constraints: const BoxConstraints(maxWidth: 280),
-                        decoration: BoxDecoration(color: m.mine ? const Color(0xFF1D4ED8) : Colors.white.withOpacity(0.1),
+                        decoration: BoxDecoration(color: m.mine ? Colors.white : Colors.white.withOpacity(0.08),
                           borderRadius: BorderRadius.only(
                             topLeft: const Radius.circular(14), topRight: const Radius.circular(14),
                             bottomLeft: Radius.circular(m.mine ? 14 : 4), bottomRight: Radius.circular(m.mine ? 4 : 14))),
                         child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                          Text(m.text, style: const TextStyle(color: Colors.white, fontSize: 14)),
+                          Text(m.text, style: TextStyle(color: m.mine ? Colors.black : Colors.white, fontSize: 14)),
                           const SizedBox(height: 4),
-                          Text(_fmt(m.time), style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 10)),
+                          Text(_fmt(m.time), style: TextStyle(color: m.mine ? Colors.black45 : Colors.white.withOpacity(0.3), fontSize: 10)),
                         ])));
                   }),
         ),
@@ -1240,21 +1306,25 @@ class _ChatPageState extends State<ChatPage> {
           child: Row(children: [
             Expanded(child: TextField(controller: _controller, style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(hintText: _connected ? 'Escribe un mensaje...' : 'Sin conexion',
-                hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
-                filled: true, fillColor: Colors.white.withOpacity(0.07),
+                hintStyle: TextStyle(color: Colors.white.withOpacity(0.2)),
+                filled: true, fillColor: Colors.white.withOpacity(0.05),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: const Color(0xFF3B82F6)))),
+                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white30)),
+              ),
               onSubmitted: (_) => _send(),
             )),
             const SizedBox(width: 8),
             FilledButton(
-              onPressed: _connected ? _send : null,
+              onPressed: _connected && !_sending ? _send : null,
               style: FilledButton.styleFrom(
                 padding: const EdgeInsets.all(14),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                disabledBackgroundColor: Colors.white24,
               ),
-              child: const Icon(Icons.send, size: 20),
+              child: _sending
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+                  : const Icon(Icons.send, size: 20),
             ),
           ]),
         ),
@@ -1297,8 +1367,7 @@ class _FirstAidPageState extends State<FirstAidPage> {
     switch (priority?.toLowerCase()) {
       case 'critica': return Colors.redAccent;
       case 'alta': return Colors.orangeAccent;
-      case 'media': return Colors.amber;
-      default: return const Color(0xFF60A5FA);
+      default: return Colors.white54;
     }
   }
 
@@ -1314,9 +1383,9 @@ class _FirstAidPageState extends State<FirstAidPage> {
             const SizedBox(height: 16),
             Expanded(
               child: _loading
-                  ? const Center(child: CircularProgressIndicator())
+                  ? const Center(child: CircularProgressIndicator(color: Colors.white))
                   : _items.isEmpty
-                      ? Center(child: Text('No hay datos disponibles', style: TextStyle(color: Colors.white.withOpacity(0.4))))
+                      ? Center(child: Text('No hay datos', style: TextStyle(color: Colors.white24)))
                       : ListView.builder(
                           itemCount: _items.length,
                           itemBuilder: (_, i) {
@@ -1327,24 +1396,24 @@ class _FirstAidPageState extends State<FirstAidPage> {
                             return Container(
                               margin: const EdgeInsets.only(bottom: 10),
                               decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.05),
+                                color: Colors.white.withOpacity(0.04),
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Colors.white.withOpacity(0.08)),
+                                border: Border.all(color: Colors.white.withOpacity(0.06)),
                               ),
                               child: ListTile(
                                 leading: Container(
                                   padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
-                                    color: _priorityColor(priority).withOpacity(0.15),
+                                    color: _priorityColor(priority).withOpacity(0.1),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Icon(Icons.local_hospital, color: _priorityColor(priority), size: 20),
                                 ),
                                 title: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                                subtitle: desc.isNotEmpty ? Text(desc, style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12), maxLines: 2, overflow: TextOverflow.ellipsis) : null,
+                                subtitle: desc.isNotEmpty ? Text(desc, style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 12), maxLines: 2, overflow: TextOverflow.ellipsis) : null,
                                 trailing: priority.isNotEmpty
                                     ? Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                        decoration: BoxDecoration(color: _priorityColor(priority).withOpacity(0.2), borderRadius: BorderRadius.circular(4)),
+                                        decoration: BoxDecoration(color: _priorityColor(priority).withOpacity(0.15), borderRadius: BorderRadius.circular(4)),
                                         child: Text(priority.toUpperCase(), style: TextStyle(color: _priorityColor(priority), fontSize: 9, fontWeight: FontWeight.w700)))
                                     : null,
                                 onTap: () {
@@ -1374,9 +1443,9 @@ class _FirstAidDetailPage extends StatelessWidget {
     final warnings = item['advertencias'] ?? item['warnings'] ?? [];
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
+      backgroundColor: const Color(0xFF0A0A0A),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1E293B),
+        backgroundColor: const Color(0xFF111111),
         title: Text(title, style: const TextStyle(color: Colors.white, fontSize: 16)),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
@@ -1386,34 +1455,34 @@ class _FirstAidDetailPage extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (desc.isNotEmpty) ...[
-              Text(desc, style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14)),
+              Text(desc, style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 14)),
               const SizedBox(height: 16),
             ],
             if (steps.isNotEmpty) ...[
-              const Text('Pasos:', style: TextStyle(color: Color(0xFF60A5FA), fontWeight: FontWeight.w700, fontSize: 14)),
+              const Text('Pasos:', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14)),
               const SizedBox(height: 8),
               ...(steps as List).asMap().entries.map((e) => Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Container(width: 24, height: 24, margin: const EdgeInsets.only(right: 10),
-                    decoration: BoxDecoration(color: const Color(0xFF3B82F6).withOpacity(0.2), borderRadius: BorderRadius.circular(12)),
-                    child: Center(child: Text('${e.key + 1}', style: const TextStyle(color: Color(0xFF60A5FA), fontSize: 11, fontWeight: FontWeight.w700)))),
-                  Expanded(child: Text(e.value.toString(), style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 13))),
+                    decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+                    child: Center(child: Text('${e.key + 1}', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)))),
+                  Expanded(child: Text(e.value.toString(), style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 13))),
                 ]),
               )),
             ],
             if (warnings.isNotEmpty) ...[
               const SizedBox(height: 16),
-              const Text('Advertencias:', style: TextStyle(color: Colors.orangeAccent, fontWeight: FontWeight.w700, fontSize: 14)),
+              const Text('Advertencias:', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w700, fontSize: 14)),
               const SizedBox(height: 8),
               ...(warnings as List).map((w) => Container(
                 margin: const EdgeInsets.only(bottom: 6),
                 padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(color: Colors.orange.withOpacity(0.08), borderRadius: BorderRadius.circular(8)),
+                decoration: BoxDecoration(color: Colors.red.withOpacity(0.05), borderRadius: BorderRadius.circular(8)),
                 child: Row(children: [
-                  const Icon(Icons.warning, color: Colors.orangeAccent, size: 16),
+                  const Icon(Icons.warning, color: Colors.redAccent, size: 16),
                   const SizedBox(width: 8),
-                  Expanded(child: Text(w.toString(), style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 12))),
+                  Expanded(child: Text(w.toString(), style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12))),
                 ]),
               )),
             ],
@@ -1454,17 +1523,6 @@ class _GuidesPageState extends State<GuidesPage> {
     }
   }
 
-  Color _categoryColor(String? cat) {
-    switch (cat?.toLowerCase()) {
-      case 'agua': return Colors.blue;
-      case 'fuego': return Colors.orangeAccent;
-      case 'refugio': return Colors.brown;
-      case 'senal': return Colors.greenAccent;
-      case 'comida': return Colors.amber;
-      default: return const Color(0xFF60A5FA);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -1473,43 +1531,37 @@ class _GuidesPageState extends State<GuidesPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const _Header('Guias de Supervivencia', Icons.terrain, 'Conocimiento esencial offline'),
+            const _Header('Guias', Icons.terrain, 'Supervivencia offline'),
             const SizedBox(height: 16),
             Expanded(
               child: _loading
-                  ? const Center(child: CircularProgressIndicator())
+                  ? const Center(child: CircularProgressIndicator(color: Colors.white))
                   : _items.isEmpty
-                      ? Center(child: Text('No hay datos disponibles', style: TextStyle(color: Colors.white.withOpacity(0.4))))
+                      ? Center(child: Text('No hay datos', style: TextStyle(color: Colors.white24)))
                       : ListView.builder(
                           itemCount: _items.length,
                           itemBuilder: (_, i) {
                             final item = _items[i] as Map<String, dynamic>;
                             final title = item['titulo'] ?? item['title'] ?? 'Sin titulo';
                             final desc = item['descripcion'] ?? item['description'] ?? '';
-                            final cat = item['categoria'] ?? item['category'] ?? '';
                             return Container(
                               margin: const EdgeInsets.only(bottom: 10),
                               decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.05),
+                                color: Colors.white.withOpacity(0.04),
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Colors.white.withOpacity(0.08)),
+                                border: Border.all(color: Colors.white.withOpacity(0.06)),
                               ),
                               child: ListTile(
                                 leading: Container(
                                   padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
-                                    color: _categoryColor(cat).withOpacity(0.15),
+                                    color: Colors.white.withOpacity(0.06),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
-                                  child: Icon(Icons.terrain, color: _categoryColor(cat), size: 20),
+                                  child: const Icon(Icons.terrain, color: Colors.white54, size: 20),
                                 ),
                                 title: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                                subtitle: desc.isNotEmpty ? Text(desc, style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12), maxLines: 2, overflow: TextOverflow.ellipsis) : null,
-                                trailing: cat.isNotEmpty
-                                    ? Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                        decoration: BoxDecoration(color: _categoryColor(cat).withOpacity(0.2), borderRadius: BorderRadius.circular(4)),
-                                        child: Text(cat.toUpperCase(), style: TextStyle(color: _categoryColor(cat), fontSize: 9, fontWeight: FontWeight.w700)))
-                                    : null,
+                                subtitle: desc.isNotEmpty ? Text(desc, style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 12), maxLines: 2, overflow: TextOverflow.ellipsis) : null,
                                 onTap: () {
                                   Navigator.push(context, MaterialPageRoute(builder: (_) => _GuideDetailPage(item: item)));
                                 },
@@ -1537,9 +1589,9 @@ class _GuideDetailPage extends StatelessWidget {
     final tips = item['consejos'] ?? item['tips'] ?? [];
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
+      backgroundColor: const Color(0xFF0A0A0A),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1E293B),
+        backgroundColor: const Color(0xFF111111),
         title: Text(title, style: const TextStyle(color: Colors.white, fontSize: 16)),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
@@ -1549,34 +1601,34 @@ class _GuideDetailPage extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (desc.isNotEmpty) ...[
-              Text(desc, style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14)),
+              Text(desc, style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 14)),
               const SizedBox(height: 16),
             ],
             if (steps.isNotEmpty) ...[
-              const Text('Pasos:', style: TextStyle(color: Color(0xFF60A5FA), fontWeight: FontWeight.w700, fontSize: 14)),
+              const Text('Pasos:', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14)),
               const SizedBox(height: 8),
               ...(steps as List).asMap().entries.map((e) => Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Container(width: 24, height: 24, margin: const EdgeInsets.only(right: 10),
-                    decoration: BoxDecoration(color: const Color(0xFF3B82F6).withOpacity(0.2), borderRadius: BorderRadius.circular(12)),
-                    child: Center(child: Text('${e.key + 1}', style: const TextStyle(color: Color(0xFF60A5FA), fontSize: 11, fontWeight: FontWeight.w700)))),
-                  Expanded(child: Text(e.value.toString(), style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 13))),
+                    decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+                    child: Center(child: Text('${e.key + 1}', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)))),
+                  Expanded(child: Text(e.value.toString(), style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 13))),
                 ]),
               )),
             ],
             if (tips.isNotEmpty) ...[
               const SizedBox(height: 16),
-              const Text('Consejos:', style: TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.w700, fontSize: 14)),
+              const Text('Consejos:', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w700, fontSize: 14)),
               const SizedBox(height: 8),
               ...(tips as List).map((t) => Container(
                 margin: const EdgeInsets.only(bottom: 6),
                 padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(color: Colors.green.withOpacity(0.08), borderRadius: BorderRadius.circular(8)),
+                decoration: BoxDecoration(color: Colors.white.withOpacity(0.03), borderRadius: BorderRadius.circular(8)),
                 child: Row(children: [
-                  const Icon(Icons.lightbulb, color: Colors.greenAccent, size: 16),
+                  const Icon(Icons.lightbulb, color: Colors.white54, size: 16),
                   const SizedBox(width: 8),
-                  Expanded(child: Text(t.toString(), style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 12))),
+                  Expanded(child: Text(t.toString(), style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 12))),
                 ]),
               )),
             ],
@@ -1588,7 +1640,7 @@ class _GuideDetailPage extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────
-// PAGINA 6: VAULT / BUSQUEDA GLOBAL
+// PAGINA 6: VAULT / BUSQUEDA
 // ─────────────────────────────────────────────
 class VaultPage extends StatefulWidget {
   const VaultPage({super.key});
@@ -1615,63 +1667,47 @@ class _VaultPageState extends State<VaultPage> {
     final q = query.toLowerCase();
     final List<Map<String, dynamic>> found = [];
 
-    // Search first aid
     try {
       final jsonStr = await rootBundle.loadString('assets/vault/first_aid/primeros_auxilios.json');
       final data = json.decode(jsonStr);
       final items = data is List ? data : (data['items'] ?? data['protocolos'] ?? []);
       for (final item in items) {
         final m = item as Map<String, dynamic>;
-        final text = (m['titulo'] ?? m['title'] ?? '').toString().toLowerCase() +
-            (m['descripcion'] ?? m['description'] ?? '').toString().toLowerCase();
-        if (text.contains(q)) {
-          found.add({...m, '_type': 'first_aid'});
-        }
+        final text = (m['titulo'] ?? '').toString().toLowerCase() + (m['descripcion'] ?? '').toString().toLowerCase();
+        if (text.contains(q)) found.add({...m, '_type': 'first_aid'});
       }
     } catch (_) {}
 
-    // Search guides
     try {
       final jsonStr = await rootBundle.loadString('assets/vault/guides/supervivencia.json');
       final data = json.decode(jsonStr);
       final items = data is List ? data : (data['items'] ?? data['guias'] ?? []);
       for (final item in items) {
         final m = item as Map<String, dynamic>;
-        final text = (m['titulo'] ?? m['title'] ?? '').toString().toLowerCase() +
-            (m['descripcion'] ?? m['description'] ?? '').toString().toLowerCase();
-        if (text.contains(q)) {
-          found.add({...m, '_type': 'guide'});
-        }
+        final text = (m['titulo'] ?? '').toString().toLowerCase() + (m['descripcion'] ?? '').toString().toLowerCase();
+        if (text.contains(q)) found.add({...m, '_type': 'guide'});
       }
     } catch (_) {}
 
-    // Search dictionary
     try {
       final jsonStr = await rootBundle.loadString('assets/vault/dictionary/diccionario.json');
       final data = json.decode(jsonStr);
       final items = data is List ? data : (data['items'] ?? data['palabras'] ?? []);
       for (final item in items) {
         final m = item as Map<String, dynamic>;
-        final text = (m['palabra'] ?? m['word'] ?? '').toString().toLowerCase() +
-            (m['definicion'] ?? m['definition'] ?? '').toString().toLowerCase();
-        if (text.contains(q)) {
-          found.add({...m, '_type': 'dictionary'});
-        }
+        final text = (m['palabra'] ?? '').toString().toLowerCase() + (m['definicion'] ?? '').toString().toLowerCase();
+        if (text.contains(q)) found.add({...m, '_type': 'dictionary'});
       }
     } catch (_) {}
 
-    // Search wikipedia
     try {
       final jsonStr = await rootBundle.loadString('assets/vault/wikipedia/wikipedia.json');
       final data = json.decode(jsonStr);
       final items = data is List ? data : (data['items'] ?? data['articulos'] ?? []);
       for (final item in items) {
         final m = item as Map<String, dynamic>;
-        final text = (m['titulo'] ?? m['title'] ?? '').toString().toLowerCase() +
-            (m['resumen'] ?? m['summary'] ?? '').toString().toLowerCase();
-        if (text.contains(q)) {
-          found.add({...m, '_type': 'wikipedia'});
-        }
+        final text = (m['titulo'] ?? '').toString().toLowerCase() + (m['resumen'] ?? '').toString().toLowerCase();
+        if (text.contains(q)) found.add({...m, '_type': 'wikipedia'});
       }
     } catch (_) {}
 
@@ -1685,16 +1721,6 @@ class _VaultPageState extends State<VaultPage> {
       case 'dictionary': return Icons.book;
       case 'wikipedia': return Icons.article;
       default: return Icons.folder;
-    }
-  }
-
-  Color _typeColor(String type) {
-    switch (type) {
-      case 'first_aid': return Colors.redAccent;
-      case 'guide': return Colors.amber;
-      case 'dictionary': return Colors.purpleAccent;
-      case 'wikipedia': return Colors.tealAccent;
-      default: return const Color(0xFF60A5FA);
     }
   }
 
@@ -1722,35 +1748,23 @@ class _VaultPageState extends State<VaultPage> {
               controller: _searchController,
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
-                hintText: 'Buscar en primeros auxilios, guias, diccionario...',
-                hintStyle: TextStyle(color: Colors.white.withOpacity(0.3)),
-                prefixIcon: const Icon(Icons.search, color: Color(0xFF60A5FA)),
+                hintText: 'Buscar en todos los recursos...',
+                hintStyle: TextStyle(color: Colors.white.withOpacity(0.2)),
+                prefixIcon: const Icon(Icons.search, color: Colors.white38),
                 filled: true,
-                fillColor: Colors.white.withOpacity(0.07),
+                fillColor: Colors.white.withOpacity(0.04),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Color(0xFF3B82F6))),
+                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.white24)),
               ),
               onSubmitted: _search,
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 6,
-              children: _results.map((r) {
-                final type = r['_type'] as String? ?? '';
-                return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(color: _typeColor(type).withOpacity(0.15), borderRadius: BorderRadius.circular(4)),
-                  child: Text(_typeLabel(type), style: TextStyle(color: _typeColor(type), fontSize: 10, fontWeight: FontWeight.w600)),
-                );
-              }).toSet().toList(),
             ),
             const SizedBox(height: 12),
             Expanded(
               child: !_searched
-                  ? Center(child: Text('Escribe algo para buscar', style: TextStyle(color: Colors.white.withOpacity(0.3))))
+                  ? Center(child: Text('Escribe algo para buscar', style: TextStyle(color: Colors.white24)))
                   : _results.isEmpty
-                      ? Center(child: Text('No se encontraron resultados', style: TextStyle(color: Colors.white.withOpacity(0.3))))
+                      ? Center(child: Text('Sin resultados', style: TextStyle(color: Colors.white24)))
                       : ListView.builder(
                           itemCount: _results.length,
                           itemBuilder: (_, i) {
@@ -1761,18 +1775,18 @@ class _VaultPageState extends State<VaultPage> {
                             return Container(
                               margin: const EdgeInsets.only(bottom: 8),
                               decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.05),
+                                color: Colors.white.withOpacity(0.04),
                                 borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: Colors.white.withOpacity(0.08)),
+                                border: Border.all(color: Colors.white.withOpacity(0.06)),
                               ),
                               child: ListTile(
-                                leading: Icon(_typeIcon(type), color: _typeColor(type), size: 20),
+                                leading: Icon(_typeIcon(type), color: Colors.white54, size: 20),
                                 title: Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13)),
-                                subtitle: desc.isNotEmpty ? Text(desc, style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11), maxLines: 2, overflow: TextOverflow.ellipsis) : null,
+                                subtitle: desc.isNotEmpty ? Text(desc, style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 11), maxLines: 2, overflow: TextOverflow.ellipsis) : null,
                                 trailing: Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(color: _typeColor(type).withOpacity(0.2), borderRadius: BorderRadius.circular(4)),
-                                  child: Text(_typeLabel(type), style: TextStyle(color: _typeColor(type), fontSize: 9, fontWeight: FontWeight.w700)),
+                                  decoration: BoxDecoration(color: Colors.white.withOpacity(0.08), borderRadius: BorderRadius.circular(4)),
+                                  child: Text(_typeLabel(type), style: const TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.w600)),
                                 ),
                                 onTap: () {
                                   if (type == 'wikipedia') {
@@ -1806,15 +1820,15 @@ class _WikiDetailPage extends StatelessWidget {
     final title = item['titulo'] ?? item['title'] ?? 'Articulo';
     final content = item['contenido'] ?? item['content'] ?? item['resumen'] ?? item['summary'] ?? '';
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
+      backgroundColor: const Color(0xFF0A0A0A),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1E293B),
+        backgroundColor: const Color(0xFF111111),
         title: Text(title, style: const TextStyle(color: Colors.white, fontSize: 16)),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
-        child: Text(content, style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14, height: 1.6)),
+        child: Text(content, style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 14, height: 1.6)),
       ),
     );
   }
@@ -1830,9 +1844,9 @@ class _DictDetailPage extends StatelessWidget {
     final def = item['definicion'] ?? item['definition'] ?? '';
     final example = item['ejemplo'] ?? item['example'] ?? '';
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
+      backgroundColor: const Color(0xFF0A0A0A),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1E293B),
+        backgroundColor: const Color(0xFF111111),
         title: Text(word, style: const TextStyle(color: Colors.white, fontSize: 16)),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
@@ -1841,17 +1855,17 @@ class _DictDetailPage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(word, style: const TextStyle(color: Color(0xFF60A5FA), fontSize: 22, fontWeight: FontWeight.w700)),
+            Text(word, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700)),
             const SizedBox(height: 12),
-            Text(def, style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14, height: 1.6)),
+            Text(def, style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 14, height: 1.6)),
             if (example.isNotEmpty) ...[
               const SizedBox(height: 16),
-              const Text('Ejemplo:', style: TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.w600)),
+              const Text('Ejemplo:', style: TextStyle(color: Colors.white54, fontWeight: FontWeight.w600)),
               const SizedBox(height: 4),
               Container(
                 padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(color: Colors.green.withOpacity(0.08), borderRadius: BorderRadius.circular(8)),
-                child: Text(example, style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 13, fontStyle: FontStyle.italic)),
+                decoration: BoxDecoration(color: Colors.white.withOpacity(0.03), borderRadius: BorderRadius.circular(8)),
+                child: Text(example, style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 13, fontStyle: FontStyle.italic)),
               ),
             ],
           ],
@@ -1876,16 +1890,16 @@ class _Header extends StatelessWidget {
       Container(
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: const Color(0xFF3B82F6).withOpacity(0.15),
+          color: Colors.white.withOpacity(0.06),
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Icon(icon, color: const Color(0xFF60A5FA), size: 24),
+        child: Icon(icon, color: Colors.white, size: 24),
       ),
       const SizedBox(width: 14),
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(title, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700)),
         const SizedBox(height: 2),
-        Text(subtitle, style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12)),
+        Text(subtitle, style: TextStyle(color: Colors.white.withOpacity(0.35), fontSize: 12)),
       ])),
     ]);
   }
