@@ -690,21 +690,37 @@ class _PermissionsPageState extends State<PermissionsPage> {
 
   Future<void> _checkAll() async {
     for (final p in _perms) {
-      final s = await p.permission.status;
-      if (mounted) setState(() => _statuses[p.permission] = s);
+      try {
+        final s = await p.permission.status;
+        if (mounted) setState(() => _statuses[p.permission] = s);
+      } catch (_) {
+        // Some permissions (photos, videos) don't exist on Android < 13
+        if (mounted) setState(() => _statuses[p.permission] = PermissionStatus.denied);
+      }
     }
   }
 
   Future<void> _requestAll() async {
     setState(() => _loading = true);
     try {
-      final r = await [
-        Permission.locationWhenInUse,
-        Permission.bluetoothScan,
-        Permission.bluetoothConnect,
-        Permission.bluetoothAdvertise,
-      ].request();
-      if (mounted) setState(() => _statuses.addAll(r));
+      // Build list dynamically — skip permissions that don't exist on this device
+      final permsToRequest = <Permission>[];
+      for (final p in _perms) {
+        try {
+          final status = await p.permission.status;
+          if (!status.isGranted) {
+            permsToRequest.add(p.permission);
+          } else {
+            if (mounted) setState(() => _statuses[p.permission] = status);
+          }
+        } catch (_) {
+          // Permission not available on this Android version, skip
+        }
+      }
+      if (permsToRequest.isNotEmpty) {
+        final r = await permsToRequest.request();
+        if (mounted) setState(() => _statuses.addAll(r));
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -3276,10 +3292,6 @@ class _TranslatorPageState extends State<TranslatorPage> {
   bool _translating = false;
 
   // Model management
-  final OnDeviceTranslator _translator = OnDeviceTranslator(
-    sourceLanguage: TranslateLanguage.spanish,
-    targetLanguage: TranslateLanguage.english,
-  );
   Map<String, String> _modelStatus = {}; // code -> 'downloaded' | 'not_downloaded' | 'downloading' | 'needs_update'
   Map<String, double> _downloadProgress = {}; // code -> 0.0-1.0
 
@@ -3347,7 +3359,16 @@ class _TranslatorPageState extends State<TranslatorPage> {
   @override
   void initState() {
     super.initState();
-    _checkModels();
+    // Delay model check to avoid blocking startup
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkModels();
+    });
+  }
+
+  @override
+  void dispose() {
+    _inputCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _checkModels() async {
@@ -3470,13 +3491,6 @@ class _TranslatorPageState extends State<TranslatorPage> {
         });
       }
     }
-  }
-
-  @override
-  void dispose() {
-    _inputCtrl.dispose();
-    _translator.close();
-    super.dispose();
   }
 
   @override
