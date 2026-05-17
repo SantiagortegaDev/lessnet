@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:google_mlkit_translation/google_mlkit_translation.dart';
 
 // ─── UUIDs del servicio BLE de LessNet ───
 const String lessnetServiceUuid = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
@@ -1491,7 +1492,7 @@ class VaultHomePage extends StatelessWidget {
       _VaultSection(
         Icons.translate,
         'Traductor Offline',
-        '238 palabras en 10 idiomas',
+        'Traduccion con IA, descarga modelos',
         Colors.blueAccent,
         const TranslatorPage(),
       ),
@@ -2712,311 +2713,429 @@ class TranslatorPage extends StatefulWidget {
 }
 
 class _TranslatorPageState extends State<TranslatorPage> {
-  Map<String, dynamic> _config = {};
-  Map<String, dynamic> _langPacks = {};
-  bool _loading = true;
   String _srcLang = 'es';
   String _tgtLang = 'en';
   final _inputCtrl = TextEditingController();
   String _output = '';
+  bool _translating = false;
+
+  // Model management
+  final OnDeviceTranslator _translator = OnDeviceTranslator(
+    sourceLanguage: TranslateLanguage.spanish,
+    targetLanguage: TranslateLanguage.english,
+  );
+  Map<String, String> _modelStatus = {}; // code -> 'downloaded' | 'not_downloaded' | 'downloading' | 'needs_update'
+  Map<String, double> _downloadProgress = {}; // code -> 0.0-1.0
+
+  static const List<Map<String, String>> _supportedLangs = [
+    {'code': 'es', 'name': 'Espanol', 'flag': '🇪🇸'},
+    {'code': 'en', 'name': 'Ingles', 'flag': '🇬🇧'},
+    {'code': 'pt', 'name': 'Portugues', 'flag': '🇧🇷'},
+    {'code': 'fr', 'name': 'Frances', 'flag': '🇫🇷'},
+    {'code': 'de', 'name': 'Aleman', 'flag': '🇩🇪'},
+    {'code': 'it', 'name': 'Italiano', 'flag': '🇮🇹'},
+    {'code': 'ru', 'name': 'Ruso', 'flag': '🇷🇺'},
+    {'code': 'zh', 'name': 'Chino', 'flag': '🇨🇳'},
+    {'code': 'ja', 'name': 'Japones', 'flag': '🇯🇵'},
+    {'code': 'ko', 'name': 'Coreano', 'flag': '🇰🇷'},
+    {'code': 'ar', 'name': 'Arabe', 'flag': '🇸🇦'},
+    {'code': 'hi', 'name': 'Hindi', 'flag': '🇮🇳'},
+    {'code': 'tr', 'name': 'Turco', 'flag': '🇹🇷'},
+    {'code': 'nl', 'name': 'Holandes', 'flag': '🇳🇱'},
+    {'code': 'pl', 'name': 'Polaco', 'flag': '🇵🇱'},
+    {'code': 'th', 'name': 'Tailandes', 'flag': '🇹🇭'},
+    {'code': 'vi', 'name': 'Vietnamita', 'flag': '🇻🇳'},
+    {'code': 'id', 'name': 'Indonesio', 'flag': '🇮🇩'},
+  ];
+
+  TranslateLanguage _codeToLang(String code) {
+    const map = {
+      'es': TranslateLanguage.spanish,
+      'en': TranslateLanguage.english,
+      'pt': TranslateLanguage.portuguese,
+      'fr': TranslateLanguage.french,
+      'de': TranslateLanguage.german,
+      'it': TranslateLanguage.italian,
+      'ru': TranslateLanguage.russian,
+      'zh': TranslateLanguage.chinese,
+      'ja': TranslateLanguage.japanese,
+      'ko': TranslateLanguage.korean,
+      'ar': TranslateLanguage.arabic,
+      'hi': TranslateLanguage.hindi,
+      'tr': TranslateLanguage.turkish,
+      'nl': TranslateLanguage.dutch,
+      'pl': TranslateLanguage.polish,
+      'th': TranslateLanguage.thai,
+      'vi': TranslateLanguage.vietnamese,
+      'id': TranslateLanguage.indonesian,
+    };
+    return map[code] ?? TranslateLanguage.english;
+  }
+
+  String _langName(String code) {
+    final lang = _supportedLangs.firstWhere(
+      (l) => l['code'] == code,
+      orElse: () => {'name': code.toUpperCase()},
+    );
+    return '${lang['flag']} ${lang['name']}';
+  }
+
+  String _langNameShort(String code) {
+    final lang = _supportedLangs.firstWhere(
+      (l) => l['code'] == code,
+      orElse: () => {'name': code.toUpperCase()},
+    );
+    return lang['name'] ?? code.toUpperCase();
+  }
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _checkModels();
   }
 
-  Future<void> _load() async {
-    try {
-      final s = await rootBundle.loadString(
-          'assets/vault/translator/translator_config.json');
-      final d = json.decode(s);
-      final Map<String, dynamic> packs = {};
-      for (final code in [
-        'es', 'en', 'pt', 'fr', 'de', 'it', 'ru', 'zh', 'ja', 'ko'
-      ]) {
-        try {
-          final ps = await rootBundle.loadString(
-              'assets/vault/translator/lang_packs/$code.json');
-          packs[code] = json.decode(ps);
-        } catch (_) {}
+  Future<void> _checkModels() async {
+    final Map<String, String> statuses = {};
+    for (final lang in _supportedLangs) {
+      final code = lang['code']!;
+      try {
+        final model = TranslateLanguageModel(_codeToLang(code));
+        final manager = OnDeviceTranslatorModelManager();
+        final isDownloaded = await manager.isModelDownloaded(model.bcpCode);
+        if (isDownloaded) {
+          // Check if model needs update
+          final needsUpdate = await manager.isModelDownloaded(model.bcpCode);
+          statuses[code] = 'downloaded';
+        } else {
+          statuses[code] = 'not_downloaded';
+        }
+      } catch (e) {
+        statuses[code] = 'not_downloaded';
       }
-      setState(() {
-        _config = d;
-        _langPacks = packs;
-        _loading = false;
-      });
-    } catch (_) {
-      if (mounted) setState(() => _loading = false);
+    }
+    if (mounted) {
+      setState(() => _modelStatus = statuses);
     }
   }
 
-  String _langName(String code) {
-    final pack = _langPacks[code] as Map<String, dynamic>?;
-    return pack?['nombre'] ?? code.toUpperCase();
+  Future<void> _downloadModel(String code) async {
+    setState(() {
+      _modelStatus[code] = 'downloading';
+      _downloadProgress[code] = 0.0;
+    });
+
+    try {
+      final model = TranslateLanguageModel(_codeToLang(code));
+      final manager = OnDeviceTranslatorModelManager();
+      await manager.downloadModel(model.bcpCode, isWifiRequired: false);
+      if (mounted) {
+        setState(() {
+          _modelStatus[code] = 'downloaded';
+          _downloadProgress.remove(code);
+        });
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Modelo de ${_langNameShort(code)} descargado!'),
+          backgroundColor: Colors.grey[800],
+        ));
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _modelStatus[code] = 'not_downloaded';
+          _downloadProgress.remove(code);
+        });
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Error al descargar: ${e.toString()}'),
+          backgroundColor: Colors.red[900],
+        ));
+      }
+    }
   }
 
-  void _translate() {
+  Future<void> _deleteModel(String code) async {
+    try {
+      final model = TranslateLanguageModel(_codeToLang(code));
+      final manager = OnDeviceTranslatorModelManager();
+      await manager.deleteModel(model.bcpCode);
+      if (mounted) {
+        setState(() => _modelStatus[code] = 'not_downloaded');
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Modelo de ${_langNameShort(code)} eliminado'),
+          backgroundColor: Colors.grey[800],
+        ));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Error al eliminar: ${e.toString()}'),
+          backgroundColor: Colors.red[900],
+        ));
+      }
+    }
+  }
+
+  Future<void> _translate() async {
     final input = _inputCtrl.text.trim();
     if (input.isEmpty) {
       setState(() => _output = '');
       return;
     }
 
-    final inputLower = input.toLowerCase();
-    final srcPack = _langPacks[_srcLang] as Map<String, dynamic>?;
-    final tgtPack = _langPacks[_tgtLang] as Map<String, dynamic>?;
+    // Check if both models are downloaded
+    final srcStatus = _modelStatus[_srcLang];
+    final tgtStatus = _modelStatus[_tgtLang];
 
-    if (srcPack == null || tgtPack == null) {
-      setState(() => _output = 'Paquete de idioma no disponible');
-      return;
-    }
-
-    final srcPhrases =
-        srcPack['frases'] as Map<String, dynamic>? ?? {};
-    final tgtPhrases =
-        tgtPack['frases'] as Map<String, dynamic>? ?? {};
-
-    // 1. Exact match
-    for (final entry in srcPhrases.entries) {
-      if (entry.value.toString().toLowerCase() == inputLower) {
-        final translation = tgtPhrases[entry.key];
-        if (translation != null) {
-          setState(() => _output = translation.toString());
-          return;
-        }
-      }
-    }
-
-    // 2. Partial match (input contains or is contained in a phrase)
-    final List<MapEntry<String, dynamic>> partials = [];
-    for (final entry in srcPhrases.entries) {
-      final val = entry.value.toString().toLowerCase();
-      if (val.contains(inputLower) || inputLower.contains(val)) {
-        if (tgtPhrases.containsKey(entry.key)) {
-          partials.add(entry);
-        }
-      }
-    }
-
-    // Sort partials: prefer shorter phrases (more specific match)
-    partials.sort((a, b) =>
-        a.value.toString().length.compareTo(b.value.toString().length));
-
-    if (partials.isNotEmpty) {
-      // Show up to 5 matches
-      final results = partials.take(5).map((e) {
-        final src = e.value.toString();
-        final tgt = tgtPhrases[e.key]?.toString() ?? '';
-        return '$src → $tgt';
-      }).join('\n');
-
+    if (srcStatus != 'downloaded' || tgtStatus != 'downloaded') {
+      final missing = <String>[];
+      if (srcStatus != 'downloaded') missing.add(_langNameShort(_srcLang));
+      if (tgtStatus != 'downloaded') missing.add(_langNameShort(_tgtLang));
       setState(() {
-        if (partials.length == 1) {
-          _output = tgtPhrases[partials.first.key]?.toString() ?? '';
-        } else {
-          _output = 'Resultados para "$input":\n\n$results';
-        }
+        _output = 'Faltan modelos: ${missing.join(', ')}.\n'
+            'Ve a "Gestionar Modelos" para descargarlos primero.';
       });
       return;
     }
 
-    // 3. Word-by-word fallback (split input and translate each word)
-    final words = inputLower.split(RegExp(r'\s+'));
-    if (words.length > 1) {
-      final translatedWords = <String>[];
-      bool anyTranslated = false;
-      for (final word in words) {
-        bool found = false;
-        for (final entry in srcPhrases.entries) {
-          if (entry.value.toString().toLowerCase() == word) {
-            final t = tgtPhrases[entry.key]?.toString();
-            if (t != null) {
-              translatedWords.add(t);
-              found = true;
-              anyTranslated = true;
-              break;
-            }
-          }
-        }
-        if (!found) translatedWords.add(word);
+    setState(() => _translating = true);
+
+    try {
+      final translator = OnDeviceTranslator(
+        sourceLanguage: _codeToLang(_srcLang),
+        targetLanguage: _codeToLang(_tgtLang),
+      );
+      final result = await translator.translateText(input);
+      translator.close();
+      if (mounted) {
+        setState(() {
+          _output = result;
+          _translating = false;
+        });
       }
-      if (anyTranslated) {
-        setState(() => _output = translatedWords.join(' '));
-        return;
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _output = 'Error de traduccion: ${e.toString()}\n\n'
+              'Asegurate de que los modelos esten descargados.';
+          _translating = false;
+        });
       }
     }
-
-    setState(() {
-      _output = 'No se encontro traduccion para "$input".\n\n'
-          'Prueba con palabras o frases mas simples.\n'
-          'El diccionario tiene ${srcPhrases.length} entradas.';
-    });
   }
 
   @override
   void dispose() {
     _inputCtrl.dispose();
+    _translator.close();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final langCodes = _langPacks.keys.toList();
     return Scaffold(
       backgroundColor: const Color(0xFF0A0A0A),
       appBar: AppBar(
         backgroundColor: const Color(0xFF111111),
         title: const Text('Traductor Offline',
             style: TextStyle(color: Colors.white)),
-        iconTheme:
-            const IconThemeData(color: Colors.white),
+        iconTheme: const IconThemeData(color: Colors.white),
+        actions: [
+          IconButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => _ModelManagerPage(
+                          modelStatus: _modelStatus,
+                          onDownload: _downloadModel,
+                          onDelete: _deleteModel,
+                          onRefresh: _checkModels,
+                          langName: _langName,
+                          langNameShort: _langNameShort,
+                          downloadProgress: _downloadProgress,
+                        )),
+              ).then((_) => _checkModels());
+            },
+            icon: const Icon(Icons.download_for_offline, color: Colors.white),
+            tooltip: 'Gestionar Modelos',
+          ),
+        ],
       ),
-      body: _loading
-          ? const Center(
-              child: CircularProgressIndicator(color: Colors.white))
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Column(
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            // Info
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.03),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
                 children: [
-                  // Info
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.03),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.info_outline,
-                            color: Colors.white24, size: 16),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                          'Traductor offline con 238 palabras y frases en 10 idiomas. Funciona sin conexion ni descarga adicional.',
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.4),
-                              fontSize: 11,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  // Language selectors
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _langDropdown('De:', _srcLang,
-                            (v) => setState(() => _srcLang = v!)),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8),
-                        child: IconButton(
-                          onPressed: () {
-                            setState(() {
-                              final tmp = _srcLang;
-                              _srcLang = _tgtLang;
-                              _tgtLang = tmp;
-                            });
-                          },
-                          icon: const Icon(Icons.swap_horiz,
-                              color: Colors.white54),
-                        ),
-                      ),
-                      Expanded(
-                        child: _langDropdown('A:', _tgtLang,
-                            (v) => setState(() => _tgtLang = v!)),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  // Input
-                  TextField(
-                    controller: _inputCtrl,
-                    style: const TextStyle(color: Colors.white),
-                    maxLines: 3,
-                    decoration: InputDecoration(
-                      hintText: 'Escribe texto para traducir...',
-                      hintStyle: TextStyle(
-                          color: Colors.white.withOpacity(0.2)),
-                      filled: true,
-                      fillColor: Colors.white.withOpacity(0.04),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(
-                            color: Colors.white24),
+                  const Icon(Icons.info_outline,
+                      color: Colors.white24, size: 16),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Traductor offline con IA. Descarga los modelos de idioma primero tocando el icono de descarga arriba.',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.4),
+                        fontSize: 11,
                       ),
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      icon: const Icon(Icons.translate),
-                      label: const Text('Traducir'),
-                      onPressed: _translate,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  // Output
-                  if (_output.isNotEmpty)
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.06),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: Colors.white.withOpacity(0.1),
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment:
-                            CrossAxisAlignment.start,
-                        children: [
-                          Text(_output,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 15,
-                              )),
-                          const SizedBox(height: 8),
-                          Row(
-                            mainAxisAlignment:
-                                MainAxisAlignment.end,
-                            children: [
-                              TextButton.icon(
-                                onPressed: () {
-                                  Clipboard.setData(
-                                      ClipboardData(text: _output));
-                                  ScaffoldMessenger.of(context)
-                                      .showSnackBar(const SnackBar(
-                                    content: Text('Copiado!'),
-                                    backgroundColor: Colors.grey,
-                                  ));
-                                },
-                                icon: const Icon(Icons.copy,
-                                    size: 14),
-                                label: const Text('Copiar',
-                                    style: TextStyle(fontSize: 11)),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
                 ],
               ),
             ),
+            const SizedBox(height: 16),
+            // Model status warning
+            if (_modelStatus[_srcLang] != 'downloaded' ||
+                _modelStatus[_tgtLang] != 'downloaded')
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.warning_amber, color: Colors.orange, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Faltan modelos de idioma. Toca el icono de descarga arriba para descargarlos.',
+                        style: TextStyle(
+                          color: Colors.orange.withOpacity(0.8),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            // Language selectors
+            Row(
+              children: [
+                Expanded(
+                  child: _langDropdown('De:', _srcLang,
+                      (v) => setState(() => _srcLang = v!)),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: IconButton(
+                    onPressed: () {
+                      setState(() {
+                        final tmp = _srcLang;
+                        _srcLang = _tgtLang;
+                        _tgtLang = tmp;
+                      });
+                    },
+                    icon: const Icon(Icons.swap_horiz, color: Colors.white54),
+                  ),
+                ),
+                Expanded(
+                  child: _langDropdown('A:', _tgtLang,
+                      (v) => setState(() => _tgtLang = v!)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            // Input
+            TextField(
+              controller: _inputCtrl,
+              style: const TextStyle(color: Colors.white),
+              maxLines: 4,
+              decoration: InputDecoration(
+                hintText: 'Escribe texto para traducir...',
+                hintStyle: TextStyle(color: Colors.white.withOpacity(0.2)),
+                filled: true,
+                fillColor: Colors.white.withOpacity(0.04),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Colors.white24),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                icon: _translating
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          color: Colors.black,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : const Icon(Icons.translate),
+                label: Text(_translating ? 'Traduciendo...' : 'Traducir'),
+                onPressed: _translating ? null : _translate,
+              ),
+            ),
+            const SizedBox(height: 16),
+            // Output
+            if (_output.isNotEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.06),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white.withOpacity(0.1)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Traduccion:',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.4),
+                          fontSize: 11,
+                        )),
+                    const SizedBox(height: 6),
+                    Text(_output,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          height: 1.4,
+                        )),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton.icon(
+                          onPressed: () {
+                            Clipboard.setData(ClipboardData(text: _output));
+                            ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                              content: Text('Copiado!'),
+                              backgroundColor: Colors.grey,
+                            ));
+                          },
+                          icon: const Icon(Icons.copy, size: 14),
+                          label: const Text('Copiar',
+                              style: TextStyle(fontSize: 11)),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -3036,6 +3155,9 @@ class _TranslatorPageState extends State<TranslatorPage> {
           decoration: BoxDecoration(
             color: Colors.white.withOpacity(0.04),
             borderRadius: BorderRadius.circular(8),
+            border: _modelStatus[value] == 'downloaded'
+                ? Border.all(color: Colors.white12)
+                : Border.all(color: Colors.orange.withOpacity(0.3)),
           ),
           child: DropdownButton<String>(
             value: value,
@@ -3043,16 +3165,240 @@ class _TranslatorPageState extends State<TranslatorPage> {
             underline: const SizedBox(),
             dropdownColor: const Color(0xFF111111),
             style: const TextStyle(color: Colors.white, fontSize: 13),
-            items: _langPacks.keys
-                .map((c) => DropdownMenuItem(
-                      value: c,
-                      child: Text(_langName(c)),
+            items: _supportedLangs
+                .map((l) => DropdownMenuItem(
+                      value: l['code'],
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(l['flag'] ?? '', style: const TextStyle(fontSize: 14)),
+                          const SizedBox(width: 6),
+                          Text(l['name'] ?? ''),
+                          const SizedBox(width: 4),
+                          if (_modelStatus[l['code']] == 'downloaded')
+                            const Icon(Icons.cloud_done, size: 12, color: Colors.greenAccent),
+                          if (_modelStatus[l['code']] == 'not_downloaded')
+                            const Icon(Icons.cloud_off, size: 12, color: Colors.orangeAccent),
+                        ],
+                      ),
                     ))
                 .toList(),
             onChanged: onChanged,
           ),
         ),
       ],
+    );
+  }
+}
+
+// ─── MODEL MANAGER PAGE ───
+class _ModelManagerPage extends StatelessWidget {
+  final Map<String, String> modelStatus;
+  final Future<void> Function(String) onDownload;
+  final Future<void> Function(String) onDelete;
+  final Future<void> Function() onRefresh;
+  final String Function(String) langName;
+  final String Function(String) langNameShort;
+  final Map<String, double> downloadProgress;
+
+  const _ModelManagerPage({
+    required this.modelStatus,
+    required this.onDownload,
+    required this.onDelete,
+    required this.onRefresh,
+    required this.langName,
+    required this.langNameShort,
+    required this.downloadProgress,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final downloaded = modelStatus.entries
+        .where((e) => e.value == 'downloaded')
+        .length;
+    final total = modelStatus.length;
+
+    return Scaffold(
+      backgroundColor: const Color(0xFF0A0A0A),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF111111),
+        title: const Text('Modelos de Traduccion',
+            style: TextStyle(color: Colors.white)),
+        iconTheme: const IconThemeData(color: Colors.white),
+        actions: [
+          IconButton(
+            onPressed: onRefresh,
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            tooltip: 'Actualizar',
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          // Summary
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            margin: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.04),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.storage, color: Colors.white54),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Modelos descargados',
+                          style: TextStyle(color: Colors.white, fontSize: 14)),
+                      Text('$downloaded de $total idiomas disponibles',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.4),
+                            fontSize: 12,
+                          )),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: downloaded > 0 ? Colors.green.withOpacity(0.2) : Colors.orange.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '$downloaded/$total',
+                    style: TextStyle(
+                      color: downloaded > 0 ? Colors.greenAccent : Colors.orangeAccent,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // List of models
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: modelStatus.length,
+              itemBuilder: (context, index) {
+                final code = modelStatus.keys.elementAt(index);
+                final status = modelStatus[code] ?? 'not_downloaded';
+                final progress = downloadProgress[code];
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.04),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: status == 'downloaded'
+                          ? Colors.white.withOpacity(0.08)
+                          : status == 'downloading'
+                              ? Colors.blue.withOpacity(0.3)
+                              : Colors.white.withOpacity(0.04),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      // Status icon
+                      if (status == 'downloaded')
+                        const Icon(Icons.cloud_done, color: Colors.greenAccent, size: 22)
+                      else if (status == 'downloading')
+                        SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                            value: progress,
+                            color: Colors.blueAccent,
+                            strokeWidth: 2.5,
+                          ),
+                        )
+                      else
+                        const Icon(Icons.cloud_download_outlined, color: Colors.white24, size: 22),
+                      const SizedBox(width: 12),
+                      // Language name
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              langName(code),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                              ),
+                            ),
+                            if (status == 'downloaded')
+                              Text(
+                                'Listo para traducir',
+                                style: TextStyle(
+                                  color: Colors.greenAccent.withOpacity(0.6),
+                                  fontSize: 11,
+                                ),
+                              )
+                            else if (status == 'downloading')
+                              Text(
+                                'Descargando... ${(progress != null ? (progress * 100).toStringAsFixed(0) : '0')}%',
+                                style: TextStyle(
+                                  color: Colors.blueAccent.withOpacity(0.8),
+                                  fontSize: 11,
+                                ),
+                              )
+                            else
+                              Text(
+                                'Toca para descargar (~30 MB)',
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.3),
+                                  fontSize: 11,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      // Action button
+                      if (status == 'downloaded')
+                        IconButton(
+                          onPressed: () => onDelete(code),
+                          icon: const Icon(Icons.delete_outline, color: Colors.white24, size: 20),
+                          tooltip: 'Eliminar modelo',
+                        )
+                      else if (status == 'downloading')
+                        const SizedBox(
+                          width: 40,
+                          height: 40,
+                          child: Center(
+                            child: SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          ),
+                        )
+                      else
+                        FilledButton(
+                          onPressed: () => onDownload(code),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: Colors.white.withOpacity(0.1),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: const Text('Descargar', style: TextStyle(fontSize: 12)),
+                        ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
