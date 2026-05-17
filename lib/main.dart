@@ -15,6 +15,7 @@ import 'package:video_player/video_player.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // ─── UUIDs del servicio BLE de LessNet ───
 const String lessnetServiceUuid = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
@@ -125,11 +126,14 @@ class LessNetApp extends StatefulWidget {
 }
 
 class _LessNetAppState extends State<LessNetApp> with WidgetsBindingObserver {
+  bool? _needsPermissions; // null = loading, true = show perms, false = go to main
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     LessNetNotifications.setAppForeground(true);
+    _checkPermissionsNeeded();
   }
 
   @override
@@ -143,6 +147,51 @@ class _LessNetAppState extends State<LessNetApp> with WidgetsBindingObserver {
     LessNetNotifications.setAppForeground(
       state == AppLifecycleState.resumed,
     );
+    // Re-check permissions when app comes back to foreground
+    if (state == AppLifecycleState.resumed && _needsPermissions == false) {
+      _checkPermissionsNeeded();
+    }
+  }
+
+  /// Returns the list of essential BLE permissions that must be granted
+  List<Permission> get _essentialPerms => [
+    Permission.locationWhenInUse,
+    Permission.bluetoothScan,
+    Permission.bluetoothConnect,
+    Permission.bluetoothAdvertise,
+  ];
+
+  Future<void> _checkPermissionsNeeded() async {
+    final prefs = await SharedPreferences.getInstance();
+    final completed = prefs.getBool('permissions_completed') ?? false;
+
+    if (!completed) {
+      // First launch — always show permissions
+      if (mounted) setState(() => _needsPermissions = true);
+      return;
+    }
+
+    // Check if any essential permission was revoked
+    bool allGranted = true;
+    for (final p in _essentialPerms) {
+      try {
+        final status = await p.status;
+        if (!status.isGranted) {
+          allGranted = false;
+          break;
+        }
+      } catch (_) {
+        // Permission not available on this device, skip
+      }
+    }
+
+    if (mounted) setState(() => _needsPermissions = !allGranted);
+  }
+
+  void _onPermissionsAccepted() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('permissions_completed', true);
+    if (mounted) setState(() => _needsPermissions = false);
   }
 
   @override
@@ -181,7 +230,50 @@ class _LessNetAppState extends State<LessNetApp> with WidgetsBindingObserver {
           ),
         ),
       ),
-      home: const HomePage(),
+      home: _needsPermissions == null
+          ? const _SplashScreen()
+          : _needsPermissions!
+              ? PermissionsGatePage(onAccepted: _onPermissionsAccepted)
+              : const HomePage(),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+// SPLASH SCREEN — Shows splash_image.png while checking permissions
+// ─────────────────────────────────────────────
+class _SplashScreen extends StatefulWidget {
+  const _SplashScreen();
+
+  @override
+  State<_SplashScreen> createState() => _SplashScreenState();
+}
+
+class _SplashScreenState extends State<_SplashScreen> {
+  @override
+  void initState() {
+    super.initState();
+    _navigate();
+  }
+
+  Future<void> _navigate() async {
+    // Small delay to show splash
+    await Future.delayed(const Duration(seconds: 2));
+    if (mounted) setState(() {}); // Parent will handle navigation
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Center(
+        child: Image.asset(
+          'assets/splash_image.png',
+          fit: BoxFit.contain,
+          width: double.infinity,
+          height: double.infinity,
+        ),
+      ),
     );
   }
 }
@@ -1085,7 +1177,7 @@ class DeviceConversation {
 }
 
 // ─────────────────────────────────────────────
-// HOME — 4 tabs: Permisos | Dispositivos | Chat | Vault
+// HOME — 3 tabs: Dispositivos | Chat | Vault
 // ─────────────────────────────────────────────
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -1103,7 +1195,6 @@ class _HomePageState extends State<HomePage> {
       body: IndexedStack(
         index: _index,
         children: const [
-          PermissionsPage(),
           ScanPage(),
           ChatListPage(),
           VaultHomePage(),
@@ -1114,11 +1205,6 @@ class _HomePageState extends State<HomePage> {
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),
         destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.shield_outlined),
-            selectedIcon: Icon(Icons.shield),
-            label: 'Permisos',
-          ),
           NavigationDestination(
             icon: Icon(Icons.bluetooth_searching),
             selectedIcon: Icon(Icons.bluetooth_connected),
@@ -1141,60 +1227,36 @@ class _HomePageState extends State<HomePage> {
 }
 
 // ─────────────────────────────────────────────
-// PERMISOS
+// PERMISOS GATE — Full-screen, shown only on first launch
+// or when essential permissions are revoked
 // ─────────────────────────────────────────────
-class PermissionsPage extends StatefulWidget {
-  const PermissionsPage({super.key});
+class PermissionsGatePage extends StatefulWidget {
+  final VoidCallback onAccepted;
+  const PermissionsGatePage({super.key, required this.onAccepted});
 
   @override
-  State<PermissionsPage> createState() => _PermissionsPageState();
+  State<PermissionsGatePage> createState() => _PermissionsGatePageState();
 }
 
-class _PermissionsPageState extends State<PermissionsPage> {
-  List<_PermItem> get _perms {
-    final items = [
-      _PermItem('Ubicacion', Icons.location_on,
-          Permission.locationWhenInUse, 'Requerida para BT scan'),
-      _PermItem('Bluetooth Scan', Icons.bluetooth_searching,
-          Permission.bluetoothScan, 'Buscar dispositivos'),
-      _PermItem('Bluetooth Connect', Icons.bluetooth_connected,
-          Permission.bluetoothConnect, 'Conectarse a dispositivos'),
-      _PermItem('Bluetooth Advertise', Icons.broadcast_on_personal,
-          Permission.bluetoothAdvertise, 'Hacerse visible'),
-    ];
-    // Android 13+ uses photos/videos, older uses storage
-    items.add(_PermItem('Fotos', Icons.photo_library,
-        Permission.photos, 'Acceder a la galeria'));
-    items.add(_PermItem('Videos', Icons.videocam,
-        Permission.videos, 'Acceder a videos'));
-    items.add(_PermItem('Almacenamiento', Icons.folder,
-        Permission.storage, 'Archivos (Android 12 o menor)'));
-    items.add(_PermItem('Notificaciones', Icons.notifications,
-        Permission.notification, 'Alertas de mensajes'));
-    return items;
-  }
+class _PermissionsGatePageState extends State<PermissionsGatePage> {
+  List<_PermItem> get _perms => [
+    _PermItem('Ubicacion', Icons.location_on,
+        Permission.locationWhenInUse, 'Requerida para BT scan'),
+    _PermItem('Bluetooth Scan', Icons.bluetooth_searching,
+        Permission.bluetoothScan, 'Buscar dispositivos'),
+    _PermItem('Bluetooth Connect', Icons.bluetooth_connected,
+        Permission.bluetoothConnect, 'Conectarse a dispositivos'),
+    _PermItem('Bluetooth Advertise', Icons.broadcast_on_personal,
+        Permission.bluetoothAdvertise, 'Hacerse visible'),
+  ];
 
   final Map<Permission, PermissionStatus> _statuses = {};
   bool _loading = false;
-  bool _btOn = false;
 
   @override
   void initState() {
     super.initState();
     _checkAll();
-    _checkBt();
-  }
-
-  Future<void> _checkBt() async {
-    try {
-      final s = await FlutterBluePlus.adapterState.first.timeout(
-        const Duration(seconds: 3),
-        onTimeout: () => BluetoothAdapterState.unknown,
-      );
-      if (mounted) {
-        setState(() => _btOn = s == BluetoothAdapterState.on);
-      }
-    } catch (_) {}
   }
 
   Future<void> _checkAll() async {
@@ -1203,7 +1265,6 @@ class _PermissionsPageState extends State<PermissionsPage> {
         final s = await p.permission.status;
         if (mounted) setState(() => _statuses[p.permission] = s);
       } catch (_) {
-        // Some permissions (photos, videos) don't exist on Android < 13
         if (mounted) setState(() => _statuses[p.permission] = PermissionStatus.denied);
       }
     }
@@ -1212,7 +1273,6 @@ class _PermissionsPageState extends State<PermissionsPage> {
   Future<void> _requestAll() async {
     setState(() => _loading = true);
     try {
-      // Build list dynamically — skip permissions that don't exist on this device
       final permsToRequest = <Permission>[];
       for (final p in _perms) {
         try {
@@ -1222,9 +1282,7 @@ class _PermissionsPageState extends State<PermissionsPage> {
           } else {
             if (mounted) setState(() => _statuses[p.permission] = status);
           }
-        } catch (_) {
-          // Permission not available on this Android version, skip
-        }
+        } catch (_) {}
       }
       if (permsToRequest.isNotEmpty) {
         final r = await permsToRequest.request();
@@ -1233,160 +1291,156 @@ class _PermissionsPageState extends State<PermissionsPage> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
-    _checkBt();
   }
 
-  String _st(PermissionStatus? s) {
-    if (s == null) return '...';
-    if (s.isGranted) return 'Concedido';
-    if (s.isDenied) return 'Denegado';
-    if (s.isPermanentlyDenied) return 'Denegado siempre';
-    return s.toString();
+  bool get _allEssentialGranted {
+    for (final p in _perms) {
+      final st = _statuses[p.permission];
+      if (st == null || !st.isGranted) return false;
+    }
+    return true;
+  }
+
+  void _onAccept() {
+    if (_allEssentialGranted) {
+      widget.onAccepted();
+    } else {
+      _requestAll();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const _Header('Permisos', Icons.shield,
-                'Necesarios para Bluetooth'),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: (_btOn ? Colors.white : Colors.red)
-                    .withOpacity(0.06),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: (_btOn ? Colors.white : Colors.red)
-                      .withOpacity(0.15),
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          child: Column(
+            children: [
+              // ─── Close / X button top center ───
+              Align(
+                alignment: Alignment.topCenter,
+                child: Container(
+                  margin: const EdgeInsets.only(top: 8),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: _kCardBgLight,
+                    shape: BoxShape.circle,
+                  ),
+                  child: GestureDetector(
+                    onTap: _allEssentialGranted ? widget.onAccepted : null,
+                    child: Icon(
+                      Icons.close,
+                      color: _allEssentialGranted ? Colors.white : Colors.white24,
+                      size: 22,
+                    ),
+                  ),
                 ),
               ),
-              child: Row(
-                children: [
-                  Icon(
-                    _btOn ? Icons.bluetooth : Icons.bluetooth_disabled,
-                    color: _btOn ? Colors.white : Colors.redAccent,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      _btOn
-                          ? 'Bluetooth ACTIVADO'
-                          : 'Bluetooth DESACTIVADO!',
-                      style: TextStyle(
-                        color:
-                            _btOn ? Colors.white : Colors.redAccent,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
+              const SizedBox(height: 24),
+              // ─── Title ───
+              const Text(
+                'Aceptar permisos\nrequeridos',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                  fontWeight: FontWeight.w700,
+                  height: 1.3,
+                ),
+              ),
+              const SizedBox(height: 28),
+              // ─── Permission cards ───
+              Expanded(
+                child: ListView.separated(
+                  itemCount: _perms.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  itemBuilder: (_, index) {
+                    final p = _perms[index];
+                    final st = _statuses[p.permission];
+                    final granted = st?.isGranted ?? false;
+                    return Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 14),
+                      decoration: BoxDecoration(
+                        color: _kCardBg,
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 6),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: _kCardBgDim,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.gps_fixed,
-                      color: Colors.white38, size: 16),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Activa la UBICACION en ajustes del telefono para buscar BLE.',
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.5),
-                        fontSize: 11,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: ListView(
-                children: _perms.map((p) {
-                  final st = _statuses[p.permission];
-                  final g = st?.isGranted ?? false;
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: _kCardBgDim,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                          color: _kBorderDim),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(p.icon,
-                            color: g ? Colors.white : Colors.white38,
-                            size: 20),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment:
-                                CrossAxisAlignment.start,
-                            children: [
-                              Text(p.name,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 13,
-                                  )),
-                              Text(p.desc,
-                                  style: TextStyle(
-                                    color:
-                                        Colors.white.withOpacity(0.3),
-                                    fontSize: 11,
-                                  )),
-                            ],
+                      child: Row(
+                        children: [
+                          Icon(p.icon,
+                              color: granted ? Colors.white : Colors.white38,
+                              size: 22),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(p.name,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 14,
+                                    )),
+                                const SizedBox(height: 2),
+                                Text(p.desc,
+                                    style: TextStyle(
+                                      color: Colors.white.withOpacity(0.4),
+                                      fontSize: 12,
+                                    )),
+                              ],
+                            ),
                           ),
-                        ),
-                        Icon(
-                          g ? Icons.check_circle : Icons.cancel,
-                          color: g ? Colors.white : Colors.redAccent,
-                          size: 18,
-                        ),
-                      ],
+                          Icon(
+                            granted ? Icons.check_circle : Icons.check_circle_outline,
+                            color: granted ? Colors.white : Colors.white24,
+                            size: 22,
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 16),
+              // ─── Accept button ───
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: FilledButton.icon(
+                  icon: _loading
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.black,
+                          ),
+                        )
+                      : const Icon(Icons.check, size: 20),
+                  label: Text(
+                    _loading
+                        ? 'Solicitando...'
+                        : (_allEssentialGranted ? 'Aceptar' : 'Solicitar permisos'),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
                     ),
-                  );
-                }).toList(),
+                  ),
+                  onPressed: _loading ? null : _onAccept,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: Colors.black,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                icon: _loading
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.black,
-                        ),
-                      )
-                    : const Icon(Icons.done_all),
-                label: Text(_loading
-                    ? 'Solicitando...'
-                    : 'Solicitar todos'),
-                onPressed: _loading ? null : _requestAll,
-              ),
-            ),
-          ],
+              const SizedBox(height: 8),
+            ],
+          ),
         ),
       ),
     );
