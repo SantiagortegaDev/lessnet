@@ -1491,7 +1491,7 @@ class VaultHomePage extends StatelessWidget {
       _VaultSection(
         Icons.translate,
         'Traductor Offline',
-        '9 idiomas disponibles',
+        '238 palabras en 10 idiomas',
         Colors.blueAccent,
         const TranslatorPage(),
       ),
@@ -2757,12 +2757,13 @@ class _TranslatorPageState extends State<TranslatorPage> {
   }
 
   void _translate() {
-    final input = _inputCtrl.text.trim().toLowerCase();
+    final input = _inputCtrl.text.trim();
     if (input.isEmpty) {
       setState(() => _output = '');
       return;
     }
 
+    final inputLower = input.toLowerCase();
     final srcPack = _langPacks[_srcLang] as Map<String, dynamic>?;
     final tgtPack = _langPacks[_tgtLang] as Map<String, dynamic>?;
 
@@ -2771,38 +2772,86 @@ class _TranslatorPageState extends State<TranslatorPage> {
       return;
     }
 
-    final phrases =
+    final srcPhrases =
         srcPack['frases'] as Map<String, dynamic>? ?? {};
     final tgtPhrases =
         tgtPack['frases'] as Map<String, dynamic>? ?? {};
 
-    String? foundKey;
-    for (final entry in phrases.entries) {
-      if (entry.value.toString().toLowerCase() == input) {
-        foundKey = entry.key;
-        break;
+    // 1. Exact match
+    for (final entry in srcPhrases.entries) {
+      if (entry.value.toString().toLowerCase() == inputLower) {
+        final translation = tgtPhrases[entry.key];
+        if (translation != null) {
+          setState(() => _output = translation.toString());
+          return;
+        }
       }
     }
 
-    if (foundKey != null && tgtPhrases.containsKey(foundKey)) {
-      setState(() => _output = tgtPhrases[foundKey]);
-    } else {
-      for (final entry in phrases.entries) {
-        if (entry.value.toString().toLowerCase().contains(input) ||
-            input
-                .contains(entry.value.toString().toLowerCase())) {
-          final k = entry.key;
-          if (tgtPhrases.containsKey(k)) {
-            setState(() => _output = tgtPhrases[k] ?? 'No encontrado');
-            return;
-          }
+    // 2. Partial match (input contains or is contained in a phrase)
+    final List<MapEntry<String, dynamic>> partials = [];
+    for (final entry in srcPhrases.entries) {
+      final val = entry.value.toString().toLowerCase();
+      if (val.contains(inputLower) || inputLower.contains(val)) {
+        if (tgtPhrases.containsKey(entry.key)) {
+          partials.add(entry);
         }
       }
-      setState(() {
-        _output =
-            'Traduccion no disponible para: "$input"\n\nNota: El traductor completo requiere el modelo NLLB-200 (350MB). Esta version incluye frases basicas offline.';
-      });
     }
+
+    // Sort partials: prefer shorter phrases (more specific match)
+    partials.sort((a, b) =>
+        a.value.toString().length.compareTo(b.value.toString().length));
+
+    if (partials.isNotEmpty) {
+      // Show up to 5 matches
+      final results = partials.take(5).map((e) {
+        final src = e.value.toString();
+        final tgt = tgtPhrases[e.key]?.toString() ?? '';
+        return '$src → $tgt';
+      }).join('\n');
+
+      setState(() {
+        if (partials.length == 1) {
+          _output = tgtPhrases[partials.first.key]?.toString() ?? '';
+        } else {
+          _output = 'Resultados para "$input":\n\n$results';
+        }
+      });
+      return;
+    }
+
+    // 3. Word-by-word fallback (split input and translate each word)
+    final words = inputLower.split(RegExp(r'\s+'));
+    if (words.length > 1) {
+      final translatedWords = <String>[];
+      bool anyTranslated = false;
+      for (final word in words) {
+        bool found = false;
+        for (final entry in srcPhrases.entries) {
+          if (entry.value.toString().toLowerCase() == word) {
+            final t = tgtPhrases[entry.key]?.toString();
+            if (t != null) {
+              translatedWords.add(t);
+              found = true;
+              anyTranslated = true;
+              break;
+            }
+          }
+        }
+        if (!found) translatedWords.add(word);
+      }
+      if (anyTranslated) {
+        setState(() => _output = translatedWords.join(' '));
+        return;
+      }
+    }
+
+    setState(() {
+      _output = 'No se encontro traduccion para "$input".\n\n'
+          'Prueba con palabras o frases mas simples.\n'
+          'El diccionario tiene ${srcPhrases.length} entradas.';
+    });
   }
 
   @override
@@ -2844,7 +2893,7 @@ class _TranslatorPageState extends State<TranslatorPage> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'Traductor offline con frases basicas. Modelo completo NLLB-200 (${_config['modelo_unificado']?['tamano_mb'] ?? 350}MB) disponible para descarga.',
+                          'Traductor offline con 238 palabras y frases en 10 idiomas. Funciona sin conexion ni descarga adicional.',
                             style: TextStyle(
                               color: Colors.white.withOpacity(0.4),
                               fontSize: 11,
