@@ -44,7 +44,7 @@ jobs:
           else
             # If no backup, patch the generated one with correct SDK versions
             GRADLE="$GITHUB_WORKSPACE/android/app/build.gradle"
-            sed -i 's/compileSdk flutter.compileSdkVersion/compileSdk 34/' "$GRADLE"
+            sed -i 's/compileSdk flutter.compileSdkVersion/compileSdk 36/' "$GRADLE"
             sed -i 's/targetSdk flutter.targetSdkVersion/targetSdk 34/' "$GRADLE"
           fi
 
