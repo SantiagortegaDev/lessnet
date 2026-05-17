@@ -8,6 +8,8 @@ on:
 jobs:
   build-apk:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -130,3 +132,33 @@ jobs:
         with:
           name: app-release
           path: build/app/outputs/flutter-apk/app-release.apk
+
+      - name: Extract version from pubspec.yaml
+        id: version
+        run: |
+          VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          VERSION_NAME=$(echo "$VERSION" | cut -d'+' -f1)
+          echo "version_name=$VERSION_NAME" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release with APK
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version_name }}
+          name: LessNet v${{ steps.version.outputs.version_name }}
+          body: |
+            ## LessNet v${{ steps.version.outputs.version_name }}
+
+            Chat BLE offline sin internet.
+
+            ### Como instalar
+            1. Descarga el archivo APK
+            2. Activa "Instalar desde fuentes desconocidas" en tu celular
+            3. Instala el APK
+
+            La app se actualiza automaticamente si hay una nueva version.
+          files: build/app/outputs/flutter-apk/app-release.apk
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

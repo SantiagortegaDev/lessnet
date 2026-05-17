@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -16,11 +17,83 @@ import 'package:open_filex/open_filex.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:crypto/crypto.dart';
+import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
+
+// ─── App Version ───
+const String kAppVersion = '1.1.0';
+const int kAppVersionCode = 2;
 
 // ─── UUIDs del servicio BLE de LessNet ───
 const String lessnetServiceUuid = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
 const String lessnetCharRxUuid = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
 const String lessnetCharTxUuid = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";
+
+// ─── Global Chat ───
+const String kGlobalChatId = '__GLOBAL__';
+
+// ─── Encryption ───
+String _encryptionKey = 'lessnet_default_key_2024';
+
+String _encryptMessage(String plaintext, String key) {
+  final random = Random.secure();
+  final iv = List<int>.generate(16, (_) => random.nextInt(256));
+  final ivHex = iv.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+  final keyStreamBase = sha256.convert(utf8.encode(key + ivHex)).bytes;
+  final plainBytes = utf8.encode(plaintext);
+  final encrypted = List<int>.filled(plainBytes.length, 0);
+  for (int i = 0; i < plainBytes.length; i++) {
+    final keyByte = keyStreamBase[i % keyStreamBase.length];
+    encrypted[i] = plainBytes[i] ^ keyByte;
+  }
+  final encHex = encrypted.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+  return '[ENC:$ivHex]$encHex';
+}
+
+String _decryptMessage(String ciphertext, String key) {
+  if (!ciphertext.startsWith('[ENC:')) return ciphertext;
+  final ivEnd = ciphertext.indexOf(']', 5);
+  if (ivEnd < 0) return ciphertext;
+  final ivHex = ciphertext.substring(5, ivEnd);
+  final encHex = ciphertext.substring(ivEnd + 1);
+  if (ivHex.length != 32 || encHex.isEmpty) return ciphertext;
+  final iv = <int>[];
+  for (int i = 0; i < ivHex.length; i += 2) {
+    iv.add(int.parse(ivHex.substring(i, i + 2), radix: 16));
+  }
+  final encBytes = <int>[];
+  for (int i = 0; i < encHex.length; i += 2) {
+    encBytes.add(int.parse(encHex.substring(i, i + 2), radix: 16));
+  }
+  final keyStreamBase = sha256.convert(utf8.encode(key + ivHex)).bytes;
+  final decrypted = List<int>.filled(encBytes.length, 0);
+  for (int i = 0; i < encBytes.length; i++) {
+    final keyByte = keyStreamBase[i % keyStreamBase.length];
+    decrypted[i] = encBytes[i] ^ keyByte;
+  }
+  return utf8.decode(decrypted, allowMalformed: true);
+}
+
+// ─── Device Name Storage ───
+Map<String, String> _deviceNames = {};
+
+Future<String> getDeviceDisplayName(String deviceId) async {
+  if (_deviceNames.containsKey(deviceId)) return _deviceNames[deviceId]!;
+  final prefs = await SharedPreferences.getInstance();
+  final customName = prefs.getString('device_name_$deviceId');
+  if (customName != null && customName.isNotEmpty) {
+    _deviceNames[deviceId] = customName;
+    return customName;
+  }
+  return deviceId;
+}
+
+Future<void> setDeviceDisplayName(String deviceId, String name) async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setString('device_name_$deviceId', name);
+  _deviceNames[deviceId] = name;
+}
 
 // ─── Notification helper ───
 class LessNetNotifications {
@@ -185,13 +258,135 @@ class _LessNetAppState extends State<LessNetApp> with WidgetsBindingObserver {
       }
     }
 
-    if (mounted) setState(() => _needsPermissions = !allGranted);
+    if (mounted) {
+      setState(() => _needsPermissions = !allGranted);
+      if (!allGranted == false) {
+        // Permissions OK — check for updates and auto-start BLE
+        _checkForUpdates();
+        _autoStartBle();
+      }
+    }
   }
 
   void _onPermissionsAccepted() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('permissions_completed', true);
-    if (mounted) setState(() => _needsPermissions = false);
+    if (mounted) {
+      setState(() => _needsPermissions = false);
+      _checkForUpdates();
+      _autoStartBle();
+    }
+  }
+
+  Future<void> _autoStartBle() async {
+    // Auto-start BLE advertising when app opens (if permissions granted)
+    try {
+      final bt = BtService();
+      if (!bt.isAdvertising && !bt.isConnected) {
+        await bt.startAdvertising();
+      }
+    } catch (_) {
+      // Some devices don't support advertising — that's OK
+    }
+  }
+
+  Future<void> _checkForUpdates() async {
+    try {
+      final response = await http.get(
+        Uri.parse('https://api.github.com/repos/SantiagortaDev/lessnet/releases/latest'),
+      );
+      if (response.statusCode != 200) return;
+      final json = jsonDecode(response.body) as Map<String, dynamic>;
+      final tagName = (json['tag_name'] as String?) ?? '';
+      if (tagName.isEmpty) return;
+      // Compare versions — tag may be like "v1.2.0" or "1.2.0"
+      final remoteVersion = tagName.replaceFirst('v', '');
+      if (_isNewerVersion(remoteVersion, kAppVersion)) {
+        if (!mounted) return;
+        // Find APK download URL
+        String? apkUrl;
+        final assets = json['assets'] as List<dynamic>?;
+        if (assets != null) {
+          for (final asset in assets) {
+            final name = (asset as Map<String, dynamic>)['name'] as String? ?? '';
+            if (name.endsWith('.apk')) {
+              apkUrl = asset['browser_download_url'] as String?;
+              break;
+            }
+          }
+        }
+        final downloadUrl = apkUrl ?? (json['html_url'] as String? ?? '');
+        _showUpdateDialog(remoteVersion, downloadUrl);
+      }
+    } catch (_) {
+      // Silently ignore update check failures
+    }
+  }
+
+  bool _isNewerVersion(String remote, String current) {
+    final rParts = remote.split('.').map(int.parse).toList();
+    final cParts = current.split('.').map(int.parse).toList();
+    for (int i = 0; i < 3; i++) {
+      final r = i < rParts.length ? rParts[i] : 0;
+      final c = i < cParts.length ? cParts[i] : 0;
+      if (r > c) return true;
+      if (r < c) return false;
+    }
+    return false;
+  }
+
+  void _showUpdateDialog(String version, String downloadUrl) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Nueva version disponible',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+        ),
+        content: Text(
+          'LessNet v$version esta disponible. Actualiza para obtener las ultimas mejoras.',
+          style: const TextStyle(color: Colors.white70, fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text(
+              'Mas tarde',
+              style: TextStyle(color: Colors.grey),
+            ),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              // Open download URL
+              _launchUrl(downloadUrl);
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: Colors.black,
+            ),
+            child: const Text('Actualizar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _launchUrl(String url) async {
+    try {
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    } catch (_) {
+      // Fallback: copy to clipboard
+      try {
+        await Clipboard.setData(ClipboardData(text: url));
+      } catch (_) {}
+    }
   }
 
   @override
@@ -221,7 +416,7 @@ class _LessNetAppState extends State<LessNetApp> with WidgetsBindingObserver {
         ),
         navigationBarTheme: NavigationBarThemeData(
           backgroundColor: const Color(0xFF111111),
-          indicatorColor: const Color(0xFF262626), // was withOpacity(0.15) — yellow on AMOLED
+          indicatorColor: const Color(0xFF262626),
           iconTheme: WidgetStateProperty.all(
             const IconThemeData(color: Colors.grey),
           ),
@@ -229,7 +424,6 @@ class _LessNetAppState extends State<LessNetApp> with WidgetsBindingObserver {
             const TextStyle(color: Colors.grey, fontSize: 11),
           ),
         ),
-        // ─── KILL ALL DEFAULT UNDERLINES GLOBALLY ───
         inputDecorationTheme: const InputDecorationTheme(
           border: OutlineInputBorder(
             borderRadius: BorderRadius.all(Radius.circular(12)),
@@ -257,7 +451,7 @@ class _LessNetAppState extends State<LessNetApp> with WidgetsBindingObserver {
 }
 
 // ─────────────────────────────────────────────
-// SPLASH SCREEN — Shows splash_image.png while checking permissions
+// SPLASH SCREEN — Shows lessnet.png with fade-in animation
 // ─────────────────────────────────────────────
 class _SplashScreen extends StatefulWidget {
   const _SplashScreen();
@@ -266,15 +460,32 @@ class _SplashScreen extends StatefulWidget {
   State<_SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<_SplashScreen> {
+class _SplashScreenState extends State<_SplashScreen> with SingleTickerProviderStateMixin {
+  late AnimationController _fadeController;
+  late Animation<double> _fadeAnimation;
+
   @override
   void initState() {
     super.initState();
+    _fadeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    );
+    _fadeAnimation = CurvedAnimation(
+      parent: _fadeController,
+      curve: Curves.easeIn,
+    );
+    _fadeController.forward();
     _navigate();
   }
 
+  @override
+  void dispose() {
+    _fadeController.dispose();
+    super.dispose();
+  }
+
   Future<void> _navigate() async {
-    // Small delay to show splash
     await Future.delayed(const Duration(seconds: 2));
     if (mounted) setState(() {}); // Parent will handle navigation
   }
@@ -284,11 +495,29 @@ class _SplashScreenState extends State<_SplashScreen> {
     return Scaffold(
       backgroundColor: Colors.black,
       body: Center(
-        child: Image.asset(
-          'assets/splash_image.png',
-          fit: BoxFit.contain,
-          width: double.infinity,
-          height: double.infinity,
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Image.asset(
+                'assets/lessnet.png',
+                fit: BoxFit.contain,
+                width: 180,
+                height: 180,
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'LessNet',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 32,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 2,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -303,12 +532,12 @@ class _SplashScreenState extends State<_SplashScreen> {
 // Chunks de escritura BLE de 200 bytes (MTU-aware).
 // ─────────────────────────────────────────────
 
-const Color _kCardBg = Color(0xFF1A1A1A);       // card background (was white 0.08)
-const Color _kCardBgLight = Color(0xFF141414);   // lighter card bg (was white 0.05)
-const Color _kCardBgDim = Color(0xFF111111);     // dim card bg (was white 0.03-0.04)
-const Color _kBorder = Color(0xFF2A2A2A);        // card border (was white 0.12-0.15)
-const Color _kBorderDim = Color(0xFF1E1E1E);     // dim border (was white 0.06-0.08)
-const Color _kInputFill = Color(0xFF151515);     // text input fill (was white 0.04)
+const Color _kCardBg = Color(0xFF1A1A1A);       // card background
+const Color _kCardBgLight = Color(0xFF141414);   // lighter card bg
+const Color _kCardBgDim = Color(0xFF111111);     // dim card bg
+const Color _kBorder = Color(0xFF2A2A2A);        // card border
+const Color _kBorderDim = Color(0xFF1E1E1E);     // dim border
+const Color _kInputFill = Color(0xFF151515);     // text input fill
 const Color _kChipBg = Color(0xFF222222);        // chip background
 const Color _kChipBgActive = Color(0xFF2E2E2E);  // active chip background
 
@@ -347,6 +576,9 @@ class BtService {
   // Keep "active" device = last connected / currently focused
   String _activeDeviceId = '';
 
+  // ─── Device custom names ───
+  final Map<String, String> deviceCustomNames = {};
+
   // ─── Legacy single-connection fields (kept for backward compat) ───
   BluetoothDevice? connectedDevice; // points to active device
   BluetoothCharacteristic? rxChar;   // points to active device's rx
@@ -383,12 +615,37 @@ class BtService {
   final _progressController = StreamController<Map<String, dynamic>>.broadcast();
   Stream<Map<String, dynamic>> get onProgress => _progressController.stream;
 
+  // Auto-connect scan subscription
+  StreamSubscription? _autoScanSub;
+  bool _autoConnecting = false;
+
   bool get isAdvertising => _isAdvertising;
   bool get isPeripheralConnected => _peripheralConnected;
   bool get isConnected =>
       _centralConnections.isNotEmpty || _peripheralConnected;
   bool get connecting => _isConnecting;
   String get advertisingError => _advertisingError;
+
+  // ─── Device name helpers ───
+  Future<String> getDeviceDisplayName(String deviceId) async {
+    if (deviceCustomNames.containsKey(deviceId)) {
+      return deviceCustomNames[deviceId]!;
+    }
+    final prefs = await SharedPreferences.getInstance();
+    final customName = prefs.getString('device_custom_name_$deviceId');
+    if (customName != null && customName.isNotEmpty) {
+      deviceCustomNames[deviceId] = customName;
+      return customName;
+    }
+    // Fall back to system name
+    return getDeviceName(deviceId);
+  }
+
+  Future<void> setDeviceCustomName(String deviceId, String name) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('device_custom_name_$deviceId', name);
+    deviceCustomNames[deviceId] = name;
+  }
 
   // ─── Multi-connection helpers ───
   List<String> get connectedDeviceIds {
@@ -569,12 +826,6 @@ class BtService {
         return;
       }
 
-      // DON'T disconnect existing connections — support multi-connect!
-      // Only clean up if connecting to the same device
-      if (_centralConnections.containsKey(deviceId)) {
-        await _cleanupSingleConnection(deviceId);
-      }
-
       await device.connect(timeout: const Duration(seconds: 20));
 
       try {
@@ -717,13 +968,19 @@ class BtService {
   }
 
   void _processReceivedText(String text) {
+    // ─── DECRYPT if encrypted ───
+    String processedText = text;
+    if (text.startsWith('[ENC:')) {
+      processedText = _decryptMessage(text, _encryptionKey);
+    }
+
     // ─── FILE TRANSFER PROTOCOL ───
     // [FILE:TYPE:FILENAME:SIZE:CRC32]base64data
-    if (text.startsWith('[FILE:')) {
+    if (processedText.startsWith('[FILE:')) {
       try {
-        final headerEnd = text.indexOf(']');
+        final headerEnd = processedText.indexOf(']');
         if (headerEnd > 5) {
-          final header = text.substring(6, headerEnd); // skip '[FILE:'
+          final header = processedText.substring(6, headerEnd); // skip '[FILE:'
           final parts = header.split(':');
           // parts: [TYPE, FILENAME, SIZE, CRC32] = 4 parts minimum
           if (parts.length >= 4) {
@@ -731,7 +988,7 @@ class BtService {
             final fileName = parts[1];
             final fileSize = int.tryParse(parts[2]) ?? 0;
             final expectedCrc = int.tryParse(parts[3]) ?? 0;
-            final b64Data = text.substring(headerEnd + 1);
+            final b64Data = processedText.substring(headerEnd + 1);
 
             final bytes = base64Decode(b64Data);
 
@@ -767,10 +1024,10 @@ class BtService {
         debugPrint('Error parsing FILE transfer: $e');
         // Fall through — don't show protocol text as chat message
         // If it looks like a protocol message, silently ignore
-        if (text.startsWith('[FILE:') || text.startsWith('[XFR:') ||
-            text.startsWith('[CHK:') || text.startsWith('[END:') ||
-            text.startsWith('[ACK:') || text.startsWith('[NAK:') ||
-            text.startsWith('[RESEND:')) {
+        if (processedText.startsWith('[FILE:') || processedText.startsWith('[XFR:') ||
+            processedText.startsWith('[CHK:') || processedText.startsWith('[END:') ||
+            processedText.startsWith('[ACK:') || processedText.startsWith('[NAK:') ||
+            processedText.startsWith('[RESEND:')) {
           return;
         }
       }
@@ -778,24 +1035,24 @@ class BtService {
 
     // ─── SILENTLY IGNORE OTHER PROTOCOL MESSAGES ───
     // Never show internal protocol text as chat messages
-    if (text.startsWith('[XFR:') || text.startsWith('[CHK:') ||
-        text.startsWith('[END:') || text.startsWith('[ACK:') ||
-        text.startsWith('[NAK:') || text.startsWith('[RESEND:')) {
+    if (processedText.startsWith('[XFR:') || processedText.startsWith('[CHK:') ||
+        processedText.startsWith('[END:') || processedText.startsWith('[ACK:') ||
+        processedText.startsWith('[NAK:') || processedText.startsWith('[RESEND:')) {
       return;
     }
 
     // ─── LEGACY PROTOCOL (backward compat) ───
-    if (text.startsWith('[IMG:') || text.startsWith('[VID:') || text.startsWith('[FILE:')) {
+    if (processedText.startsWith('[IMG:') || processedText.startsWith('[VID:') || processedText.startsWith('[FILE:')) {
       try {
-        final firstBracket = text.indexOf('[');
-        final headerEnd = text.indexOf(']', firstBracket);
+        final firstBracket = processedText.indexOf('[');
+        final headerEnd = processedText.indexOf(']', firstBracket);
         if (firstBracket >= 0 && headerEnd > firstBracket) {
-          final header = text.substring(firstBracket + 1, headerEnd);
+          final header = processedText.substring(firstBracket + 1, headerEnd);
           final parts = header.split(':');
           final msgType = parts[0].toLowerCase();
           final fileName = parts.length > 1 ? parts[1] : 'file';
           final fileSize = parts.length > 2 ? int.tryParse(parts[2]) ?? 0 : 0;
-          final b64Data = text.substring(headerEnd + 1);
+          final b64Data = processedText.substring(headerEnd + 1);
 
           final bytes = base64Decode(b64Data);
           _saveReceivedFile(msgType, fileName, bytes).then((savedPath) {
@@ -823,13 +1080,19 @@ class BtService {
       }
     }
 
-    // ─── Plain text message ───
-    final msg = ChatMessage(id: DateTime.now().microsecondsSinceEpoch.toString(), text: text, mine: false, time: DateTime.now(), deviceId: connectedDeviceId);
+    // ─── Plain text message (already decrypted) ───
+    final msg = ChatMessage(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      text: processedText,
+      mine: false,
+      time: DateTime.now(),
+      deviceId: connectedDeviceId,
+    );
     messages.add(msg);
     _msgController.add(msg);
     MessageDB.insert(msg);
     // Show notification for background message
-    try { LessNetNotifications.showMessageNotification(connectedName, text); } catch (_) {}
+    try { LessNetNotifications.showMessageNotification(connectedName, processedText); } catch (_) {}
   }
 
   Future<String> _saveReceivedFile(String type, String fileName, List<int> bytes) async {
@@ -868,15 +1131,36 @@ class BtService {
     }
   }
 
-  Future<void> sendMessage(String text, {String? deviceId}) async {
-    if (text.isEmpty) return;
+  /// Send a text message to a specific device.
+  /// Returns false if the target device is not connected (and not global chat).
+  /// Encrypts the text before sending, but stores the plaintext in the ChatMessage.
+  Future<bool> sendMessage(String text, {String? deviceId}) async {
+    if (text.isEmpty) return false;
     final targetId = deviceId ?? _activeDeviceId;
-    final msg = ChatMessage(id: DateTime.now().microsecondsSinceEpoch.toString(), text: text, mine: true, time: DateTime.now(), deviceId: targetId);
+
+    // Connection check: if not global chat and device not connected, fail
+    if (targetId != kGlobalChatId && !isDeviceConnected(targetId)) {
+      _statusController.add('Dispositivo no conectado');
+      return false;
+    }
+
+    // Store plaintext in ChatMessage
+    final msg = ChatMessage(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      text: text,
+      mine: true,
+      time: DateTime.now(),
+      deviceId: targetId,
+      isGlobal: targetId == kGlobalChatId,
+    );
     messages.add(msg);
     _msgController.add(msg);
     MessageDB.insert(msg);
 
-    await _sendRawMessage(text, deviceId: deviceId);
+    // Encrypt before sending
+    final encrypted = _encryptMessage(text, _encryptionKey);
+    await _sendRawMessage(encrypted, deviceId: deviceId);
+    return true;
   }
 
   // ─── File send — simple protocol, one message, MTU-aware ───
@@ -954,6 +1238,141 @@ class BtService {
     }
   }
 
+  /// Send a message to ALL connected devices (global chat).
+  /// Stores the message with deviceId = kGlobalChatId.
+  /// Returns true if at least one send succeeded.
+  Future<bool> sendGlobalMessage(String text) async {
+    if (text.isEmpty) return false;
+
+    // Store message with global chat ID
+    final msg = ChatMessage(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      text: text,
+      mine: true,
+      time: DateTime.now(),
+      deviceId: kGlobalChatId,
+      isGlobal: true,
+    );
+    messages.add(msg);
+    _msgController.add(msg);
+    MessageDB.insert(msg);
+
+    final encrypted = _encryptMessage(text, _encryptionKey);
+    bool anySuccess = false;
+
+    // Send to all central connections
+    for (final deviceId in _centralConnections.keys.toList()) {
+      try {
+        await _sendRawMessage(encrypted, deviceId: deviceId);
+        anySuccess = true;
+      } catch (_) {
+        // Continue trying other devices
+      }
+    }
+
+    // Send to peripheral if connected
+    if (_isPeripheral && _peripheralConnected) {
+      try {
+        await _sendRawMessage(encrypted);
+        anySuccess = true;
+      } catch (_) {}
+    }
+
+    return anySuccess;
+  }
+
+  /// Start an auto-connect scan that automatically connects to
+  /// any discovered LessNet BLE device without user interaction.
+  Future<void> startAutoConnectScan() async {
+    if (_autoConnecting) return;
+    _autoConnecting = true;
+
+    try {
+      // Check permissions first
+      final st = await [
+        Permission.locationWhenInUse,
+        Permission.bluetoothScan,
+        Permission.bluetoothConnect,
+      ].request();
+      if (!(st[Permission.bluetoothScan]?.isGranted ?? false)) {
+        _autoConnecting = false;
+        return;
+      }
+
+      // Check BT is ON
+      try {
+        final adapterState = await FlutterBluePlus.adapterState.first.timeout(
+          const Duration(seconds: 3),
+          onTimeout: () => BluetoothAdapterState.unknown,
+        );
+        if (adapterState != BluetoothAdapterState.on) {
+          _autoConnecting = false;
+          return;
+        }
+      } catch (_) {
+        _autoConnecting = false;
+        return;
+      }
+
+      // Start scanning for LessNet devices
+      await FlutterBluePlus.startScan(
+        timeout: const Duration(seconds: 30),
+        androidUsesFineLocation: true,
+      );
+
+      _autoScanSub = FlutterBluePlus.scanResults.listen((results) {
+        for (final result in results) {
+          // Check if this device advertises the LessNet service
+          bool hasLessNetService = false;
+          if (result.advertisementData.serviceUuids.isNotEmpty) {
+            for (final uuid in result.advertisementData.serviceUuids) {
+              if (uuid.str128.toLowerCase() == lessnetServiceUuid.toLowerCase()) {
+                hasLessNetService = true;
+                break;
+              }
+            }
+          }
+          // Also try connecting to devices with "LessNet" in the name
+          final deviceName = result.device.platformName;
+          if (!hasLessNetService && deviceName.isNotEmpty &&
+              !deviceName.toLowerCase().contains('lessnet')) {
+            continue; // Skip non-LessNet devices
+          }
+
+          final deviceId = deviceName.isNotEmpty
+              ? deviceName
+              : result.device.remoteId.toString();
+
+          // Skip if already connected
+          if (_centralConnections.containsKey(deviceId)) continue;
+
+          // Auto-connect
+          try {
+            connectToDevice(result.device);
+          } catch (_) {
+            // Connection failed, continue scanning
+          }
+        }
+      });
+
+      // Stop auto-connect after scan timeout
+      Future.delayed(const Duration(seconds: 30), () {
+        stopAutoConnectScan();
+      });
+    } catch (_) {
+      _autoConnecting = false;
+    }
+  }
+
+  Future<void> stopAutoConnectScan() async {
+    _autoScanSub?.cancel();
+    _autoScanSub = null;
+    _autoConnecting = false;
+    try {
+      await FlutterBluePlus.stopScan();
+    } catch (_) {}
+  }
+
   Future<void> _cleanupPreConnect() async {
     // Clean up legacy single-connection subscriptions only
     _txSub?.cancel();
@@ -992,12 +1411,14 @@ class BtService {
       await _cleanupSingleConnection(deviceId);
     }
     if (_isPeripheral) await stopAdvertising();
+    stopAutoConnectScan();
     _connectionController.add(false);
   }
 
   void dispose() {
     _txSub?.cancel();
     _connSub?.cancel();
+    _autoScanSub?.cancel();
     _msgController.close();
     _connectionController.close();
     _advertisingController.close();
@@ -1016,6 +1437,7 @@ class ChatMessage {
   final String? filePath; // local file path for received/sent files
   final int? fileSize;
   final String deviceId; // remote device identifier
+  final bool isGlobal; // true for global chat messages
 
   ChatMessage({
     required this.id,
@@ -1027,6 +1449,7 @@ class ChatMessage {
     this.filePath,
     this.fileSize,
     this.deviceId = '',
+    this.isGlobal = false,
   });
 
   Map<String, dynamic> toMap() => {
@@ -1039,6 +1462,7 @@ class ChatMessage {
     'filePath': filePath,
     'fileSize': fileSize,
     'deviceId': deviceId,
+    'isGlobal': isGlobal ? 1 : 0,
   };
 
   factory ChatMessage.fromMap(Map<String, dynamic> m) => ChatMessage(
@@ -1051,6 +1475,7 @@ class ChatMessage {
     filePath: m['filePath'] as String?,
     fileSize: m['fileSize'] as int?,
     deviceId: m['deviceId'] as String? ?? '',
+    isGlobal: (m['isGlobal'] as int?) == 1,
   );
 }
 
@@ -1068,7 +1493,7 @@ class MessageDB {
     final path = await getDatabasesPath();
     return openDatabase(
       '$path/lessnet_messages.db',
-      version: 2,
+      version: 3,
       onCreate: (db, ver) async {
         await db.execute('''
           CREATE TABLE messages (
@@ -1080,13 +1505,17 @@ class MessageDB {
             fileName TEXT,
             filePath TEXT,
             fileSize INTEGER,
-            deviceId TEXT DEFAULT ''
+            deviceId TEXT DEFAULT '',
+            isGlobal INTEGER DEFAULT 0
           )
         ''');
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
           await db.execute('ALTER TABLE messages ADD COLUMN deviceId TEXT DEFAULT \'\'');
+        }
+        if (oldVersion < 3) {
+          await db.execute('ALTER TABLE messages ADD COLUMN isGlobal INTEGER DEFAULT 0');
         }
       },
     );
@@ -1130,6 +1559,22 @@ class MessageDB {
     await d.delete('messages', where: 'deviceId = ?', whereArgs: [deviceId]);
   }
 
+  static Future<List<ChatMessage>> getGlobal() async {
+    final d = await db;
+    final rows = await d.query(
+      'messages',
+      where: 'isGlobal = 1 OR deviceId = ?',
+      whereArgs: [kGlobalChatId],
+      orderBy: 'time ASC',
+    );
+    return rows.map((m) => ChatMessage.fromMap(m)).toList();
+  }
+
+  static Future<void> deleteGlobal() async {
+    final d = await db;
+    await d.delete('messages', where: 'isGlobal = 1 OR deviceId = ?', whereArgs: [kGlobalChatId]);
+  }
+
   static Future<List<DeviceConversation>> getDeviceList() async {
     final d = await db;
     final rows = await d.rawQuery('''
@@ -1140,7 +1585,7 @@ class MessageDB {
                SELECT id FROM messages WHERE mine = 0 ORDER BY time DESC LIMIT 0
              )) as unreadCount
       FROM messages m
-      WHERE deviceId IS NOT NULL AND deviceId != ''
+      WHERE deviceId IS NOT NULL AND deviceId != '' AND (isGlobal = 0 OR isGlobal IS NULL)
       GROUP BY deviceId
       ORDER BY lastTime DESC
     ''');
@@ -1157,7 +1602,7 @@ class MessageDB {
         lastTime: DateTime.fromMillisecondsSinceEpoch(
           (row['lastTime'] as int?) ?? 0,
         ),
-        unreadCount: 0, // Simplified: we'll count unread via a separate approach
+        unreadCount: 0,
       ));
     }
     // Add "General" conversation if there are messages without deviceId
@@ -1251,8 +1696,7 @@ class _HomePageState extends State<HomePage> {
 }
 
 // ─────────────────────────────────────────────
-// PERMISOS GATE — Full-screen, shown only on first launch
-// or when essential permissions are revoked
+// PERMISOS GATE — Pantalla de permisos inicial
 // ─────────────────────────────────────────────
 class PermissionsGatePage extends StatefulWidget {
   final VoidCallback onAccepted;
@@ -1263,24 +1707,47 @@ class PermissionsGatePage extends StatefulWidget {
 }
 
 class _PermissionsGatePageState extends State<PermissionsGatePage> {
-  List<_PermItem> get _perms => [
-    _PermItem('Ubicacion', Icons.location_on,
-        Permission.locationWhenInUse, 'Requerida para BT scan'),
-    _PermItem('Bluetooth Scan', Icons.bluetooth_searching,
-        Permission.bluetoothScan, 'Buscar dispositivos'),
-    _PermItem('Bluetooth Connect', Icons.bluetooth_connected,
-        Permission.bluetoothConnect, 'Conectarse a dispositivos'),
-    _PermItem('Bluetooth Advertise', Icons.broadcast_on_personal,
-        Permission.bluetoothAdvertise, 'Hacerse visible'),
-  ];
+  List<_PermItem> get _perms {
+    final items = [
+      _PermItem('Ubicacion', Icons.location_on,
+          Permission.locationWhenInUse, 'Requerida para BT scan'),
+      _PermItem('Bluetooth Scan', Icons.bluetooth_searching,
+          Permission.bluetoothScan, 'Buscar dispositivos'),
+      _PermItem('Bluetooth Connect', Icons.bluetooth_connected,
+          Permission.bluetoothConnect, 'Conectarse a dispositivos'),
+      _PermItem('Bluetooth Advertise', Icons.broadcast_on_personal,
+          Permission.bluetoothAdvertise, 'Hacerse visible'),
+    ];
+    items.add(_PermItem('Fotos', Icons.photo_library,
+        Permission.photos, 'Acceder a la galeria'));
+    items.add(_PermItem('Videos', Icons.videocam,
+        Permission.videos, 'Acceder a videos'));
+    items.add(_PermItem('Almacenamiento', Icons.folder,
+        Permission.storage, 'Archivos (Android 12 o menor)'));
+    return items;
+  }
 
   final Map<Permission, PermissionStatus> _statuses = {};
   bool _loading = false;
+  bool _btOn = false;
 
   @override
   void initState() {
     super.initState();
     _checkAll();
+    _checkBt();
+  }
+
+  Future<void> _checkBt() async {
+    try {
+      final s = await FlutterBluePlus.adapterState.first.timeout(
+        const Duration(seconds: 3),
+        onTimeout: () => BluetoothAdapterState.unknown,
+      );
+      if (mounted) {
+        setState(() => _btOn = s == BluetoothAdapterState.on);
+      }
+    } catch (_) {}
   }
 
   Future<void> _checkAll() async {
@@ -1315,156 +1782,168 @@ class _PermissionsGatePageState extends State<PermissionsGatePage> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+    _checkBt();
   }
 
-  bool get _allEssentialGranted {
-    for (final p in _perms) {
-      final st = _statuses[p.permission];
-      if (st == null || !st.isGranted) return false;
-    }
-    return true;
-  }
-
-  void _onAccept() {
-    if (_allEssentialGranted) {
-      widget.onAccepted();
-    } else {
-      _requestAll();
-    }
+  String _st(PermissionStatus? s) {
+    if (s == null) return '...';
+    if (s.isGranted) return 'Concedido';
+    if (s.isDenied) return 'Denegado';
+    if (s.isPermanentlyDenied) return 'Denegado siempre';
+    return s.toString();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-          child: Column(
-            children: [
-              // ─── Close / X button top center ───
-              Align(
-                alignment: Alignment.topCenter,
-                child: Container(
-                  margin: const EdgeInsets.only(top: 8),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: _kCardBgLight,
-                    shape: BoxShape.circle,
-                  ),
-                  child: GestureDetector(
-                    onTap: _allEssentialGranted ? widget.onAccepted : null,
-                    child: Icon(
-                      Icons.close,
-                      color: _allEssentialGranted ? Colors.white : Colors.white24,
-                      size: 22,
-                    ),
-                  ),
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _Header('Permisos', Icons.shield,
+                'Necesarios para Bluetooth'),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: (_btOn ? Colors.white : Colors.red)
+                    .withOpacity(0.06),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: (_btOn ? Colors.white : Colors.red)
+                      .withOpacity(0.15),
                 ),
               ),
-              const SizedBox(height: 24),
-              // ─── Title ───
-              const Text(
-                'Aceptar permisos\nrequeridos',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
-                  height: 1.3,
-                ),
-              ),
-              const SizedBox(height: 28),
-              // ─── Permission cards ───
-              Expanded(
-                child: ListView.separated(
-                  itemCount: _perms.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 10),
-                  itemBuilder: (_, index) {
-                    final p = _perms[index];
-                    final st = _statuses[p.permission];
-                    final granted = st?.isGranted ?? false;
-                    return Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 14),
-                      decoration: BoxDecoration(
-                        color: _kCardBg,
-                        borderRadius: BorderRadius.circular(12),
+              child: Row(
+                children: [
+                  Icon(
+                    _btOn ? Icons.bluetooth : Icons.bluetooth_disabled,
+                    color: _btOn ? Colors.white : Colors.redAccent,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      _btOn
+                          ? 'Bluetooth ACTIVADO'
+                          : 'Bluetooth DESACTIVADO!',
+                      style: TextStyle(
+                        color: _btOn ? Colors.white : Colors.redAccent,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
                       ),
-                      child: Row(
-                        children: [
-                          Icon(p.icon,
-                              color: granted ? Colors.white : Colors.white38,
-                              size: 22),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(p.name,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 14,
-                                    )),
-                                const SizedBox(height: 2),
-                                Text(p.desc,
-                                    style: TextStyle(
-                                      color: Colors.white.withOpacity(0.4),
-                                      fontSize: 12,
-                                    )),
-                              ],
-                            ),
-                          ),
-                          Icon(
-                            granted ? Icons.check_circle : Icons.check_circle_outline,
-                            color: granted ? Colors.white : Colors.white24,
-                            size: 22,
-                          ),
-                        ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.03),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.gps_fixed, color: Colors.white38, size: 16),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Activa la UBICACION en ajustes del telefono para buscar BLE.',
+                      style: TextStyle(
+                        color: Colors.white54,
+                        fontSize: 11,
                       ),
-                    );
-                  },
-                ),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
-              // ─── Accept button ───
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: FilledButton.icon(
-                  icon: _loading
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.black,
+            ),
+            const SizedBox(height: 16),
+            Expanded(
+              child: ListView(
+                children: _perms.map((p) {
+                  final st = _statuses[p.permission];
+                  final g = st?.isGranted ?? false;
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.04),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                          color: Colors.white.withOpacity(0.06)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(p.icon,
+                            color: g ? Colors.white : Colors.white38,
+                            size: 20),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(p.name,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13,
+                                  )),
+                              Text(p.desc,
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.3),
+                                    fontSize: 11,
+                                  )),
+                            ],
                           ),
-                        )
-                      : const Icon(Icons.check, size: 20),
-                  label: Text(
-                    _loading
-                        ? 'Solicitando...'
-                        : (_allEssentialGranted ? 'Aceptar' : 'Solicitar permisos'),
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
+                        ),
+                        Icon(
+                          g ? Icons.check_circle : Icons.cancel,
+                          color: g ? Colors.white : Colors.redAccent,
+                          size: 18,
+                        ),
+                      ],
                     ),
-                  ),
-                  onPressed: _loading ? null : _onAccept,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: Colors.black,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                  );
+                }).toList(),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      icon: _loading
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.black,
+                              ),
+                            )
+                          : const Icon(Icons.done_all),
+                      label: Text(_loading
+                          ? 'Solicitando...'
+                          : 'Solicitar todos'),
+                      onPressed: _loading ? null : _requestAll,
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 8),
-            ],
-          ),
+                const SizedBox(width: 12),
+                FilledButton.icon(
+                  icon: const Icon(Icons.check),
+                  label: const Text('Continuar'),
+                  onPressed: widget.onAccepted,
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -1480,7 +1959,9 @@ class _PermItem {
 }
 
 // ─────────────────────────────────────────────
-// SCAN + ADVERTISING + CONECTAR
+// SCAN PAGE — Buscar y conectar dispositivos BLE
+// Solo muestra dispositivos con UUID LessNet.
+// Auto-scan al entrar. Auto-connect al encontrar.
 // ─────────────────────────────────────────────
 class ScanPage extends StatefulWidget {
   const ScanPage({super.key});
@@ -1490,558 +1971,469 @@ class ScanPage extends StatefulWidget {
 }
 
 class _ScanPageState extends State<ScanPage> {
-  final bt = BtService();
-  final List<ScanResult> _results = [];
+  final BtService bt = BtService();
+  List<ScanResult> _results = [];
   bool _scanning = false;
-  int _scanSeconds = 0;
-  Timer? _scanTimer;
   StreamSubscription? _scanSub;
-  StreamSubscription? _scanningSub;
+  final Map<String, bool> _connecting = {}; // deviceId -> connecting
   StreamSubscription? _connSub;
-  StreamSubscription? _advSub;
-  StreamSubscription? _statusSub;
-  int _advSec = 0;
-  Timer? _advTimer;
 
   @override
   void initState() {
     super.initState();
+    _startScan(); // Auto-scan on page load
     _connSub = bt.onConnectionChange.listen((_) {
       if (mounted) setState(() {});
     });
-    _advSub = bt.onAdvertisingChange.listen((a) {
-      if (mounted) {
-        setState(() {});
-        if (a) {
-          _advSec = 0;
-          _advTimer?.cancel();
-          _advTimer = Timer.periodic(const Duration(seconds: 1),
-              (_) {
-            if (mounted) setState(() => _advSec++);
-          });
-        } else {
-          _advTimer?.cancel();
-          _advTimer = null;
-        }
-      }
-    });
-    _statusSub = bt.onStatusChange.listen((m) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).clearSnackBars();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(m),
-            backgroundColor: Colors.grey[800],
-          ),
-        );
-      }
-    });
-  }
-
-  Future<void> _startScan() async {
-    if (bt.isAdvertising) await bt.stopAdvertising();
-
-    final st = await [
-      Permission.locationWhenInUse,
-      Permission.bluetoothScan,
-      Permission.bluetoothConnect,
-    ].request();
-
-    if (!(st[Permission.bluetoothScan]?.isGranted ?? false) ||
-        !(st[Permission.bluetoothConnect]?.isGranted ?? false)) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Concede permisos primero'),
-          backgroundColor: Colors.red,
-        ));
-      }
-      return;
-    }
-
-    // Check BT is ON
-    try {
-      final a = await FlutterBluePlus.adapterState.first.timeout(
-        const Duration(seconds: 3),
-        onTimeout: () => BluetoothAdapterState.unknown,
-      );
-      if (a != BluetoothAdapterState.on) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Bluetooth APAGADO!'),
-            backgroundColor: Colors.red,
-            duration: Duration(seconds: 5),
-          ));
-        }
-        return;
-      }
-    } catch (_) {}
-
-    _results.clear();
-    setState(() => _scanning = true);
-    _scanSeconds = 0;
-    _scanTimer?.cancel();
-    _scanTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() => _scanSeconds++);
-    });
-
-    try {
-      // NO withServices filter — OPPO can't handle 128-bit UUID filters
-      await FlutterBluePlus.startScan(
-        timeout: const Duration(seconds: 60),
-        androidUsesFineLocation: true,
-      );
-      _scanSub = FlutterBluePlus.scanResults.listen((r) {
-        if (mounted) {
-          setState(() {
-            _results.clear();
-            _results.addAll(r);
-          });
-        }
-      });
-      _scanningSub = FlutterBluePlus.isScanning.listen((s) {
-        if (!s && mounted) {
-          setState(() => _scanning = false);
-          _scanTimer?.cancel();
-          _scanTimer = null;
-        }
-      });
-    } catch (_) {
-      if (mounted) {
-        setState(() => _scanning = false);
-        _scanTimer?.cancel();
-      }
-    }
-  }
-
-  Future<void> _stopScan() async {
-    await FlutterBluePlus.stopScan();
-    _scanSub?.cancel();
-    _scanningSub?.cancel();
-    _scanTimer?.cancel();
-    _scanTimer = null;
-    if (mounted) setState(() => _scanning = false);
-  }
-
-  Future<void> _startAdv() async {
-    if (_scanning) await _stopScan();
-    try {
-      await bt.startAdvertising();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Visible! El otro celular debe buscar.'),
-          backgroundColor: Colors.grey,
-        ));
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text(
-              'Este celular NO soporta advertising. Usalo para BUSCAR.'),
-          backgroundColor: Colors.red,
-          duration: Duration(seconds: 6),
-        ));
-      }
-    }
-  }
-
-  Future<void> _connect(BluetoothDevice d) async {
-    try {
-      await bt.connectToDevice(d);
-      await _stopScan();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Error: $e'),
-          backgroundColor: Colors.red,
-        ));
-      }
-    }
-  }
-
-  String _fmt(int s) {
-    return '${(s ~/ 60).toString().padLeft(2, '0')}:${(s % 60).toString().padLeft(2, '0')}';
   }
 
   @override
   void dispose() {
     _scanSub?.cancel();
-    _scanningSub?.cancel();
     _connSub?.cancel();
-    _advSub?.cancel();
-    _statusSub?.cancel();
-    _advTimer?.cancel();
-    _scanTimer?.cancel();
-    FlutterBluePlus.stopScan();
     super.dispose();
+  }
+
+  /// Check if a scan result advertises the LessNet service UUID
+  bool _isLessNetDevice(ScanResult result) {
+    if (result.advertisementData.serviceUuids.isNotEmpty) {
+      for (final uuid in result.advertisementData.serviceUuids) {
+        if (uuid.str128.toLowerCase() == lessnetServiceUuid.toLowerCase()) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  Future<void> _startScan() async {
+    if (_scanning) return;
+    setState(() {
+      _scanning = true;
+      _results.clear();
+    });
+
+    try {
+      // Request permissions
+      await [
+        Permission.locationWhenInUse,
+        Permission.bluetoothScan,
+        Permission.bluetoothConnect,
+      ].request();
+
+      // Check BT adapter
+      final adapterState = await FlutterBluePlus.adapterState.first.timeout(
+        const Duration(seconds: 3),
+        onTimeout: () => BluetoothAdapterState.unknown,
+      );
+      if (adapterState != BluetoothAdapterState.on) {
+        if (mounted) {
+          setState(() => _scanning = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Bluetooth desactivado'),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Scan without UUID filter (OPPO compatibility)
+      await FlutterBluePlus.startScan(
+        timeout: const Duration(seconds: 15),
+        androidUsesFineLocation: true,
+      );
+
+      _scanSub = FlutterBluePlus.scanResults.listen((results) {
+        if (!mounted) return;
+
+        // Filter: only show devices with LessNet service UUID
+        final filtered = <ScanResult>[];
+        for (final r in results) {
+          if (_isLessNetDevice(r)) {
+            filtered.add(r);
+
+            // Auto-connect to LessNet devices
+            final deviceId = r.device.platformName.isNotEmpty
+                ? r.device.platformName
+                : r.device.remoteId.toString();
+            if (!bt.isDeviceConnected(deviceId) &&
+                !_connecting.containsKey(deviceId)) {
+              _autoConnect(r.device, deviceId);
+            }
+          }
+        }
+
+        setState(() {
+          _results = filtered;
+        });
+      });
+
+      // Auto-stop after scan timeout
+      Future.delayed(const Duration(seconds: 15), () {
+        if (mounted && _scanning) {
+          setState(() => _scanning = false);
+        }
+      });
+    } catch (e) {
+      if (mounted) {
+        setState(() => _scanning = false);
+      }
+    }
+  }
+
+  Future<void> _autoConnect(BluetoothDevice device, String deviceId) async {
+    setState(() => _connecting[deviceId] = true);
+    try {
+      await bt.connectToDevice(device);
+    } catch (_) {
+      // Connection failed, will retry on next scan
+    } finally {
+      if (mounted) {
+        setState(() => _connecting.remove(deviceId));
+      }
+    }
+  }
+
+  void _stopScan() {
+    _scanSub?.cancel();
+    _scanSub = null;
+    try {
+      FlutterBluePlus.stopScan();
+    } catch (_) {}
+    setState(() => _scanning = false);
+  }
+
+  String _deviceName(ScanResult r) {
+    final name = r.device.platformName;
+    if (name.isNotEmpty) return name;
+    return r.device.remoteId.toString().substring(0, 8);
   }
 
   @override
   Widget build(BuildContext context) {
-    final sorted = List<ScanResult>.from(_results)..sort((a, b) {
-      final aL = a.advertisementData.serviceUuids.any(
-          (u) => u.str128.toLowerCase() == lessnetServiceUuid.toLowerCase());
-      final bL = b.advertisementData.serviceUuids.any(
-          (u) => u.str128.toLowerCase() == lessnetServiceUuid.toLowerCase());
-      if (aL && !bL) return -1;
-      if (!aL && bL) return 1;
-      return b.rssi.compareTo(a.rssi);
-    });
-
     return SafeArea(
-      child: SingleChildScrollView(
+      child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _Header(
-              'Dispositivos',
-              Icons.bluetooth_searching,
-              bt.centralConnectionCount > 0
-                  ? '${bt.centralConnectionCount} conectado${bt.centralConnectionCount > 1 ? 's' : ''}'
-                  : bt.isAdvertising
-                      ? 'Visible'
-                      : 'Sin conexion',
-              subtitleColor: bt.isConnected ? Colors.greenAccent : (bt.isAdvertising ? Colors.blueAccent : Colors.white38),
-            ),
-            const SizedBox(height: 16),
-
-            // Connected devices cards (show all)
-            ...bt.connectedDeviceIds.map((devId) => Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: _kCardBg,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                    color: devId == bt.activeDeviceId
-                        ? Colors.greenAccent.withOpacity(0.3)
-                        : _kBorder),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    devId == bt.activeDeviceId
-                        ? Icons.bluetooth_connected
-                        : Icons.bluetooth,
-                    color: devId == bt.activeDeviceId ? Colors.greenAccent : Colors.white,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(bt.getDeviceName(devId),
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: devId == bt.activeDeviceId ? FontWeight.w600 : FontWeight.w400,
-                        )),
-                  ),
-                  TextButton(
-                    onPressed: () => bt.disconnectDevice(devId),
-                    child: const Text('Desconectar',
-                        style: TextStyle(color: Colors.redAccent)),
-                  ),
-                ],
-              ),
-            )),
-
-            // Advertising indicator
-            if (bt.isAdvertising && !bt.isConnected)
-              Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: _kCardBgLight,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                      color: _kBorder),
-                ),
-                child: Row(
-                  children: [
-                    const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white54,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'Esperando conexion... ${_fmt(_advSec)}',
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.6),
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        bt.stopAdvertising();
-                        _advTimer?.cancel();
-                        _advTimer = null;
-                        _advSec = 0;
-                        setState(() {});
-                      },
-                      child: const Text('Detener',
-                          style:
-                              TextStyle(color: Colors.redAccent)),
-                    ),
-                  ],
-                ),
-              ),
-
-            // Advertising error
-            if (bt.advertisingError.isNotEmpty &&
-                !bt.isAdvertising)
-              Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  'Advertising no disponible. Usa ESTE celular para BUSCAR.',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.6),
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-
-            // Two mode buttons
             Row(
               children: [
-                Expanded(
-                  child: FilledButton.icon(
-                    icon: _scanning
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.black,
-                            ),
-                          )
-                        : const Icon(Icons.search),
-                    label: Text(
-                      _scanning ? _fmt(_scanSeconds) : 'Buscar',
-                      style: const TextStyle(fontSize: 13),
-                    ),
-                    onPressed: _scanning
-                        ? _stopScan
-                        : (bt.isAdvertising ? null : _startScan),
-                    style: FilledButton.styleFrom(
-                      padding:
-                          const EdgeInsets.symmetric(vertical: 12),
-                      backgroundColor:
-                          _scanning ? Colors.grey : Colors.white,
-                    ),
-                  ),
+                const Expanded(
+                  child: _Header('Dispositivos', Icons.bluetooth_searching,
+                      'Busca dispositivos LessNet'),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: FilledButton.icon(
-                    icon: bt.isAdvertising
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.black,
-                            ),
-                          )
-                        : const Icon(Icons.broadcast_on_personal),
-                    label: Text(
-                      bt.isAdvertising
-                          ? _fmt(_advSec)
-                          : 'Visible',
-                      style: const TextStyle(fontSize: 13),
-                    ),
-                    onPressed: bt.isPeripheralConnected
-                        ? null
-                        : (bt.isAdvertising
-                            ? () {
-                                bt.stopAdvertising();
-                                _advTimer?.cancel();
-                                _advSec = 0;
-                                setState(() {});
-                              }
-                            : _startAdv),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: bt.isAdvertising
-                          ? Colors.grey
-                          : Colors.white,
-                      padding:
-                          const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 16),
-
-            // Scan results
-            if (_scanning || _results.isNotEmpty) ...[
-              Row(
-                children: [
-                  Text(
-                    'Encontrados (${_results.length})',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  if (_scanning)
-                    const SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white38,
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              ...sorted.map((r) {
-                final isC = bt.connectedDevice?.remoteId ==
-                    r.device.remoteId;
-                final isLN = r.advertisementData.serviceUuids.any(
-                    (u) => u.str128.toLowerCase() ==
-                        lessnetServiceUuid.toLowerCase());
-                final name = r.device.platformName.isNotEmpty
-                    ? r.device.platformName
-                    : 'Desconocido';
-                final sig = r.rssi > -60
-                    ? Colors.greenAccent
-                    : r.rssi > -80
-                        ? Colors.orangeAccent
-                        : Colors.redAccent;
-
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: isLN
-                        ? _kCardBgLight
-                        : _kCardBgDim,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: isLN
-                          ? _kBorder
-                          : _kBorderDim,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        isLN ? Icons.phone_android : Icons.bluetooth,
-                        color: isLN ? Colors.white : Colors.white38,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment:
-                              CrossAxisAlignment.start,
+                const SizedBox(width: 8),
+                // Visible (advertising) toggle
+                StreamBuilder<bool>(
+                  stream: bt.onAdvertisingChange,
+                  initialData: bt.isAdvertising,
+                  builder: (context, snap) {
+                    final adv = snap.data ?? bt.isAdvertising;
+                    return GestureDetector(
+                      onTap: () async {
+                        try {
+                          if (adv) {
+                            await bt.stopAdvertising();
+                          } else {
+                            await bt.startAdvertising();
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(bt.advertisingError.isNotEmpty
+                                    ? bt.advertisingError
+                                    : 'Error al cambiar visibilidad'),
+                                backgroundColor: Colors.redAccent,
+                              ),
+                            );
+                          }
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: adv ? Colors.white : Colors.white10,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: adv ? Colors.white : Colors.white24,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(name,
-                                      style: TextStyle(
-                                        color: isLN
-                                            ? Colors.white
-                                            : Colors.white60,
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 13,
-                                      )),
-                                ),
-                                if (isLN)
-                                  Container(
-                                    padding: const EdgeInsets
-                                        .symmetric(
-                                        horizontal: 5, vertical: 1),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white
-                                          .withOpacity(0.12),
-                                      borderRadius:
-                                          BorderRadius.circular(3),
-                                    ),
-                                    child: const Text('LessNet',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 8,
-                                          fontWeight: FontWeight.w700,
-                                        )),
-                                  ),
-                              ],
+                            Icon(
+                              adv ? Icons.visibility : Icons.visibility_off,
+                              color: adv ? Colors.black : Colors.white54,
+                              size: 16,
                             ),
+                            const SizedBox(width: 6),
                             Text(
-                              r.device.remoteId.toString(),
+                              adv ? 'Visible' : 'Oculto',
                               style: TextStyle(
-                                color:
-                                    Colors.white.withOpacity(0.25),
-                                fontSize: 10,
+                                color: adv ? Colors.black : Colors.white54,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 12,
                               ),
                             ),
                           ],
                         ),
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: sig.withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(5),
+                    );
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            // Scan button
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                icon: _scanning
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.black,
                         ),
-                        child: Text('${r.rssi}',
-                            style: TextStyle(
-                              color: sig,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                            )),
-                      ),
-                      if (!isC)
-                        Padding(
-                          padding: const EdgeInsets.only(left: 4),
-                          child: TextButton(
-                            onPressed: () => _connect(r.device),
-                            child: const Text('Conectar',
-                                style: TextStyle(fontSize: 11)),
-                          ),
-                        ),
-                    ],
-                  ),
-                );
-              }),
-            ] else if (!_scanning &&
-                !bt.isAdvertising &&
-                !bt.isConnected)
-              Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 30),
-                  child: Text(
-                    'Presiona Buscar o Visible\npara empezar',
-                    style:
-                        const TextStyle(color: Color(0xFF2F2F2F)),
-                    textAlign: TextAlign.center,
-                  ),
+                      )
+                    : const Icon(Icons.search),
+                label: Text(
+                    _scanning ? 'Buscando...' : 'Buscar dispositivos'),
+                onPressed: _scanning ? _stopScan : _startScan,
+              ),
+            ),
+            const SizedBox(height: 16),
+            // Connected devices section
+            if (bt.connectedDeviceIds.isNotEmpty) ...[
+              const Text(
+                'Conectados',
+                style: TextStyle(
+                  color: Colors.white54,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
+              const SizedBox(height: 8),
+              ...bt.connectedDeviceIds
+                  .map((id) => _buildConnectedDevice(id)),
+              const SizedBox(height: 12),
+            ],
+            // Scan results (only LessNet devices)
+            Expanded(
+              child: _results.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _scanning
+                                ? Icons.bluetooth_searching
+                                : Icons.bluetooth_disabled,
+                            color: Colors.white24,
+                            size: 48,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            _scanning
+                                ? 'Buscando dispositivos LessNet...'
+                                : 'Sin dispositivos LessNet encontrados',
+                            style: const TextStyle(
+                              color: Colors.white38,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : ListView.builder(
+                      itemCount: _results.length,
+                      itemBuilder: (context, index) {
+                        final r = _results[index];
+                        final deviceId =
+                            r.device.platformName.isNotEmpty
+                                ? r.device.platformName
+                                : r.device.remoteId.toString();
+                        final isConnecting =
+                            _connecting[deviceId] == true;
+                        final isConnected =
+                            bt.isDeviceConnected(deviceId);
+
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: _kCardBg,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: _kBorder),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: isConnected
+                                      ? Colors.white.withOpacity(0.15)
+                                      : Colors.white.withOpacity(0.05),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Icon(
+                                  isConnected
+                                      ? Icons.bluetooth_connected
+                                      : Icons.bluetooth,
+                                  color: isConnected
+                                      ? Colors.white
+                                      : Colors.white38,
+                                  size: 20,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    FutureBuilder<String>(
+                                      future: bt.getDeviceDisplayName(
+                                          deviceId),
+                                      initialData: _deviceName(r),
+                                      builder: (context, snap) => Text(
+                                        snap.data ?? _deviceName(r),
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ),
+                                    Text(
+                                      'LessNet · ${r.rssi} dBm',
+                                      style: TextStyle(
+                                        color:
+                                            Colors.white.withOpacity(0.3),
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              // Auto-connect: no "Conectar" button
+                              // Show status indicator instead
+                              if (isConnected)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color:
+                                        Colors.white.withOpacity(0.15),
+                                    borderRadius:
+                                        BorderRadius.circular(12),
+                                  ),
+                                  child: const Text(
+                                    'Conectado',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                )
+                              else if (isConnecting)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color:
+                                        Colors.white.withOpacity(0.08),
+                                    borderRadius:
+                                        BorderRadius.circular(12),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      SizedBox(
+                                        width: 12,
+                                        height: 12,
+                                        child:
+                                            CircularProgressIndicator(
+                                          strokeWidth: 1.5,
+                                          color: Colors.white
+                                              .withOpacity(0.6),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        'Conectando...',
+                                        style: TextStyle(
+                                          color: Colors.white
+                                              .withOpacity(0.6),
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+            ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildConnectedDevice(String deviceId) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: _kCardBg,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.bluetooth_connected,
+              color: Colors.white, size: 18),
+          const SizedBox(width: 10),
+          Expanded(
+            child: FutureBuilder<String>(
+              future: bt.getDeviceDisplayName(deviceId),
+              initialData: deviceId,
+              builder: (context, snap) => Text(
+                snap.data ?? deviceId,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close,
+                color: Colors.white38, size: 18),
+            onPressed: () async {
+              await bt.disconnectDevice(deviceId);
+              if (mounted) setState(() {});
+            },
+          ),
+        ],
       ),
     );
   }
 }
 
 // ─────────────────────────────────────────────
-// CHAT LIST — List of device conversations
+// CHAT LIST PAGE — Conversaciones con Chat Global
 // ─────────────────────────────────────────────
 class ChatListPage extends StatefulWidget {
   const ChatListPage({super.key});
@@ -2051,8 +2443,9 @@ class ChatListPage extends StatefulWidget {
 }
 
 class _ChatListPageState extends State<ChatListPage> {
-  final bt = BtService();
+  final BtService bt = BtService();
   List<DeviceConversation> _conversations = [];
+  String _lastGlobalMessage = '';
   bool _loading = true;
   StreamSubscription? _msgSub;
   StreamSubscription? _connSub;
@@ -2061,68 +2454,10 @@ class _ChatListPageState extends State<ChatListPage> {
   void initState() {
     super.initState();
     _loadConversations();
-    _msgSub = bt.onMessage.listen((_) {
-      if (mounted) _loadConversations();
-    });
+    _msgSub = bt.onMessage.listen((_) => _loadConversations());
     _connSub = bt.onConnectionChange.listen((_) {
-      if (mounted) _loadConversations();
+      if (mounted) setState(() {});
     });
-  }
-
-  Future<void> _loadConversations() async {
-    try {
-      final convs = await MessageDB.getDeviceList();
-      if (mounted) setState(() {
-        _conversations = convs;
-        _loading = false;
-      });
-    } catch (_) {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  String _fmtTime(DateTime t) {
-    final now = DateTime.now();
-    final diff = now.difference(t);
-    if (diff.inDays == 0) {
-      return '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
-    } else if (diff.inDays == 1) {
-      return 'Ayer';
-    } else if (diff.inDays < 7) {
-      const days = ['Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab', 'Dom'];
-      return days[t.weekday - 1];
-    } else {
-      return '${t.day}/${t.month}';
-    }
-  }
-
-  Future<void> _deleteConversation(String deviceId) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A1A),
-        title: const Text('Eliminar chat', style: TextStyle(color: Colors.white)),
-        content: Text(
-          'Seguro que quieres eliminar la conversacion con ${deviceId.isEmpty ? "General" : deviceId}? Esta accion no se puede deshacer.',
-          style: const TextStyle(color: Colors.white70),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Eliminar', style: TextStyle(color: Colors.redAccent)),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true) {
-      await MessageDB.deleteByDevice(deviceId);
-      bt.messages.removeWhere((m) => m.deviceId == deviceId);
-      _loadConversations();
-    }
   }
 
   @override
@@ -2132,339 +2467,621 @@ class _ChatListPageState extends State<ChatListPage> {
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final currentDeviceId = bt.activeDeviceId;
+  Future<void> _loadConversations() async {
+    final convos = await MessageDB.getDeviceList();
+    final globalMsgs = await MessageDB.getGlobal();
+    if (mounted) {
+      setState(() {
+        _conversations = convos;
+        _lastGlobalMessage =
+            globalMsgs.isNotEmpty ? globalMsgs.last.text : '';
+        _loading = false;
+      });
+    }
+  }
 
-    // Show conversation list always (even when connected, for multi-device navigation)
-    return SafeArea(
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
-            child: _Header(
-              'Chat',
-              Icons.chat_bubble,
-              _conversations.isEmpty
-                  ? 'Sin conversaciones'
-                  : bt.centralConnectionCount > 0
-                      ? '${bt.centralConnectionCount} dispositivo${bt.centralConnectionCount > 1 ? 's' : ''} conectado${bt.centralConnectionCount > 1 ? 's' : ''}'
-                      : '${_conversations.length} conversacion${_conversations.length > 1 ? 'es' : ''}',
-              subtitleColor: bt.isConnected ? Colors.greenAccent : Colors.white38,
+  void _showNewChatDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => _NewChatDialog(
+        bt: bt,
+        onSelect: (deviceId) {
+          Navigator.of(ctx).pop();
+          Navigator.of(context)
+              .push(
+            MaterialPageRoute(
+              builder: (_) =>
+                  ChatPage(deviceId: deviceId, isGlobal: false),
             ),
+          )
+              .then((_) => _loadConversations());
+        },
+      ),
+    );
+  }
+
+  void _showRenameDialog(String deviceId) {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: _kCardBg,
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Renombrar dispositivo',
+          style: TextStyle(
+              color: Colors.white, fontWeight: FontWeight.w700),
+        ),
+        content: TextField(
+          controller: controller,
+          style: const TextStyle(color: Colors.white),
+          decoration: InputDecoration(
+            hintText: 'Nombre personalizado',
+            hintStyle:
+                TextStyle(color: Colors.white.withOpacity(0.3)),
           ),
-          // Show currently connected devices as quick-access chips
-          if (bt.centralConnectionCount > 0)
-            Container(
-              height: 44,
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: bt.connectedDeviceIds.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
-                itemBuilder: (_, i) {
-                  final devId = bt.connectedDeviceIds[i];
-                  final isActive = devId == currentDeviceId;
-                  return ActionChip(
-                    label: Text(bt.getDeviceName(devId)),
-                    onPressed: () {
-                      bt.setActiveDevice(devId);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ChatPage(deviceId: devId),
-                        ),
-                      ).then((_) => _loadConversations());
-                    },
-                    backgroundColor: isActive ? _kChipBgActive : _kCardBgLight,
-                    labelStyle: TextStyle(
-                      color: isActive ? Colors.white : Colors.white60,
-                      fontSize: 12,
-                      fontWeight: isActive ? FontWeight.w700 : FontWeight.w400,
-                    ),
-                    side: BorderSide(
-                      color: isActive ? _kBorder : _kBorderDim,
-                    ),
-                  );
-                },
-              ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancelar',
+                style: TextStyle(color: Colors.grey)),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final name = controller.text.trim();
+              if (name.isNotEmpty) {
+                await bt.setDeviceCustomName(deviceId, name);
+                _loadConversations();
+              }
+              if (ctx.mounted) Navigator.of(ctx).pop();
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: Colors.black,
             ),
-          Expanded(
-            child: _loading
-                ? const Center(child: CircularProgressIndicator(color: Colors.white))
-                : _conversations.isEmpty
-                    ? Center(
-                        child: Text(
-                          'Conecta un dispositivo para chatear',
-                          style: const TextStyle(color: Color(0xFF2F2F2F)),
-                          textAlign: TextAlign.center,
-                        ),
-                      )
-                    : RefreshIndicator(
-                        onRefresh: _loadConversations,
-                        color: Colors.white,
-                        backgroundColor: Colors.grey[800],
-                        child: ListView.builder(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          itemCount: _conversations.length,
-                          itemBuilder: (_, i) {
-                            final conv = _conversations[i];
-                            final isActive = conv.deviceId == currentDeviceId;
-                            return Dismissible(
-                              key: Key(conv.deviceId + conv.lastTime.millisecondsSinceEpoch.toString()),
-                              direction: DismissDirection.endToStart,
-                              background: Container(
-                                alignment: Alignment.centerRight,
-                                padding: const EdgeInsets.only(right: 20),
-                                margin: const EdgeInsets.only(bottom: 6),
-                                decoration: BoxDecoration(
-                                  color: Colors.red.withOpacity(0.15),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: const Icon(Icons.delete, color: Colors.redAccent),
-                              ),
-                              confirmDismiss: (_) => _deleteConversation(conv.deviceId).then((_) => false),
-                              child: Container(
-                                margin: const EdgeInsets.only(bottom: 6),
-                                child: Container(
-                                  decoration: isActive
-                                      ? BoxDecoration(
-                                          color: _kCardBg,
-                                          borderRadius: BorderRadius.circular(12),
-                                          border: Border.all(color: _kBorder),
-                                        )
-                                      : BoxDecoration(
-                                          color: _kCardBgDim,
-                                          borderRadius: BorderRadius.circular(12),
-                                        ),
-                                  child: Material(
-                                    color: Colors.transparent,
-                                    borderRadius: BorderRadius.circular(12),
-                                    child: InkWell(
-                                    borderRadius: BorderRadius.circular(12),
-                                    onTap: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) => ChatPage(deviceId: conv.deviceId),
-                                        ),
-                                      ).then((_) => _loadConversations());
-                                    },
-                                    onLongPress: () => _deleteConversation(conv.deviceId),
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(14),
-                                      child: Row(
-                                        children: [
-                                          Container(
-                                            padding: const EdgeInsets.all(10),
-                                            decoration: BoxDecoration(
-                                              color: isActive
-                                                  ? const Color(0xFF1A1A1A)
-                                                  : _kCardBgLight,
-                                              borderRadius: BorderRadius.circular(10),
-                                            ),
-                                            child: Icon(
-                                              isActive ? Icons.bluetooth_connected : Icons.phone_android,
-                                              color: isActive ? Colors.white : Colors.white38,
-                                              size: 20,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 12),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  conv.displayName,
-                                                  style: TextStyle(
-                                                    color: isActive ? Colors.white : Colors.white70,
-                                                    fontWeight: FontWeight.w600,
-                                                    fontSize: 14,
-                                                  ),
-                                                ),
-                                                const SizedBox(height: 2),
-                                                Text(
-                                                  conv.lastMessage,
-                                                  style: TextStyle(
-                                                    color: const Color(0xFF595959),
-                                                    fontSize: 12,
-                                                  ),
-                                                  maxLines: 1,
-                                                  overflow: TextOverflow.ellipsis,
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          Column(
-                                            crossAxisAlignment: CrossAxisAlignment.end,
-                                            children: [
-                                              Text(
-                                                _fmtTime(conv.lastTime),
-                                                style: TextStyle(
-                                                  color: const Color(0xFF404040),
-                                                  fontSize: 11,
-                                                ),
-                                              ),
-                                              if (conv.unreadCount > 0)
-                                                Container(
-                                                  margin: const EdgeInsets.only(top: 4),
-                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                                  decoration: BoxDecoration(
-                                                    color: Colors.white,
-                                                    borderRadius: BorderRadius.circular(10),
-                                                  ),
-                                                  child: Text(
-                                                    '${conv.unreadCount}',
-                                                    style: const TextStyle(
-                                                      color: Colors.black,
-                                                      fontSize: 10,
-                                                      fontWeight: FontWeight.w700,
-                                                    ),
-                                                  ),
-                                                ),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
-                          },
-                        ),
-                      ),
+            child: const Text('Guardar'),
           ),
         ],
       ),
     );
   }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Expanded(
+                  child: _Header(
+                      'Chat', Icons.chat_bubble, 'Conversaciones'),
+                ),
+                // + button to start new chat
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: IconButton(
+                    icon:
+                        const Icon(Icons.add, color: Colors.black),
+                    onPressed: _showNewChatDialog,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            // Global Chat — always first, pinned
+            _buildGlobalChatItem(),
+            const SizedBox(height: 8),
+            // Personal conversations
+            Expanded(
+              child: _loading
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                          color: Colors.white),
+                    )
+                  : _conversations.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.chat_bubble_outline,
+                                  color: Colors.white24, size: 48),
+                              const SizedBox(height: 12),
+                              const Text(
+                                'Sin conversaciones',
+                                style: TextStyle(
+                                    color: Colors.white38,
+                                    fontSize: 14),
+                              ),
+                            ],
+                          ),
+                        )
+                      : ListView.builder(
+                          itemCount: _conversations.length,
+                          itemBuilder: (context, index) {
+                            final convo = _conversations[index];
+                            return _buildConversationItem(convo);
+                          },
+                        ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGlobalChatItem() {
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context)
+            .push(
+          MaterialPageRoute(
+            builder: (_) => const ChatPage(
+                deviceId: kGlobalChatId, isGlobal: true),
+          ),
+        )
+            .then((_) => _loadConversations());
+      },
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: _kCardBg,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.white.withOpacity(0.12)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.public,
+                  color: Colors.white, size: 22),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Chat Global',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _lastGlobalMessage.isNotEmpty
+                        ? _lastGlobalMessage
+                        : 'Envia un mensaje a todos los conectados',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.4),
+                      fontSize: 12,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right,
+                color: Colors.white24, size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildConversationItem(DeviceConversation convo) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context)
+            .push(
+          MaterialPageRoute(
+            builder: (_) => ChatPage(
+                deviceId: convo.deviceId, isGlobal: false),
+          ),
+        )
+            .then((_) => _loadConversations());
+      },
+      onLongPress: () => _showRenameDialog(convo.deviceId),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 6),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: _kCardBg,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: _kBorder),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.phone_android,
+                  color: Colors.white54, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  FutureBuilder<String>(
+                    future:
+                        bt.getDeviceDisplayName(convo.deviceId),
+                    initialData: convo.displayName,
+                    builder: (context, snap) => Text(
+                      snap.data ?? convo.displayName,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    convo.lastMessage.isNotEmpty
+                        ? convo.lastMessage
+                        : 'Sin mensajes',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.3),
+                      fontSize: 12,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            Text(
+              _formatTime(convo.lastTime),
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.2),
+                fontSize: 10,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatTime(DateTime t) {
+    final now = DateTime.now();
+    final diff = now.difference(t);
+    if (diff.inMinutes < 1) return 'ahora';
+    if (diff.inHours < 1) return '${diff.inMinutes}m';
+    if (diff.inDays < 1) return '${diff.inHours}h';
+    return '${diff.inDays}d';
+  }
 }
 
 // ─────────────────────────────────────────────
-// CHAT — Conversation with a specific device
+// NEW CHAT DIALOG — Buscar dispositivo para chat personal
+// ─────────────────────────────────────────────
+class _NewChatDialog extends StatefulWidget {
+  final BtService bt;
+  final Function(String deviceId) onSelect;
+  const _NewChatDialog({required this.bt, required this.onSelect});
+
+  @override
+  State<_NewChatDialog> createState() => _NewChatDialogState();
+}
+
+class _NewChatDialogState extends State<_NewChatDialog> {
+  List<ScanResult> _results = [];
+  bool _scanning = false;
+  StreamSubscription? _scanSub;
+  final Map<String, bool> _connecting = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _startScan();
+  }
+
+  @override
+  void dispose() {
+    _scanSub?.cancel();
+    try {
+      FlutterBluePlus.stopScan();
+    } catch (_) {}
+    super.dispose();
+  }
+
+  bool _isLessNetDevice(ScanResult result) {
+    if (result.advertisementData.serviceUuids.isNotEmpty) {
+      for (final uuid in result.advertisementData.serviceUuids) {
+        if (uuid.str128.toLowerCase() ==
+            lessnetServiceUuid.toLowerCase()) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  Future<void> _startScan() async {
+    setState(() {
+      _scanning = true;
+      _results.clear();
+    });
+
+    try {
+      await FlutterBluePlus.startScan(
+        timeout: const Duration(seconds: 10),
+        androidUsesFineLocation: true,
+      );
+
+      _scanSub = FlutterBluePlus.scanResults.listen((results) {
+        if (!mounted) return;
+        // Only show LessNet devices
+        final filtered = results.where(_isLessNetDevice).toList();
+        setState(() {
+          _results = filtered;
+        });
+      });
+
+      Future.delayed(const Duration(seconds: 10), () {
+        if (mounted) setState(() => _scanning = false);
+      });
+    } catch (_) {
+      if (mounted) setState(() => _scanning = false);
+    }
+  }
+
+  Future<void> _connectAndSelect(
+      BluetoothDevice device, String deviceId) async {
+    if (widget.bt.isDeviceConnected(deviceId)) {
+      widget.onSelect(deviceId);
+      return;
+    }
+
+    setState(() => _connecting[deviceId] = true);
+    try {
+      await widget.bt.connectToDevice(device);
+      widget.onSelect(deviceId);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Error al conectar'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _connecting.remove(deviceId));
+    }
+  }
+
+  String _deviceName(ScanResult r) {
+    return r.device.platformName.isNotEmpty
+        ? r.device.platformName
+        : r.device.remoteId.toString().substring(0, 8);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: _kCardBg,
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16)),
+      title: Row(
+        children: [
+          const Icon(Icons.add_circle_outline,
+              color: Colors.white, size: 20),
+          const SizedBox(width: 8),
+          const Text(
+            'Nuevo chat',
+            style: TextStyle(
+                color: Colors.white, fontWeight: FontWeight.w700),
+          ),
+        ],
+      ),
+      content: SizedBox(
+        width: double.maxFinite,
+        height: 300,
+        child: _scanning && _results.isEmpty
+            ? const Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(color: Colors.white),
+                    SizedBox(height: 12),
+                    Text('Buscando dispositivos...',
+                        style: TextStyle(
+                            color: Colors.white38, fontSize: 13)),
+                  ],
+                ),
+              )
+            : _results.isEmpty
+                ? const Center(
+                    child: Text('Sin dispositivos LessNet',
+                        style: TextStyle(
+                            color: Colors.white38, fontSize: 13)),
+                  )
+                : ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: _results.length,
+                    itemBuilder: (context, index) {
+                      final r = _results[index];
+                      final deviceId =
+                          r.device.platformName.isNotEmpty
+                              ? r.device.platformName
+                              : r.device.remoteId.toString();
+                      final isConnecting =
+                          _connecting[deviceId] == true;
+                      final isConnected = widget.bt
+                          .isDeviceConnected(deviceId);
+
+                      return ListTile(
+                        leading: Icon(
+                          isConnected
+                              ? Icons.bluetooth_connected
+                              : Icons.bluetooth,
+                          color: isConnected
+                              ? Colors.white
+                              : Colors.white54,
+                        ),
+                        title: FutureBuilder<String>(
+                          future: widget.bt
+                              .getDeviceDisplayName(deviceId),
+                          initialData: _deviceName(r),
+                          builder: (context, snap) => Text(
+                            snap.data ?? _deviceName(r),
+                            style: const TextStyle(
+                                color: Colors.white, fontSize: 14),
+                          ),
+                        ),
+                        subtitle: Text(
+                          isConnected
+                              ? 'Conectado'
+                              : 'LessNet · ${r.rssi} dBm',
+                          style: TextStyle(
+                              color: Colors.white.withOpacity(0.3),
+                              fontSize: 11),
+                        ),
+                        trailing: isConnecting
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 1.5,
+                                    color: Colors.white),
+                              )
+                            : const Icon(Icons.chevron_right,
+                                color: Colors.white24),
+                        onTap: isConnecting
+                            ? null
+                            : () => _connectAndSelect(
+                                r.device, deviceId),
+                      );
+                    },
+                  ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancelar',
+              style: TextStyle(color: Colors.grey)),
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+// CHAT PAGE — Conversacion con dispositivo o global
 // ─────────────────────────────────────────────
 class ChatPage extends StatefulWidget {
   final String deviceId;
-  const ChatPage({super.key, this.deviceId = ''});
+  final bool isGlobal;
+  const ChatPage(
+      {super.key, this.deviceId = '', this.isGlobal = false});
 
   @override
   State<ChatPage> createState() => _ChatPageState();
 }
 
 class _ChatPageState extends State<ChatPage> {
-  final _ctrl = TextEditingController();
-  final _scroll = ScrollController();
-  final bt = BtService();
+  final BtService bt = BtService();
+  final _controller = TextEditingController();
+  final _scrollController = ScrollController();
+  List<ChatMessage> _messages = [];
+  bool _connected = false;
+  String _deviceName = '';
   StreamSubscription? _msgSub;
   StreamSubscription? _connSub;
-  StreamSubscription? _progressSub;
-  bool _connected = false;
-  double _sendProgress = 0;
-  bool _sending = false;
-  bool _loadingHistory = true;
-  String _sendingFileName = '';
-  Timer? _sendTimeout;
+  StreamSubscription? _statusSub;
 
   @override
   void initState() {
     super.initState();
-    _connected = _checkConnected();
-    _loadHistory();
-    _msgSub = bt.onMessage.listen((_) {
-      if (mounted) setState(() {});
-      _toBottom();
-    });
-    _connSub = bt.onConnectionChange.listen((_) {
-      if (mounted) setState(() => _connected = _checkConnected());
-    });
-    // Also listen for status changes (peripheral connect/disconnect)
-    // Set active device when entering chat
-    if (widget.deviceId.isNotEmpty) {
-      bt.setActiveDevice(widget.deviceId);
-    }
-    _progressSub = bt.onProgress.listen((p) {
-      if (mounted && p.containsKey('progress')) {
-        setState(() {
-          _sendProgress = (p['progress'] as num).toDouble();
-          if (p.containsKey('fileName')) {
-            _sendingFileName = p['fileName'] as String;
-          }
-          // Update _sending based on actual BtService state
-          _sending = bt.isSending;
-          if (_sendProgress >= 1.0) {
-            _sendProgress = 0;
-            _sendingFileName = '';
-            _sendTimeout?.cancel();
-            _sendTimeout = null;
-          }
-          if (_sendProgress < 0) {
-            // Error occurred
-            _sendProgress = 0;
-            _sendingFileName = '';
-            _sendTimeout?.cancel();
-            _sendTimeout = null;
-          }
-        });
-      }
-    });
-  }
+    _loadMessages();
+    _updateConnectionState();
+    _loadDeviceName();
 
-  /// Check if THIS chat is connected.
-  /// For peripheral: always connected if a Central is linked to us.
-  /// For central: connected if the specific device is in our connection map.
-  bool _checkConnected() {
-    // If this is a peripheral-side chat, just check if peripheral is connected
-    if (bt.isPeripheralConnected) return true;
-    // Otherwise check if the specific device is connected
-    return bt.isDeviceConnected(widget.deviceId);
-  }
-
-  void _startSendTimeout() {
-    _sendTimeout?.cancel();
-    _sendTimeout = Timer(const Duration(minutes: 5), () {
-      if (mounted && _sending) {
-        setState(() {
-          _sending = false;
-          _sendProgress = 0;
-          _sendingFileName = '';
-        });
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Envio cancelado: tiempo de espera agotado'),
-          backgroundColor: Colors.red,
-        ));
-      }
-    });
-  }
-
-  Future<void> _loadHistory() async {
-    try {
-      final saved = await MessageDB.getAll();
-      if (saved.isNotEmpty && bt.messages.isEmpty) {
-        bt.messages.addAll(saved);
-      }
-      // Also load device-specific history from DB
-      if (widget.deviceId.isNotEmpty) {
-        final deviceMsgs = await MessageDB.getByDevice(widget.deviceId);
-        // Merge any DB messages not already in memory
-        for (final m in deviceMsgs) {
-          if (!bt.messages.any((e) => e.id == m.id)) {
-            bt.messages.add(m);
-          }
+    _msgSub = bt.onMessage.listen((msg) {
+      // Only add messages relevant to this chat
+      if (widget.isGlobal) {
+        if (msg.isGlobal || msg.deviceId == kGlobalChatId) {
+          setState(() => _messages.add(msg));
+          _scrollToBottom();
         }
-        bt.messages.sort((a, b) => a.time.compareTo(b.time));
+      } else {
+        if (msg.deviceId == widget.deviceId ||
+            (msg.deviceId.isEmpty &&
+                bt.connectedDeviceId == widget.deviceId)) {
+          setState(() => _messages.add(msg));
+          _scrollToBottom();
+        }
       }
-    } catch (_) {}
-    if (mounted) setState(() => _loadingHistory = false);
-    _toBottom();
+    });
+
+    _connSub = bt.onConnectionChange.listen((_) {
+      _updateConnectionState();
+    });
+
+    _statusSub = bt.onStatusChange.listen((_) {
+      if (mounted) setState(() {});
+    });
   }
 
-  void _toBottom() {
+  Future<void> _loadMessages() async {
+    List<ChatMessage> msgs;
+    if (widget.isGlobal) {
+      msgs = await MessageDB.getGlobal();
+    } else {
+      msgs = await MessageDB.getByDevice(widget.deviceId);
+    }
+    if (mounted) {
+      setState(() => _messages = msgs);
+      _scrollToBottom();
+    }
+  }
+
+  Future<void> _loadDeviceName() async {
+    if (widget.isGlobal) {
+      if (mounted) setState(() => _deviceName = 'Chat Global');
+      return;
+    }
+    final name = await bt.getDeviceDisplayName(widget.deviceId);
+    if (mounted) setState(() => _deviceName = name);
+  }
+
+  void _updateConnectionState() {
+    if (!mounted) return;
+    if (widget.isGlobal) {
+      // Global chat: any device connected is enough
+      setState(() => _connected = bt.isConnected);
+    } else {
+      // Personal chat: specific device must be connected
+      setState(() => _connected = bt.isDeviceConnected(widget.deviceId));
+    }
+  }
+
+  void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scroll.hasClients) {
-        _scroll.animateTo(
-          _scroll.position.maxScrollExtent,
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
           duration: const Duration(milliseconds: 200),
           curve: Curves.easeOut,
         );
@@ -2472,942 +3089,441 @@ class _ChatPageState extends State<ChatPage> {
     });
   }
 
+  /// BUG FIX: Check _connected FIRST before attempting to send.
+  /// For global chat, check bt.isConnected (any device connected).
+  /// For personal chat, check bt.isDeviceConnected(widget.deviceId).
   Future<void> _send() async {
-    final t = _ctrl.text.trim();
-    if (t.isEmpty) return;
-    _ctrl.clear();
-    try {
-      await bt.sendMessage(t, deviceId: widget.deviceId);
-    } catch (_) {}
-    if (mounted) setState(() {});
-    _toBottom();
-  }
+    final text = _controller.text.trim();
+    if (text.isEmpty) return;
 
-  Future<void> _pickImage() async {
-    if (bt.isSending) return; // Prevenir doble envio
-    try {
-      final picker = ImagePicker();
-      final xfile = await picker.pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 1600,
-        maxHeight: 1600,
-        imageQuality: 50,
-      );
-      if (xfile == null) return;
-      final size = await xfile.length();
-      if (size > _kMaxFileSize) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('Imagen muy grande (${(size / 1024 / 1024).toStringAsFixed(1)} MB). Max ${_kMaxFileSize ~/ (1024 * 1024)} MB para BLE.'),
-            backgroundColor: Colors.red[900],
-          ));
-        }
-        return;
-      }
-      setState(() { _sending = true; _sendingFileName = xfile.name; _sendProgress = 0; });
-      _startSendTimeout();
-      await bt.sendFile(
-        localPath: xfile.path,
-        msgType: 'image',
-        fileName: xfile.name,
-        deviceId: widget.deviceId,
-      );
-      // _sending is reset by BtService.isSending via progress listener
-      if (mounted) setState(() { _sending = bt.isSending; });
-      _sendTimeout?.cancel();
-      _toBottom();
-    } catch (e) {
-      if (mounted) {
-        setState(() { _sending = false; _sendProgress = 0; _sendingFileName = ''; });
-        _sendTimeout?.cancel();
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Error: $e'),
-          backgroundColor: Colors.red[900],
-        ));
-      }
-    }
-  }
-
-  Future<void> _pickVideo() async {
-    if (bt.isSending) return;
-    try {
-      final picker = ImagePicker();
-      final xfile = await picker.pickVideo(
-        source: ImageSource.gallery,
-        maxDuration: const Duration(seconds: 120),
-      );
-      if (xfile == null) return;
-      final size = await xfile.length();
-      if (size > _kMaxFileSize) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('Video muy grande (${(size / 1024 / 1024).toStringAsFixed(1)} MB). Max ${_kMaxFileSize ~/ (1024 * 1024)} MB para BLE.'),
-            backgroundColor: Colors.red[900],
-          ));
-        }
-        return;
-      }
-      setState(() { _sending = true; _sendingFileName = xfile.name; _sendProgress = 0; });
-      _startSendTimeout();
-      await bt.sendFile(
-        localPath: xfile.path,
-        msgType: 'video',
-        fileName: xfile.name,
-        deviceId: widget.deviceId,
-      );
-      if (mounted) setState(() { _sending = bt.isSending; });
-      _sendTimeout?.cancel();
-      _toBottom();
-    } catch (e) {
-      if (mounted) {
-        setState(() { _sending = false; _sendProgress = 0; _sendingFileName = ''; });
-        _sendTimeout?.cancel();
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Error: $e'),
-          backgroundColor: Colors.red[900],
-        ));
-      }
-    }
-  }
-
-  Future<void> _pickFile() async {
-    if (bt.isSending) return;
-    try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.any,
-      );
-      if (result == null || result.files.isEmpty) return;
-      final file = result.files.first;
-      if (file.path == null) return;
-      final size = file.size;
-      if (size > _kMaxFileSize) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('Archivo muy grande (${(size / 1024 / 1024).toStringAsFixed(1)} MB). Max ${_kMaxFileSize ~/ (1024 * 1024)} MB para BLE.'),
-            backgroundColor: Colors.red[900],
-          ));
-        }
-        return;
-      }
-      setState(() { _sending = true; _sendingFileName = file.name; _sendProgress = 0; });
-      _startSendTimeout();
-      await bt.sendFile(
-        localPath: file.path!,
-        msgType: 'file',
-        fileName: file.name,
-        deviceId: widget.deviceId,
-      );
-      if (mounted) setState(() { _sending = bt.isSending; });
-      _sendTimeout?.cancel();
-      _toBottom();
-    } catch (e) {
-      if (mounted) {
-        setState(() { _sending = false; _sendProgress = 0; _sendingFileName = ''; });
-        _sendTimeout?.cancel();
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Error: $e'),
-          backgroundColor: Colors.red[900],
-        ));
-      }
-    }
-  }
-
-  String _fmt(DateTime t) =>
-      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
-
-  String _fmtSize(int? bytes) {
-    if (bytes == null) return '';
-    if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    return '${(bytes / 1024 / 1024).toStringAsFixed(1)} MB';
-  }
-
-  @override
-  void dispose() {
-    _msgSub?.cancel();
-    _connSub?.cancel();
-    _progressSub?.cancel();
-    _sendTimeout?.cancel();
-    _ctrl.dispose();
-    _scroll.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final msgs = widget.deviceId.isNotEmpty
-        ? bt.messages.where((m) => m.deviceId == widget.deviceId || (widget.deviceId.isEmpty && m.deviceId.isEmpty)).toList()
-        : bt.messages;
-    return PopScope(
-      canPop: !bt.isSending,
-      onPopInvokedWithResult: (didPop, _) async {
-        if (didPop) return;
-        // Warn user about active transfer
-        final shouldLeave = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            backgroundColor: const Color(0xFF1A1A1A),
-            title: const Text('Transferencia en progreso', style: TextStyle(color: Colors.white)),
-            content: const Text(
-              'Si sales ahora la transferencia se cancelara. Seguro que quieres salir?',
-              style: TextStyle(color: Colors.white70),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Quedarme'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('Salir', style: TextStyle(color: Colors.redAccent)),
-              ),
-            ],
-          ),
-        );
-        if (shouldLeave == true && context.mounted) {
-          Navigator.of(context).pop();
-        }
-      },
-      child: SafeArea(
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: _Header(
-                    'Chat',
-                    Icons.chat_bubble,
-                    _connected
-                        ? 'Conectado por Bluetooth'
-                        : 'Sin conexion',
-                    subtitleColor: _connected ? Colors.greenAccent : Colors.white38,
-                  ),
-                ),
-                if (widget.deviceId.isNotEmpty)
-                  IconButton(
-                    onPressed: () async {
-                      final confirmed = await showDialog<bool>(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
-                          backgroundColor: const Color(0xFF1A1A1A),
-                          title: const Text('Eliminar chat', style: TextStyle(color: Colors.white)),
-                          content: Text(
-                            'Seguro que quieres eliminar la conversacion con ${widget.deviceId.isEmpty ? "General" : widget.deviceId}? Esta accion no se puede deshacer.',
-                            style: const TextStyle(color: Colors.white70),
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(ctx, false),
-                              child: const Text('Cancelar'),
-                            ),
-                            TextButton(
-                              onPressed: () => Navigator.pop(ctx, true),
-                              child: const Text('Eliminar', style: TextStyle(color: Colors.redAccent)),
-                            ),
-                          ],
-                        ),
-                      );
-                      if (confirmed == true) {
-                        await MessageDB.deleteByDevice(widget.deviceId);
-                        bt.messages.removeWhere((m) => m.deviceId == widget.deviceId);
-                        if (mounted) Navigator.of(context).pop();
-                      }
-                    },
-                    icon: const Icon(Icons.delete_outline, color: Colors.white38, size: 20),
-                    tooltip: 'Eliminar chat',
-                  ),
-              ],
-            ),
-          ),
-          if (_connected)
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 20),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-              decoration: BoxDecoration(
-                color: _kCardBgLight,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.bluetooth_connected, color: Colors.white, size: 14),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Conectado a ${bt.connectedName}',
-                    style: const TextStyle(color: Colors.white, fontSize: 11),
-                  ),
-                ],
-              ),
-            ),
-          // Send progress bar with percentage
-          if (_sending)
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-              child: Column(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(
-                      value: _sendProgress > 0 ? _sendProgress : null,
-                      backgroundColor: Colors.white12,
-                      valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    _sendProgress > 0
-                        ? 'Enviando ${_sendingFileName.isNotEmpty ? _sendingFileName : "archivo"}... ${(_sendProgress * 100).toStringAsFixed(0)}%'
-                        : 'Enviando ${_sendingFileName.isNotEmpty ? _sendingFileName : "archivo"}...',
-                    style: const TextStyle(color: Color(0xFF808080), fontSize: 10),
-                  ),
-                ],
-              ),
-            ),
-          Expanded(
-            child: _loadingHistory
-                ? const Center(child: CircularProgressIndicator(color: Colors.white))
-                : msgs.isEmpty
-                    ? Center(
-                        child: Text(
-                          _connected
-                              ? 'Escribe un mensaje'
-                              : 'Conecta un dispositivo primero',
-                          style: const TextStyle(color: Color(0xFF2F2F2F)),
-                          textAlign: TextAlign.center,
-                        ),
-                      )
-                    : ListView.builder(
-                        controller: _scroll,
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        itemCount: msgs.length,
-                        itemBuilder: (_, i) {
-                          final m = msgs[i];
-                          return _buildMessage(m);
-                        },
-                      ),
-          ),
-          // Input area with multimedia buttons
-          Container(
-            padding: const EdgeInsets.fromLTRB(8, 8, 8, 16),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    // Attach buttons
-                    if (_connected) ...[
-                      IconButton(
-                        onPressed: _sending ? null : _pickImage,
-                        icon: const Icon(Icons.photo, size: 22),
-                        style: IconButton.styleFrom(
-                          foregroundColor: Colors.white54,
-                        ),
-                        tooltip: 'Foto',
-                      ),
-                      IconButton(
-                        onPressed: _sending ? null : _pickVideo,
-                        icon: const Icon(Icons.videocam, size: 22),
-                        style: IconButton.styleFrom(
-                          foregroundColor: Colors.white54,
-                        ),
-                        tooltip: 'Video',
-                      ),
-                      IconButton(
-                        onPressed: _sending ? null : _pickFile,
-                        icon: const Icon(Icons.attach_file, size: 22),
-                        style: IconButton.styleFrom(
-                          foregroundColor: Colors.white54,
-                        ),
-                        tooltip: 'Archivo',
-                      ),
-                    ],
-                    Expanded(
-                      child: TextField(
-                        controller: _ctrl,
-                        style: const TextStyle(color: Colors.white),
-                        decoration: InputDecoration(
-                          hintText: _connected ? 'Mensaje...' : 'Sin conexion',
-                          hintStyle: const TextStyle(color: Color(0xFF3A3A3A)),
-                          isDense: true,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
-                          ),
-                        ),
-                        onSubmitted: (_) => _send(),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    FilledButton(
-                      onPressed: _connected ? _send : null,
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.all(10),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        disabledBackgroundColor: Colors.white12,
-                      ),
-                      child: const Icon(Icons.send, size: 18),
-                    ),
-                  ],
-                ),
-                if (_connected)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text(
-                      'Max ${_kMaxFileSize ~/ (1024 * 1024)} MB por archivo (BLE)',
-                      style: const TextStyle(color: Color(0xFF333333), fontSize: 10),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ],
-      ),
-      ), // SafeArea
-    ); // PopScope
-  }
-
-  Widget _buildMessage(ChatMessage m) {
-    return Align(
-      alignment: m.mine ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        constraints: const BoxConstraints(maxWidth: 280),
-        decoration: BoxDecoration(
-          color: m.mine ? Colors.white : _kCardBg,
-          borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(14),
-            topRight: const Radius.circular(14),
-            bottomLeft: Radius.circular(m.mine ? 14 : 4),
-            bottomRight: Radius.circular(m.mine ? 4 : 14),
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Media content
-            if (m.type == 'image' && m.filePath != null)
-              _buildImageContent(m),
-            if (m.type == 'video' && m.filePath != null)
-              _buildVideoContent(m),
-            if (m.type == 'file' && m.fileName != null)
-              _buildFileContent(m),
-            // Text content (for text messages or caption)
-            if (m.type == 'text')
-              Text(m.text,
-                  style: TextStyle(
-                    color: m.mine ? Colors.black : Colors.white,
-                    fontSize: 14,
-                  )),
-            const SizedBox(height: 4),
-            // Time + size
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(_fmt(m.time),
-                    style: TextStyle(
-                      color: m.mine ? Colors.black38 : const Color(0xFF404040),
-                      fontSize: 10,
-                    )),
-                if (m.fileSize != null) ...[
-                  const SizedBox(width: 6),
-                  Text(_fmtSize(m.fileSize),
-                      style: TextStyle(
-                        color: m.mine ? Colors.black38 : const Color(0xFF404040),
-                        fontSize: 10,
-                      )),
-                ],
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildImageContent(ChatMessage m) {
-    final file = File(m.filePath!);
-    return GestureDetector(
-      onTap: () => _showImagePreview(m.filePath!),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: FutureBuilder<bool>(
-          future: file.exists(),
-          builder: (_, snap) {
-            if (snap.data == true) {
-              return Image.file(
-                file,
-                width: 240,
-                height: 180,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => _buildMediaPlaceholder(Icons.broken_image, m.fileName ?? 'Imagen'),
-              );
-            }
-            return _buildMediaPlaceholder(Icons.image, m.fileName ?? 'Imagen');
-          },
-        ),
-      ),
-    );
-  }
-
-  Widget _buildVideoContent(ChatMessage m) {
-    return GestureDetector(
-      onTap: () => _showVideoPlayer(m.filePath!, m.fileName ?? 'Video'),
-      child: Container(
-        width: 240,
-        height: 160,
-        decoration: BoxDecoration(
-          color: Colors.black,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            // Video thumbnail
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: _VideoThumbnail(filePath: m.filePath!),
-            ),
-            // Semi-transparent overlay
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.35),
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            // Play button centered
-            Center(
-              child: Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF333333),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.play_arrow, color: Colors.white, size: 32),
-              ),
-            ),
-            // Filename at bottom
-            Positioned(
-              left: 8,
-              right: 8,
-              bottom: 8,
-              child: Row(
-                children: [
-                  const Icon(Icons.videocam, color: Colors.white70, size: 12),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(m.fileName ?? 'Video',
-                        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w500),
-                        overflow: TextOverflow.ellipsis),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFileContent(ChatMessage m) {
-    return GestureDetector(
-      onTap: () => _openFile(m.filePath),
-      child: Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: m.mine ? const Color(0xFF0F0F0F) : const Color(0xFF141414),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.insert_drive_file, color: m.mine ? Colors.black54 : Colors.white54, size: 24),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(m.fileName ?? 'Archivo',
-                      style: TextStyle(
-                        color: m.mine ? Colors.black87 : Colors.white,
-                        fontSize: 13,
-                      ),
-                      overflow: TextOverflow.ellipsis),
-                  if (m.fileSize != null)
-                    Text(_fmtSize(m.fileSize),
-                        style: TextStyle(
-                          color: m.mine ? Colors.black38 : const Color(0xFF666666),
-                          fontSize: 10,
-                        )),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Icon(Icons.download, color: m.mine ? Colors.black38 : Colors.white38, size: 18),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMediaPlaceholder(IconData icon, String label) {
-    return Container(
-      width: 240,
-      height: 120,
-      decoration: BoxDecoration(
-        color: Colors.black26,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, color: Colors.white38, size: 32),
-          const SizedBox(height: 4),
-          Text(label, style: const TextStyle(color: Colors.white38, fontSize: 11)),
-        ],
-      ),
-    );
-  }
-
-  void _showImagePreview(String path) {
-    Navigator.push(context, MaterialPageRoute(builder: (_) {
-      return Scaffold(
-        backgroundColor: Colors.black,
-        appBar: AppBar(
-          backgroundColor: Colors.black,
-          iconTheme: const IconThemeData(color: Colors.white),
-        ),
-        body: Center(
-          child: InteractiveViewer(
-            child: Image.file(File(path), fit: BoxFit.contain),
-          ),
+    // ── CONNECTION CHECK FIRST ──
+    _updateConnectionState();
+    if (!_connected) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Sin conexion - no se puede enviar'),
+          backgroundColor: Colors.redAccent,
         ),
       );
-    }));
-  }
-
-  void _showVideoPlayer(String path, String title) {
-    Navigator.push(context, MaterialPageRoute(builder: (_) {
-      return _VideoPlayerPage(filePath: path, title: title);
-    }));
-  }
-
-  Future<void> _openFile(String? path) async {
-    if (path == null) return;
-    final file = File(path);
-    if (!await file.exists()) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Archivo no encontrado: $path'),
-          backgroundColor: Colors.red[900],
-        ));
-      }
       return;
     }
-    try {
-      await OpenFilex.open(path);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('No se pudo abrir el archivo: $e'),
-          backgroundColor: Colors.grey[800],
-        ));
+
+    _controller.clear();
+
+    if (widget.isGlobal) {
+      // Global chat: use sendGlobalMessage
+      final success = await bt.sendGlobalMessage(text);
+      if (!success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Error al enviar mensaje global'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    } else {
+      // Personal chat: use sendMessage with deviceId
+      final success =
+          await bt.sendMessage(text, deviceId: widget.deviceId);
+      if (!success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Sin conexion - no se puede enviar'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
       }
     }
+
+    _loadMessages();
   }
-}
 
-// ─────────────────────────────────────────────
-// VIDEO PLAYER PAGE — Full-screen playback
-// ─────────────────────────────────────────────
-class _VideoPlayerPage extends StatefulWidget {
-  final String filePath;
-  final String title;
-  const _VideoPlayerPage({required this.filePath, required this.title});
-
-  @override
-  State<_VideoPlayerPage> createState() => _VideoPlayerPageState();
-}
-
-class _VideoPlayerPageState extends State<_VideoPlayerPage> {
-  late VideoPlayerController _controller;
-  bool _initialized = false;
-  bool _hasError = false;
-  String _errorMessage = '';
-  bool _showControls = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = VideoPlayerController.file(File(widget.filePath))
-      ..initialize().then((_) {
-        if (mounted) {
-          setState(() => _initialized = true);
-          _controller.play();
-        }
-      }).catchError((e) {
-        if (mounted) {
-          setState(() {
-            _hasError = true;
-            _errorMessage = e.toString();
-          });
-        }
-      });
-    _controller.addListener(() {
-      if (mounted) setState(() {});
-    });
+  void _showRenameDialog() {
+    final controller = TextEditingController(text: _deviceName);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: _kCardBg,
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Renombrar dispositivo',
+          style: TextStyle(
+              color: Colors.white, fontWeight: FontWeight.w700),
+        ),
+        content: TextField(
+          controller: controller,
+          style: const TextStyle(color: Colors.white),
+          decoration: InputDecoration(
+            hintText: 'Nombre personalizado',
+            hintStyle:
+                TextStyle(color: Colors.white.withOpacity(0.3)),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancelar',
+                style: TextStyle(color: Colors.grey)),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final name = controller.text.trim();
+              if (name.isNotEmpty) {
+                await bt.setDeviceCustomName(
+                    widget.deviceId, name);
+                _loadDeviceName();
+              }
+              if (ctx.mounted) Navigator.of(ctx).pop();
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: Colors.black,
+            ),
+            child: const Text('Guardar'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   void dispose() {
     _controller.dispose();
+    _scrollController.dispose();
+    _msgSub?.cancel();
+    _connSub?.cancel();
+    _statusSub?.cancel();
     super.dispose();
-  }
-
-  String _formatDuration(Duration d) {
-    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return '$m:$s';
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: const Color(0xFF0A0A0A),
       appBar: AppBar(
-        backgroundColor: Colors.black,
-        iconTheme: const IconThemeData(color: Colors.white),
-        title: Text(
-          widget.title,
-          style: const TextStyle(color: Colors.white, fontSize: 14),
-          overflow: TextOverflow.ellipsis,
+        backgroundColor: _kCardBg,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: Row(
+          children: [
+            Icon(
+              widget.isGlobal
+                  ? Icons.public
+                  : Icons.phone_android,
+              color: Colors.white,
+              size: 20,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                widget.isGlobal ? 'Chat Global' : _deviceName,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.open_in_new, color: Colors.white70),
-            onPressed: () async {
-              try {
-                await OpenFilex.open(widget.filePath);
-              } catch (_) {}
-            },
-            tooltip: 'Abrir con otra app',
+          // Edit device name button (only for personal chats)
+          if (!widget.isGlobal)
+            IconButton(
+              icon: const Icon(Icons.edit,
+                  color: Colors.white54, size: 18),
+              onPressed: _showRenameDialog,
+            ),
+        ],
+      ),
+      body: Column(
+        children: [
+          // ── Connection status bar with encryption indicator ──
+          Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            color: _connected
+                ? Colors.white.withOpacity(0.05)
+                : Colors.red.withOpacity(0.08),
+            child: Row(
+              children: [
+                Icon(
+                  _connected
+                      ? Icons.bluetooth_connected
+                      : Icons.bluetooth_disabled,
+                  color: _connected
+                      ? Colors.white38
+                      : Colors.redAccent,
+                  size: 14,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  _connected ? 'Conectado' : 'Desconectado',
+                  style: TextStyle(
+                    color: _connected
+                        ? Colors.white38
+                        : Colors.redAccent,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const Spacer(),
+                // Encryption indicator (lock icon)
+                if (_connected) ...[
+                  const Icon(Icons.lock,
+                      color: Colors.white24, size: 12),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Cifrado',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.2),
+                      fontSize: 10,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          // ── Messages list ──
+          Expanded(
+            child: _messages.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          widget.isGlobal
+                              ? Icons.public
+                              : Icons.chat_bubble_outline,
+                          color: Colors.white12,
+                          size: 48,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          widget.isGlobal
+                              ? 'Chat Global - envia a todos los conectados'
+                              : 'Sin mensajes',
+                          style: const TextStyle(
+                            color: Colors.white24,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : ListView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 8),
+                    itemCount: _messages.length,
+                    itemBuilder: (context, index) {
+                      final msg = _messages[index];
+                      return _buildMessageBubble(msg);
+                    },
+                  ),
+          ),
+          // ── Input bar ──
+          Container(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 20),
+            decoration: BoxDecoration(
+              color: _kCardBg,
+              border: Border(top: BorderSide(color: _kBorder)),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _controller,
+                    style: const TextStyle(
+                        color: Colors.white, fontSize: 14),
+                    decoration: InputDecoration(
+                      hintText: widget.isGlobal
+                          ? 'Mensaje global...'
+                          : 'Mensaje...',
+                      hintStyle: TextStyle(
+                          color: Colors.white.withOpacity(0.2)),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 10),
+                    ),
+                    onSubmitted: (_) {
+                      // Check connection before sending on submit
+                      _updateConnectionState();
+                      if (!_connected) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                                'Sin conexion - no se puede enviar'),
+                            backgroundColor: Colors.redAccent,
+                          ),
+                        );
+                        return;
+                      }
+                      _send();
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: IconButton(
+                    icon: const Icon(Icons.send,
+                        color: Colors.black, size: 18),
+                    onPressed: _send,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
-      body: _hasError
-          ? Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.error_outline, color: Colors.redAccent, size: 48),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'No se pudo reproducir el video',
-                      style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      _errorMessage,
-                      style: const TextStyle(color: Colors.white54, fontSize: 12),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 20),
-                    FilledButton.icon(
-                      onPressed: () async {
-                        try {
-                          await OpenFilex.open(widget.filePath);
-                        } catch (e) {
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                              content: Text('No se pudo abrir: $e'),
-                              backgroundColor: Colors.red[900],
-                            ));
-                          }
-                        }
-                      },
-                      icon: const Icon(Icons.open_in_new),
-                      label: const Text('Abrir con otra app'),
-                    ),
-                  ],
-                ),
-              ),
-            )
-          : !_initialized
-              ? const Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      CircularProgressIndicator(color: Colors.white),
-                      SizedBox(height: 16),
-                      Text('Cargando video...', style: TextStyle(color: Colors.white54, fontSize: 14)),
-                    ],
-                  ),
-                )
-              : GestureDetector(
-                  onTap: () => setState(() => _showControls = !_showControls),
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      // Video
-                      Center(
-                        child: AspectRatio(
-                          aspectRatio: _controller.value.aspectRatio,
-                          child: VideoPlayer(_controller),
-                        ),
-                      ),
-                      // Controls overlay
-                      if (_showControls)
-                        Container(
-                          color: Colors.black26,
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              // Play/Pause + progress
-                              const Spacer(),
-                              GestureDetector(
-                                onTap: () {
-                                  if (_controller.value.isPlaying) {
-                                    _controller.pause();
-                                  } else {
-                                    _controller.play();
-                                  }
-                                },
-                                child: Icon(
-                                  _controller.value.isPlaying ? Icons.pause_circle : Icons.play_circle,
-                                  color: Colors.white,
-                                  size: 64,
-                                ),
-                              ),
-                              const Spacer(),
-                              // Progress bar
-                              Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 16),
-                                child: Column(
-                                  children: [
-                                    VideoProgressIndicator(
-                                      _controller,
-                                      allowScrubbing: true,
-                                      colors: const VideoProgressColors(
-                                        playedColor: Colors.white,
-                                        bufferedColor: Colors.white24,
-                                        backgroundColor: Colors.white12,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          _formatDuration(_controller.value.position),
-                                          style: const TextStyle(color: Colors.white70, fontSize: 12),
-                                        ),
-                                        Text(
-                                          _formatDuration(_controller.value.duration),
-                                          style: const TextStyle(color: Colors.white54, fontSize: 12),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                            ],
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
     );
   }
-}
 
-// ─────────────────────────────────────────────
-// VIDEO THUMBNAIL — Generates thumbnail from video file
-// ─────────────────────────────────────────────
-class _VideoThumbnail extends StatefulWidget {
-  final String filePath;
-  const _VideoThumbnail({required this.filePath});
-
-  @override
-  State<_VideoThumbnail> createState() => _VideoThumbnailState();
-}
-
-class _VideoThumbnailState extends State<_VideoThumbnail> {
-  VideoPlayerController? _controller;
-  bool _initialized = false;
-  bool _hasError = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = VideoPlayerController.file(File(widget.filePath))
-      ..initialize().then((_) {
-        if (mounted) {
-          setState(() => _initialized = true);
-          // Seek to 1 second to get a better thumbnail (not black first frame)
-          _controller!.seekTo(const Duration(seconds: 1));
-        }
-      }).catchError((_) {
-        if (mounted) setState(() => _hasError = true);
-      });
-  }
-
-  @override
-  void dispose() {
-    _controller?.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_hasError || !_initialized || _controller == null) {
-      return Container(
-        width: 240,
-        height: 160,
-        color: Colors.black26,
-        child: const Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.videocam, color: Colors.white38, size: 36),
-            SizedBox(height: 4),
-            Text('Video', style: TextStyle(color: Colors.white38, fontSize: 11)),
-          ],
+  Widget _buildMessageBubble(ChatMessage msg) {
+    final isMine = msg.mine;
+    return Align(
+      alignment:
+          isMine ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 2),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width * 0.75,
         ),
-      );
-    }
-    return SizedBox(
-      width: 240,
-      height: 160,
-      child: FittedBox(
-        fit: BoxFit.cover,
-        clipBehavior: Clip.antiAlias,
-        child: SizedBox(
-          width: _controller!.value.size.width,
-          height: _controller!.value.size.height,
-          child: VideoPlayer(_controller!),
+        decoration: BoxDecoration(
+          color: isMine
+              ? Colors.white.withOpacity(0.15)
+              : _kCardBg,
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(14),
+            topRight: const Radius.circular(14),
+            bottomLeft: Radius.circular(isMine ? 14 : 4),
+            bottomRight: Radius.circular(isMine ? 4 : 14),
+          ),
+          border: Border.all(
+            color: isMine
+                ? Colors.white.withOpacity(0.1)
+                : _kBorder,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            // Image message
+            if (msg.type == 'image' && msg.filePath != null)
+              GestureDetector(
+                onTap: () => _openFile(msg.filePath!),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.file(
+                    File(msg.filePath!),
+                    width: 200,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      width: 200,
+                      height: 120,
+                      color: _kCardBgLight,
+                      child: const Center(
+                        child: Icon(Icons.broken_image,
+                            color: Colors.white24, size: 32),
+                      ),
+                    ),
+                  ),
+                ),
+              )
+            // Video message
+            else if (msg.type == 'video' &&
+                msg.filePath != null)
+              GestureDetector(
+                onTap: () => _openFile(msg.filePath!),
+                child: Container(
+                  width: 200,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    color: _kCardBgLight,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Center(
+                    child: Icon(Icons.play_circle_outline,
+                        color: Colors.white38, size: 40),
+                  ),
+                ),
+              )
+            // File message
+            else if (msg.type == 'file' &&
+                msg.filePath != null)
+              GestureDetector(
+                onTap: () => _openFile(msg.filePath!),
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: _kCardBgLight,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: _kBorder),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.insert_drive_file,
+                          color: Colors.white38, size: 20),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          msg.fileName ?? 'archivo',
+                          style: const TextStyle(
+                              color: Colors.white54, fontSize: 12),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            // Text message
+            if (msg.type == 'text')
+              Text(
+                msg.text,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                ),
+              ),
+            const SizedBox(height: 4),
+            Text(
+              _formatMessageTime(msg.time),
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.2),
+                fontSize: 10,
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
+
+  void _openFile(String path) {
+    try {
+      OpenFilex.open(path);
+    } catch (_) {}
+  }
+
+  String _formatMessageTime(DateTime t) {
+    return '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+  }
 }
 
 // ─────────────────────────────────────────────
-// VAULT HOME — 6 secciones con acceso directo
+// VAULT HOME PAGE
 // ─────────────────────────────────────────────
 class VaultHomePage extends StatelessWidget {
   const VaultHomePage({super.key});
@@ -3470,7 +3586,7 @@ class VaultHomePage extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: _kCardBgDim,
+                color: Colors.white.withOpacity(0.03),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -3494,7 +3610,7 @@ class VaultHomePage extends StatelessWidget {
             ...sections.map((s) => Container(
                   margin: const EdgeInsets.only(bottom: 10),
                   child: Material(
-                    color: _kCardBgDim,
+                    color: Colors.white.withOpacity(0.04),
                     borderRadius: BorderRadius.circular(14),
                     child: InkWell(
                       borderRadius: BorderRadius.circular(14),
@@ -3657,7 +3773,7 @@ class _FirstAidPageState extends State<FirstAidPage> {
                 return Container(
                   margin: const EdgeInsets.only(bottom: 8),
                   child: Material(
-                    color: _kCardBgDim,
+                    color: Colors.white.withOpacity(0.04),
                     borderRadius: BorderRadius.circular(12),
                     child: ListTile(
                       contentPadding:
@@ -3782,7 +3898,7 @@ class _GuidesPageState extends State<GuidesPage> {
                 return Container(
                   margin: const EdgeInsets.only(bottom: 8),
                   child: Material(
-                    color: _kCardBgDim,
+                    color: Colors.white.withOpacity(0.04),
                     borderRadius: BorderRadius.circular(12),
                     child: ListTile(
                       contentPadding:
@@ -3791,7 +3907,7 @@ class _GuidesPageState extends State<GuidesPage> {
                       leading: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: _kCardBgLight,
+                          color: Colors.white.withOpacity(0.06),
                           borderRadius:
                               BorderRadius.circular(8),
                         ),
@@ -3819,7 +3935,8 @@ class _GuidesPageState extends State<GuidesPage> {
                                       horizontal: 5,
                                       vertical: 1),
                               decoration: BoxDecoration(
-                                color: _kCardBg,
+                                color: Colors.white
+                                    .withOpacity(0.08),
                                 borderRadius:
                                     BorderRadius.circular(3),
                               ),
@@ -3925,12 +4042,14 @@ class _DictionaryPageState extends State<DictionaryPage> {
               onChanged: _filter,
               decoration: InputDecoration(
                 hintText: 'Buscar termino...',
-                hintStyle: const TextStyle(color: Color(0xFF3A3A3A)),
+                hintStyle: TextStyle(
+                    color: Colors.white.withOpacity(0.2)),
                 prefixIcon: const Icon(Icons.search,
                     color: Colors.white38),
+                filled: true,
+                fillColor: Colors.white.withOpacity(0.04),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -3938,7 +4057,8 @@ class _DictionaryPageState extends State<DictionaryPage> {
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
+                  borderSide: const BorderSide(
+                      color: Colors.white24),
                 ),
               ),
             ),
@@ -3963,7 +4083,7 @@ class _DictionaryPageState extends State<DictionaryPage> {
                                 horizontal: 12, vertical: 3),
                             child: Material(
                               color:
-                                  _kCardBgDim,
+                                  Colors.white.withOpacity(0.04),
                               borderRadius:
                                   BorderRadius.circular(10),
                               child: ListTile(
@@ -3994,7 +4114,8 @@ class _DictionaryPageState extends State<DictionaryPage> {
                                       horizontal: 5,
                                       vertical: 1),
                                   decoration: BoxDecoration(
-                                    color: _kCardBgLight,
+                                    color: Colors.white
+                                        .withOpacity(0.06),
                                     borderRadius:
                                         BorderRadius.circular(3),
                                   ),
@@ -4077,7 +4198,8 @@ class _DictDetail extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: _kCardBgLight,
+                            color:
+                                Colors.white.withOpacity(0.05),
                             borderRadius:
                                 BorderRadius.circular(6),
                           ),
@@ -4191,8 +4313,10 @@ class _WikipediaPageState extends State<WikipediaPage> {
                           label: const Text('Todo'),
                           selected: _selectedCat == null,
                           onSelected: (_) => _selectCat(null),
-                          backgroundColor: _kCardBgLight,
-                          selectedColor: _kChipBgActive,
+                          backgroundColor:
+                              Colors.white.withOpacity(0.05),
+                          selectedColor:
+                              Colors.white.withOpacity(0.15),
                           labelStyle: TextStyle(
                             color: _selectedCat == null
                                 ? Colors.white
@@ -4209,8 +4333,10 @@ class _WikipediaPageState extends State<WikipediaPage> {
                                   c.substring(1)),
                               selected: _selectedCat == c,
                               onSelected: (_) => _selectCat(c),
-                              backgroundColor: _kCardBgLight,
-                              selectedColor: _kChipBgActive,
+                              backgroundColor:
+                                  Colors.white.withOpacity(0.05),
+                              selectedColor:
+                                  Colors.white.withOpacity(0.15),
                               labelStyle: TextStyle(
                                 color: _selectedCat == c
                                     ? Colors.white
@@ -4553,8 +4679,8 @@ class _EmergencyMapPageState extends State<EmergencyMapPage> {
         label: Text(label),
         selected: _filter == val,
         onSelected: (_) => setState(() => _filter = val),
-        backgroundColor: _kCardBgLight,
-        selectedColor: _kChipBgActive,
+        backgroundColor: Colors.white.withOpacity(0.05),
+        selectedColor: Colors.white.withOpacity(0.15),
         labelStyle: TextStyle(
           color: _filter == val ? Colors.white : Colors.white54,
           fontSize: 12,
@@ -4911,7 +5037,7 @@ class _TranslatorPageState extends State<TranslatorPage> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: _kCardBgDim,
+                color: Colors.white.withOpacity(0.03),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -4994,10 +5120,11 @@ class _TranslatorPageState extends State<TranslatorPage> {
               maxLines: 4,
               decoration: InputDecoration(
                 hintText: 'Escribe texto para traducir...',
-                hintStyle: const TextStyle(color: Color(0xFF3A3A3A)),
+                hintStyle: TextStyle(color: Colors.white.withOpacity(0.2)),
+                filled: true,
+                fillColor: Colors.white.withOpacity(0.04),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -5005,7 +5132,7 @@ class _TranslatorPageState extends State<TranslatorPage> {
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
+                  borderSide: const BorderSide(color: Colors.white24),
                 ),
               ),
             ),
@@ -5034,9 +5161,9 @@ class _TranslatorPageState extends State<TranslatorPage> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: _kCardBgLight,
+                  color: Colors.white.withOpacity(0.06),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: _kBorder),
+                  border: Border.all(color: Colors.white.withOpacity(0.1)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -5095,7 +5222,7 @@ class _TranslatorPageState extends State<TranslatorPage> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
-            color: _kCardBgDim,
+            color: Colors.white.withOpacity(0.04),
             borderRadius: BorderRadius.circular(8),
             border: _modelStatus[value] == 'downloaded'
                 ? Border.all(color: Colors.white12)
@@ -5183,7 +5310,7 @@ class _ModelManagerPage extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             margin: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: _kCardBgDim,
+              color: Colors.white.withOpacity(0.04),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
@@ -5235,14 +5362,14 @@ class _ModelManagerPage extends StatelessWidget {
                   margin: const EdgeInsets.only(bottom: 8),
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: _kCardBgDim,
+                    color: Colors.white.withOpacity(0.04),
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
                       color: status == 'downloaded'
-                          ? _kBorderDim
+                          ? Colors.white.withOpacity(0.08)
                           : status == 'downloading'
                               ? Colors.blue.withOpacity(0.3)
-                              : _kCardBgDim,
+                              : Colors.white.withOpacity(0.04),
                     ),
                   ),
                   child: Row(
@@ -5475,7 +5602,8 @@ class _VaultSearchPageState extends State<VaultSearchPage> {
               onSubmitted: _search,
               decoration: InputDecoration(
                 hintText: 'Buscar en todo el vault...',
-                hintStyle: const TextStyle(color: Color(0xFF3A3A3A)),
+                hintStyle: TextStyle(
+                    color: Colors.white.withOpacity(0.2)),
                 prefixIcon: _searching
                     ? const SizedBox(
                         width: 20,
@@ -5492,9 +5620,10 @@ class _VaultSearchPageState extends State<VaultSearchPage> {
                       color: Colors.white38),
                   onPressed: () => _search(_searchCtrl.text),
                 ),
+                filled: true,
+                fillColor: Colors.white.withOpacity(0.04),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -5502,7 +5631,8 @@ class _VaultSearchPageState extends State<VaultSearchPage> {
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
+                  borderSide: const BorderSide(
+                      color: Colors.white24),
                 ),
               ),
             ),
@@ -5534,7 +5664,7 @@ class _VaultSearchPageState extends State<VaultSearchPage> {
                                 horizontal: 12, vertical: 3),
                             child: Material(
                               color:
-                                  _kCardBgDim,
+                                  Colors.white.withOpacity(0.04),
                               borderRadius:
                                   BorderRadius.circular(10),
                               child: ListTile(
@@ -5563,7 +5693,8 @@ class _VaultSearchPageState extends State<VaultSearchPage> {
                                       horizontal: 5,
                                       vertical: 1),
                                   decoration: BoxDecoration(
-                                    color: _kCardBgLight,
+                                    color: Colors.white
+                                        .withOpacity(0.06),
                                     borderRadius:
                                         BorderRadius.circular(3),
                                   ),
@@ -5675,7 +5806,8 @@ class _DetailPage extends StatelessWidget {
                           height: 24,
                           margin: const EdgeInsets.only(right: 10),
                           decoration: BoxDecoration(
-                            color: _kCardBg,
+                            color:
+                                Colors.white.withOpacity(0.08),
                             borderRadius:
                                 BorderRadius.circular(12),
                           ),
@@ -5776,14 +5908,209 @@ class _DetailPage extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────
+// VIDEO PLAYER PAGE
+// ─────────────────────────────────────────────
+class _VideoPlayerPage extends StatefulWidget {
+  final String filePath;
+  final String fileName;
+  const _VideoPlayerPage({required this.filePath, required this.fileName});
+
+  @override
+  State<_VideoPlayerPage> createState() => _VideoPlayerPageState();
+}
+
+class _VideoPlayerPageState extends State<_VideoPlayerPage> {
+  late VideoPlayerController _controller;
+  bool _initialized = false;
+  bool _hasError = false;
+  String _errorMsg = '';
+  bool _showControls = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = VideoPlayerController.file(File(widget.filePath))
+      ..initialize().then((_) {
+        if (mounted) {
+          setState(() => _initialized = true);
+          _controller.play();
+        }
+      }).catchError((e) {
+        if (mounted) {
+          setState(() { _hasError = true; _errorMsg = e.toString(); });
+        }
+      });
+
+    _controller.addListener(() {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  String _formatDuration(Duration d) {
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    final h = d.inHours;
+    final m = d.inMinutes.remainder(60);
+    final s = d.inSeconds.remainder(60);
+    if (h > 0) {
+      return '$h:${twoDigits(m)}:${twoDigits(s)}';
+    }
+    return '${twoDigits(m)}:${twoDigits(s)}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: Text(
+          widget.fileName,
+          style: const TextStyle(color: Colors.white, fontSize: 14),
+          overflow: TextOverflow.ellipsis,
+        ),
+        actions: [
+          // Open with external player
+          IconButton(
+            icon: const Icon(Icons.open_in_new, color: Colors.white54),
+            tooltip: 'Abrir con otra app',
+            onPressed: () async {
+              try {
+                await OpenFile.open(widget.filePath);
+              } catch (_) {}
+            },
+          ),
+        ],
+      ),
+      body: Center(
+        child: _hasError
+            ? Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.error_outline, color: Colors.redAccent, size: 48),
+                  const SizedBox(height: 16),
+                  Text('Error al cargar video', style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 16)),
+                  const SizedBox(height: 8),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 32),
+                    child: Text(_errorMsg, style: TextStyle(color: Colors.white38, fontSize: 12), textAlign: TextAlign.center),
+                  ),
+                  const SizedBox(height: 16),
+                  FilledButton.icon(
+                    icon: const Icon(Icons.open_in_new),
+                    label: const Text('Abrir con otra app'),
+                    onPressed: () async {
+                      try { await OpenFile.open(widget.filePath); } catch (_) {}
+                    },
+                  ),
+                ],
+              )
+            : !_initialized
+                ? const CircularProgressIndicator(color: Colors.white)
+                : GestureDetector(
+                    onTap: () => setState(() => _showControls = !_showControls),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        AspectRatio(
+                          aspectRatio: _controller.value.aspectRatio,
+                          child: VideoPlayer(_controller),
+                        ),
+                        // Controls overlay
+                        if (_showControls)
+                          AnimatedOpacity(
+                            opacity: _showControls ? 1.0 : 0.0,
+                            duration: const Duration(milliseconds: 300),
+                            child: Container(
+                              color: Colors.black26,
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  // Play/Pause
+                                  IconButton(
+                                    icon: Icon(
+                                      _controller.value.isPlaying ? Icons.pause_circle : Icons.play_circle_fill,
+                                      color: Colors.white,
+                                      size: 64,
+                                    ),
+                                    onPressed: () {
+                                      if (_controller.value.isPlaying) {
+                                        _controller.pause();
+                                      } else {
+                                        _controller.play();
+                                      }
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+      ),
+      bottomNavigationBar: _initialized && !_hasError
+          ? Container(
+              color: Colors.black87,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Progress bar
+                  VideoProgressIndicator(
+                    _controller,
+                    allowScrubbing: true,
+                    colors: const VideoProgressColors(
+                      playedColor: Colors.white,
+                      bufferedColor: Colors.white24,
+                      backgroundColor: Colors.white12,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  // Time + controls
+                  Row(
+                    children: [
+                      Text(
+                        _formatDuration(_controller.value.position),
+                        style: const TextStyle(color: Colors.white54, fontSize: 11),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          widget.fileName,
+                          style: const TextStyle(color: Colors.white38, fontSize: 11),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        _formatDuration(_controller.value.duration),
+                        style: const TextStyle(color: Colors.white54, fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            )
+          : null,
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
 // REUSABLE HEADER
 // ─────────────────────────────────────────────
 class _Header extends StatelessWidget {
   final String title;
   final IconData icon;
   final String subtitle;
-  final Color? subtitleColor;
-  const _Header(this.title, this.icon, this.subtitle, {this.subtitleColor});
+  const _Header(this.title, this.icon, this.subtitle);
 
   @override
   Widget build(BuildContext context) {
@@ -5792,7 +6119,7 @@ class _Header extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: _kCardBgLight,
+            color: Colors.white.withOpacity(0.06),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(icon, color: Colors.white, size: 24),
@@ -5811,7 +6138,7 @@ class _Header extends StatelessWidget {
               const SizedBox(height: 2),
               Text(subtitle,
                   style: TextStyle(
-                    color: subtitleColor ?? const Color(0xFF595959),
+                    color: Colors.white.withOpacity(0.35),
                     fontSize: 12,
                   )),
             ],
