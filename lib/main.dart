@@ -194,6 +194,15 @@ class _LessNetAppState extends State<LessNetApp> with WidgetsBindingObserver {
 // Chunks de escritura BLE de 200 bytes (MTU-aware).
 // ─────────────────────────────────────────────
 
+const Color _kCardBg = Color(0xFF1A1A1A);       // card background (was white 0.08)
+const Color _kCardBgLight = Color(0xFF141414);   // lighter card bg (was white 0.05)
+const Color _kCardBgDim = Color(0xFF111111);     // dim card bg (was white 0.03-0.04)
+const Color _kBorder = Color(0xFF2A2A2A);        // card border (was white 0.12-0.15)
+const Color _kBorderDim = Color(0xFF1E1E1E);     // dim border (was white 0.06-0.08)
+const Color _kInputFill = Color(0xFF151515);     // text input fill (was white 0.04)
+const Color _kChipBg = Color(0xFF222222);        // chip background
+const Color _kChipBgActive = Color(0xFF2E2E2E);  // active chip background
+
 const int _kBleWriteSize = 200; // bytes por write BLE (MTU-safe)
 const int _kMaxFileSize = 2 * 1024 * 1024; // 2 MB
 const int _kPeripheralNotifyDelayMs = 10; // ms entre notificaciones (peripheral)
@@ -273,9 +282,23 @@ class BtService {
   String get advertisingError => _advertisingError;
 
   // ─── Multi-connection helpers ───
-  List<String> get connectedDeviceIds => _centralConnections.keys.toList();
-  int get centralConnectionCount => _centralConnections.length;
-  bool isDeviceConnected(String deviceId) => _centralConnections.containsKey(deviceId);
+  List<String> get connectedDeviceIds {
+    final ids = _centralConnections.keys.toList();
+    // Also include peripheral connection
+    if (_peripheralConnected && _peripheralDeviceName.isNotEmpty) {
+      if (!ids.contains(_peripheralDeviceName)) {
+        ids.add(_peripheralDeviceName);
+      }
+    }
+    return ids;
+  }
+  int get centralConnectionCount => connectedDeviceIds.length;
+  bool isDeviceConnected(String deviceId) {
+    if (_centralConnections.containsKey(deviceId)) return true;
+    // Also check peripheral connection
+    if (_peripheralConnected && _peripheralDeviceName == deviceId) return true;
+    return false;
+  }
 
   String get activeDeviceId => _activeDeviceId;
 
@@ -1271,7 +1294,7 @@ class _PermissionsPageState extends State<PermissionsPage> {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.03),
+                color: _kCardBgDim,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -1301,10 +1324,10 @@ class _PermissionsPageState extends State<PermissionsPage> {
                     margin: const EdgeInsets.only(bottom: 8),
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.04),
+                      color: _kCardBgDim,
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                          color: Colors.white.withOpacity(0.06)),
+                          color: _kBorderDim),
                     ),
                     child: Row(
                       children: [
@@ -1609,12 +1632,12 @@ class _ScanPageState extends State<ScanPage> {
               margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.08),
+                color: _kCardBg,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
                     color: devId == bt.activeDeviceId
                         ? Colors.greenAccent.withOpacity(0.3)
-                        : Colors.white.withOpacity(0.15)),
+                        : _kBorder),
               ),
               child: Row(
                 children: [
@@ -1648,10 +1671,10 @@ class _ScanPageState extends State<ScanPage> {
                 margin: const EdgeInsets.only(bottom: 12),
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.05),
+                  color: _kCardBgLight,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                      color: Colors.white.withOpacity(0.1)),
+                      color: _kBorder),
                 ),
                 child: Row(
                   children: [
@@ -1826,13 +1849,13 @@ class _ScanPageState extends State<ScanPage> {
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: isLN
-                        ? Colors.white.withOpacity(0.06)
-                        : Colors.white.withOpacity(0.02),
+                        ? _kCardBgLight
+                        : _kCardBgDim,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
                       color: isLN
-                          ? Colors.white.withOpacity(0.12)
-                          : Colors.white.withOpacity(0.04),
+                          ? _kBorder
+                          : _kBorderDim,
                     ),
                   ),
                   child: Row(
@@ -2075,14 +2098,14 @@ class _ChatListPageState extends State<ChatListPage> {
                         ),
                       ).then((_) => _loadConversations());
                     },
-                    backgroundColor: isActive ? Colors.white.withOpacity(0.15) : Colors.white.withOpacity(0.05),
+                    backgroundColor: isActive ? _kChipBgActive : _kCardBgLight,
                     labelStyle: TextStyle(
                       color: isActive ? Colors.white : Colors.white60,
                       fontSize: 12,
                       fontWeight: isActive ? FontWeight.w700 : FontWeight.w400,
                     ),
                     side: BorderSide(
-                      color: isActive ? Colors.white.withOpacity(0.3) : Colors.white.withOpacity(0.08),
+                      color: isActive ? _kBorder : _kBorderDim,
                     ),
                   );
                 },
@@ -2128,12 +2151,12 @@ class _ChatListPageState extends State<ChatListPage> {
                                 child: Container(
                                   decoration: isActive
                                       ? BoxDecoration(
-                                          color: Colors.white.withOpacity(0.08),
+                                          color: _kCardBg,
                                           borderRadius: BorderRadius.circular(12),
-                                          border: Border.all(color: Colors.white.withOpacity(0.12)),
+                                          border: Border.all(color: _kBorder),
                                         )
                                       : BoxDecoration(
-                                          color: Colors.white.withOpacity(0.03),
+                                          color: _kCardBgDim,
                                           borderRadius: BorderRadius.circular(12),
                                         ),
                                   child: Material(
@@ -2159,7 +2182,7 @@ class _ChatListPageState extends State<ChatListPage> {
                                             decoration: BoxDecoration(
                                               color: isActive
                                                   ? Colors.white.withOpacity(0.1)
-                                                  : Colors.white.withOpacity(0.05),
+                                                  : _kCardBgLight,
                                               borderRadius: BorderRadius.circular(10),
                                             ),
                                             child: Icon(
@@ -2269,14 +2292,14 @@ class _ChatPageState extends State<ChatPage> {
   @override
   void initState() {
     super.initState();
-    _connected = bt.isDeviceConnected(widget.deviceId) || (widget.deviceId.isEmpty && bt.isConnected);
+    _connected = bt.isDeviceConnected(widget.deviceId) || bt.isPeripheralConnected;
     _loadHistory();
     _msgSub = bt.onMessage.listen((_) {
       if (mounted) setState(() {});
       _toBottom();
     });
     _connSub = bt.onConnectionChange.listen((_) {
-      if (mounted) setState(() => _connected = bt.isDeviceConnected(widget.deviceId) || (widget.deviceId.isEmpty && bt.isConnected));
+      if (mounted) setState(() => _connected = bt.isDeviceConnected(widget.deviceId) || bt.isPeripheralConnected);
     });
     // Set active device when entering chat
     if (widget.deviceId.isNotEmpty && bt.isDeviceConnected(widget.deviceId)) {
@@ -2614,7 +2637,7 @@ class _ChatPageState extends State<ChatPage> {
               margin: const EdgeInsets.symmetric(horizontal: 20),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.05),
+                color: _kCardBgLight,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -2717,7 +2740,7 @@ class _ChatPageState extends State<ChatPage> {
                           hintText: _connected ? 'Mensaje...' : 'Sin conexion',
                           hintStyle: TextStyle(color: Colors.white.withOpacity(0.15)),
                           filled: true,
-                          fillColor: Colors.white.withOpacity(0.04),
+                          fillColor: _kInputFill,
                           isDense: true,
                           contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                           border: OutlineInputBorder(
@@ -2774,7 +2797,7 @@ class _ChatPageState extends State<ChatPage> {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         constraints: const BoxConstraints(maxWidth: 280),
         decoration: BoxDecoration(
-          color: m.mine ? Colors.white : Colors.white.withOpacity(0.08),
+          color: m.mine ? Colors.white : _kCardBg,
           borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(14),
             topRight: const Radius.circular(14),
@@ -3359,7 +3382,7 @@ class VaultHomePage extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.03),
+                color: _kCardBgDim,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -3383,7 +3406,7 @@ class VaultHomePage extends StatelessWidget {
             ...sections.map((s) => Container(
                   margin: const EdgeInsets.only(bottom: 10),
                   child: Material(
-                    color: Colors.white.withOpacity(0.04),
+                    color: _kCardBgDim,
                     borderRadius: BorderRadius.circular(14),
                     child: InkWell(
                       borderRadius: BorderRadius.circular(14),
@@ -3546,7 +3569,7 @@ class _FirstAidPageState extends State<FirstAidPage> {
                 return Container(
                   margin: const EdgeInsets.only(bottom: 8),
                   child: Material(
-                    color: Colors.white.withOpacity(0.04),
+                    color: _kCardBgDim,
                     borderRadius: BorderRadius.circular(12),
                     child: ListTile(
                       contentPadding:
@@ -3671,7 +3694,7 @@ class _GuidesPageState extends State<GuidesPage> {
                 return Container(
                   margin: const EdgeInsets.only(bottom: 8),
                   child: Material(
-                    color: Colors.white.withOpacity(0.04),
+                    color: _kCardBgDim,
                     borderRadius: BorderRadius.circular(12),
                     child: ListTile(
                       contentPadding:
@@ -3680,7 +3703,7 @@ class _GuidesPageState extends State<GuidesPage> {
                       leading: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.06),
+                          color: _kCardBgLight,
                           borderRadius:
                               BorderRadius.circular(8),
                         ),
@@ -3708,8 +3731,7 @@ class _GuidesPageState extends State<GuidesPage> {
                                       horizontal: 5,
                                       vertical: 1),
                               decoration: BoxDecoration(
-                                color: Colors.white
-                                    .withOpacity(0.08),
+                                color: _kCardBg,
                                 borderRadius:
                                     BorderRadius.circular(3),
                               ),
@@ -3820,7 +3842,7 @@ class _DictionaryPageState extends State<DictionaryPage> {
                 prefixIcon: const Icon(Icons.search,
                     color: Colors.white38),
                 filled: true,
-                fillColor: Colors.white.withOpacity(0.04),
+                fillColor: _kInputFill,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -3856,7 +3878,7 @@ class _DictionaryPageState extends State<DictionaryPage> {
                                 horizontal: 12, vertical: 3),
                             child: Material(
                               color:
-                                  Colors.white.withOpacity(0.04),
+                                  _kCardBgDim,
                               borderRadius:
                                   BorderRadius.circular(10),
                               child: ListTile(
@@ -3887,8 +3909,7 @@ class _DictionaryPageState extends State<DictionaryPage> {
                                       horizontal: 5,
                                       vertical: 1),
                                   decoration: BoxDecoration(
-                                    color: Colors.white
-                                        .withOpacity(0.06),
+                                    color: _kCardBgLight,
                                     borderRadius:
                                         BorderRadius.circular(3),
                                   ),
@@ -3971,8 +3992,7 @@ class _DictDetail extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color:
-                                Colors.white.withOpacity(0.05),
+                            color: _kCardBgLight,
                             borderRadius:
                                 BorderRadius.circular(6),
                           ),
@@ -4086,10 +4106,8 @@ class _WikipediaPageState extends State<WikipediaPage> {
                           label: const Text('Todo'),
                           selected: _selectedCat == null,
                           onSelected: (_) => _selectCat(null),
-                          backgroundColor:
-                              Colors.white.withOpacity(0.05),
-                          selectedColor:
-                              Colors.white.withOpacity(0.15),
+                          backgroundColor: _kCardBgLight,
+                          selectedColor: _kChipBgActive,
                           labelStyle: TextStyle(
                             color: _selectedCat == null
                                 ? Colors.white
@@ -4106,10 +4124,8 @@ class _WikipediaPageState extends State<WikipediaPage> {
                                   c.substring(1)),
                               selected: _selectedCat == c,
                               onSelected: (_) => _selectCat(c),
-                              backgroundColor:
-                                  Colors.white.withOpacity(0.05),
-                              selectedColor:
-                                  Colors.white.withOpacity(0.15),
+                              backgroundColor: _kCardBgLight,
+                              selectedColor: _kChipBgActive,
                               labelStyle: TextStyle(
                                 color: _selectedCat == c
                                     ? Colors.white
@@ -4452,8 +4468,8 @@ class _EmergencyMapPageState extends State<EmergencyMapPage> {
         label: Text(label),
         selected: _filter == val,
         onSelected: (_) => setState(() => _filter = val),
-        backgroundColor: Colors.white.withOpacity(0.05),
-        selectedColor: Colors.white.withOpacity(0.15),
+        backgroundColor: _kCardBgLight,
+        selectedColor: _kChipBgActive,
         labelStyle: TextStyle(
           color: _filter == val ? Colors.white : Colors.white54,
           fontSize: 12,
@@ -4810,7 +4826,7 @@ class _TranslatorPageState extends State<TranslatorPage> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.03),
+                color: _kCardBgDim,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -4895,7 +4911,7 @@ class _TranslatorPageState extends State<TranslatorPage> {
                 hintText: 'Escribe texto para traducir...',
                 hintStyle: TextStyle(color: Colors.white.withOpacity(0.2)),
                 filled: true,
-                fillColor: Colors.white.withOpacity(0.04),
+                fillColor: _kInputFill,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -4934,9 +4950,9 @@ class _TranslatorPageState extends State<TranslatorPage> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.06),
+                  color: _kCardBgLight,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.white.withOpacity(0.1)),
+                  border: Border.all(color: _kBorder),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -4995,7 +5011,7 @@ class _TranslatorPageState extends State<TranslatorPage> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.04),
+            color: _kCardBgDim,
             borderRadius: BorderRadius.circular(8),
             border: _modelStatus[value] == 'downloaded'
                 ? Border.all(color: Colors.white12)
@@ -5083,7 +5099,7 @@ class _ModelManagerPage extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             margin: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.04),
+              color: _kCardBgDim,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
@@ -5135,14 +5151,14 @@ class _ModelManagerPage extends StatelessWidget {
                   margin: const EdgeInsets.only(bottom: 8),
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.04),
+                    color: _kCardBgDim,
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
                       color: status == 'downloaded'
-                          ? Colors.white.withOpacity(0.08)
+                          ? _kBorderDim
                           : status == 'downloading'
                               ? Colors.blue.withOpacity(0.3)
-                              : Colors.white.withOpacity(0.04),
+                              : _kCardBgDim,
                     ),
                   ),
                   child: Row(
@@ -5394,7 +5410,7 @@ class _VaultSearchPageState extends State<VaultSearchPage> {
                   onPressed: () => _search(_searchCtrl.text),
                 ),
                 filled: true,
-                fillColor: Colors.white.withOpacity(0.04),
+                fillColor: _kInputFill,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -5437,7 +5453,7 @@ class _VaultSearchPageState extends State<VaultSearchPage> {
                                 horizontal: 12, vertical: 3),
                             child: Material(
                               color:
-                                  Colors.white.withOpacity(0.04),
+                                  _kCardBgDim,
                               borderRadius:
                                   BorderRadius.circular(10),
                               child: ListTile(
@@ -5466,8 +5482,7 @@ class _VaultSearchPageState extends State<VaultSearchPage> {
                                       horizontal: 5,
                                       vertical: 1),
                                   decoration: BoxDecoration(
-                                    color: Colors.white
-                                        .withOpacity(0.06),
+                                    color: _kCardBgLight,
                                     borderRadius:
                                         BorderRadius.circular(3),
                                   ),
@@ -5579,8 +5594,7 @@ class _DetailPage extends StatelessWidget {
                           height: 24,
                           margin: const EdgeInsets.only(right: 10),
                           decoration: BoxDecoration(
-                            color:
-                                Colors.white.withOpacity(0.08),
+                            color: _kCardBg,
                             borderRadius:
                                 BorderRadius.circular(12),
                           ),
@@ -5697,7 +5711,7 @@ class _Header extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.06),
+            color: _kCardBgLight,
             borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(icon, color: Colors.white, size: 24),
