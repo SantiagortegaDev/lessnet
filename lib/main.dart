@@ -11,6 +11,8 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:video_player/video_player.dart';
+import 'package:open_filex/open_filex.dart';
 
 // ─── UUIDs del servicio BLE de LessNet ───
 const String lessnetServiceUuid = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
@@ -2101,22 +2103,58 @@ class _ChatPageState extends State<ChatPage> {
 
   Widget _buildVideoContent(ChatMessage m) {
     return GestureDetector(
-      onTap: () => _openFile(m.filePath),
+      onTap: () => _showVideoPlayer(m.filePath!, m.fileName ?? 'Video'),
       child: Container(
         width: 240,
-        height: 120,
+        height: 160,
         decoration: BoxDecoration(
-          color: Colors.black26,
+          color: Colors.black,
           borderRadius: BorderRadius.circular(8),
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+        child: Stack(
+          fit: StackFit.expand,
           children: [
-            const Icon(Icons.play_circle_fill, color: Colors.white70, size: 40),
-            const SizedBox(height: 4),
-            Text(m.fileName ?? 'Video',
-                style: const TextStyle(color: Colors.white70, fontSize: 11),
-                overflow: TextOverflow.ellipsis),
+            // Video thumbnail
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: _VideoThumbnail(filePath: m.filePath!),
+            ),
+            // Semi-transparent overlay
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.35),
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            // Play button centered
+            Center(
+              child: Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.play_arrow, color: Colors.white, size: 32),
+              ),
+            ),
+            // Filename at bottom
+            Positioned(
+              left: 8,
+              right: 8,
+              bottom: 8,
+              child: Row(
+                children: [
+                  const Icon(Icons.videocam, color: Colors.white70, size: 12),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(m.fileName ?? 'Video',
+                        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w500),
+                        overflow: TextOverflow.ellipsis),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -2200,13 +2238,311 @@ class _ChatPageState extends State<ChatPage> {
     }));
   }
 
+  void _showVideoPlayer(String path, String title) {
+    Navigator.push(context, MaterialPageRoute(builder: (_) {
+      return _VideoPlayerPage(filePath: path, title: title);
+    }));
+  }
+
   Future<void> _openFile(String? path) async {
     if (path == null) return;
-    // Just show the path for now - can add open_file dependency later
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('Archivo guardado en: $path'),
-      backgroundColor: Colors.grey[800],
-    ));
+    final file = File(path);
+    if (!await file.exists()) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Archivo no encontrado: $path'),
+          backgroundColor: Colors.red[900],
+        ));
+      }
+      return;
+    }
+    try {
+      await OpenFilex.open(path);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('No se pudo abrir el archivo: $e'),
+          backgroundColor: Colors.grey[800],
+        ));
+      }
+    }
+  }
+}
+
+// ─────────────────────────────────────────────
+// VIDEO PLAYER PAGE — Full-screen playback
+// ─────────────────────────────────────────────
+class _VideoPlayerPage extends StatefulWidget {
+  final String filePath;
+  final String title;
+  const _VideoPlayerPage({required this.filePath, required this.title});
+
+  @override
+  State<_VideoPlayerPage> createState() => _VideoPlayerPageState();
+}
+
+class _VideoPlayerPageState extends State<_VideoPlayerPage> {
+  late VideoPlayerController _controller;
+  bool _initialized = false;
+  bool _hasError = false;
+  String _errorMessage = '';
+  bool _showControls = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = VideoPlayerController.file(File(widget.filePath))
+      ..initialize().then((_) {
+        if (mounted) {
+          setState(() => _initialized = true);
+          _controller.play();
+        }
+      }).catchError((e) {
+        if (mounted) {
+          setState(() {
+            _hasError = true;
+            _errorMessage = e.toString();
+          });
+        }
+      });
+    _controller.addListener(() {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  String _formatDuration(Duration d) {
+    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$m:$s';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: Text(
+          widget.title,
+          style: const TextStyle(color: Colors.white, fontSize: 14),
+          overflow: TextOverflow.ellipsis,
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.open_in_new, color: Colors.white70),
+            onPressed: () async {
+              try {
+                await OpenFilex.open(widget.filePath);
+              } catch (_) {}
+            },
+            tooltip: 'Abrir con otra app',
+          ),
+        ],
+      ),
+      body: _hasError
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.error_outline, color: Colors.redAccent, size: 48),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'No se pudo reproducir el video',
+                      style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _errorMessage,
+                      style: const TextStyle(color: Colors.white54, fontSize: 12),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 20),
+                    FilledButton.icon(
+                      onPressed: () async {
+                        try {
+                          await OpenFilex.open(widget.filePath);
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                              content: Text('No se pudo abrir: $e'),
+                              backgroundColor: Colors.red[900],
+                            ));
+                          }
+                        }
+                      },
+                      icon: const Icon(Icons.open_in_new),
+                      label: const Text('Abrir con otra app'),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : !_initialized
+              ? const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CircularProgressIndicator(color: Colors.white),
+                      SizedBox(height: 16),
+                      Text('Cargando video...', style: TextStyle(color: Colors.white54, fontSize: 14)),
+                    ],
+                  ),
+                )
+              : GestureDetector(
+                  onTap: () => setState(() => _showControls = !_showControls),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      // Video
+                      Center(
+                        child: AspectRatio(
+                          aspectRatio: _controller.value.aspectRatio,
+                          child: VideoPlayer(_controller),
+                        ),
+                      ),
+                      // Controls overlay
+                      if (_showControls)
+                        Container(
+                          color: Colors.black26,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              // Play/Pause + progress
+                              const Spacer(),
+                              GestureDetector(
+                                onTap: () {
+                                  if (_controller.value.isPlaying) {
+                                    _controller.pause();
+                                  } else {
+                                    _controller.play();
+                                  }
+                                },
+                                child: Icon(
+                                  _controller.value.isPlaying ? Icons.pause_circle : Icons.play_circle,
+                                  color: Colors.white,
+                                  size: 64,
+                                ),
+                              ),
+                              const Spacer(),
+                              // Progress bar
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                child: Column(
+                                  children: [
+                                    VideoProgressIndicator(
+                                      _controller,
+                                      allowScrubbing: true,
+                                      colors: const VideoProgressColors(
+                                        playedColor: Colors.white,
+                                        bufferedColor: Colors.white24,
+                                        backgroundColor: Colors.white12,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          _formatDuration(_controller.value.position),
+                                          style: const TextStyle(color: Colors.white70, fontSize: 12),
+                                        ),
+                                        Text(
+                                          _formatDuration(_controller.value.duration),
+                                          style: const TextStyle(color: Colors.white54, fontSize: 12),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+// VIDEO THUMBNAIL — Generates thumbnail from video file
+// ─────────────────────────────────────────────
+class _VideoThumbnail extends StatefulWidget {
+  final String filePath;
+  const _VideoThumbnail({required this.filePath});
+
+  @override
+  State<_VideoThumbnail> createState() => _VideoThumbnailState();
+}
+
+class _VideoThumbnailState extends State<_VideoThumbnail> {
+  VideoPlayerController? _controller;
+  bool _initialized = false;
+  bool _hasError = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = VideoPlayerController.file(File(widget.filePath))
+      ..initialize().then((_) {
+        if (mounted) {
+          setState(() => _initialized = true);
+          // Seek to 1 second to get a better thumbnail (not black first frame)
+          _controller!.seekTo(const Duration(seconds: 1));
+        }
+      }).catchError((_) {
+        if (mounted) setState(() => _hasError = true);
+      });
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_hasError || !_initialized || _controller == null) {
+      return Container(
+        width: 240,
+        height: 160,
+        color: Colors.black26,
+        child: const Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.videocam, color: Colors.white38, size: 36),
+            SizedBox(height: 4),
+            Text('Video', style: TextStyle(color: Colors.white38, fontSize: 11)),
+          ],
+        ),
+      );
+    }
+    return SizedBox(
+      width: 240,
+      height: 160,
+      child: FittedBox(
+        fit: BoxFit.cover,
+        clipBehavior: Clip.antiAlias,
+        child: SizedBox(
+          width: _controller!.value.size.width,
+          height: _controller!.value.size.height,
+          child: VideoPlayer(_controller!),
+        ),
+      ),
+    );
   }
 }
 

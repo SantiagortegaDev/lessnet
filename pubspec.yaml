@@ -17,6 +17,8 @@ dependencies:
   path_provider: ^2.1.4
   image_picker: ^1.1.2
   file_picker: ^8.0.7
+  video_player: ^2.9.2
+  open_filex: ^4.5.0
 
 dev_dependencies:
   flutter_test:
