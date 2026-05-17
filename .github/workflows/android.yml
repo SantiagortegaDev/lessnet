@@ -38,6 +38,7 @@ jobs:
           cp -r android/app/src/main/res/mipmap-xxxhdpi /tmp/mipmap_xxxhdpi 2>/dev/null || true
           cp -r android/app/src/main/res/drawable /tmp/drawable_backup 2>/dev/null || true
           cp android/app/src/main/res/values/styles.xml /tmp/styles_backup.xml 2>/dev/null || true
+          cp -r android/app/src/main/res/xml /tmp/xml_backup 2>/dev/null || true
 
           # Create a fresh Flutter project with correct name and org
           cd /tmp
@@ -64,6 +65,10 @@ jobs:
           fi
           if [ -f "/tmp/styles_backup.xml" ]; then
             cp /tmp/styles_backup.xml "$RES_DIR/values/styles.xml"
+          fi
+          if [ -d "/tmp/xml_backup" ]; then
+            mkdir -p "$RES_DIR/xml"
+            cp -r /tmp/xml_backup/* "$RES_DIR/xml/" 2>/dev/null || true
           fi
 
           # Patch build.gradle with our SDK versions and permission_handler config

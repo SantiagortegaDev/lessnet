@@ -28,6 +28,44 @@ const String lessnetCharTxUuid = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";
 const String kGlobalChatId = "__global__";
 const String kGitHubOwner = "SantiagortegaDev";
 const String kGitHubRepo = "lessnet";
+const String kAppVersion = '1.2.0';
+const String kHotspotChannel = 'com.lessnet.hotspot';
+const String kLocationChannel = 'com.lessnet.location';
+
+// ─── APP LOGGER (ring buffer for debug mode) ───
+class AppLogger {
+  static final AppLogger _instance = AppLogger._internal();
+  factory AppLogger() => _instance;
+  AppLogger._internal();
+
+  static const int _maxEntries = 100;
+  final List<String> _logs = [];
+  final _logController = StreamController<String>.broadcast();
+  Stream<String> get onLog => _logController.stream;
+  bool _debugMode = false;
+  bool get debugMode => _debugMode;
+
+  static void log(String message) {
+    final ts = DateTime.now().toIso8601String().substring(11, 19);
+    final entry = '[$ts] $message';
+    final inst = AppLogger();
+    inst._logs.add(entry);
+    if (inst._logs.length > _maxEntries) {
+      inst._logs.removeAt(0);
+    }
+    inst._logController.add(entry);
+    debugPrint('[LessNet] $entry');
+  }
+
+  static List<String> getLogs() => List.from(AppLogger()._logs);
+
+  static void setDebugMode(bool enabled) {
+    AppLogger()._debugMode = enabled;
+    log('Debug mode: ${enabled ? "ON" : "OFF"}');
+  }
+
+  static bool get isDebugMode => AppLogger()._debugMode;
+}
 
 // ─── ENCRYPTION HELPER ───
 class LessNetCrypto {
@@ -158,6 +196,34 @@ class LessNetNotifications {
       details,
     );
   }
+
+  static Future<void> showSOSNotification(String data) async {
+    // Parse SOS data: [SOS:latitude:longitude:userId:timestamp]
+    final parts = data.replaceAll('[SOS:', '').replaceAll(']', '').split(':');
+    final lat = parts.isNotEmpty ? parts[0] : '?';
+    final lng = parts.length > 1 ? parts[1] : '?';
+    final userId = parts.length > 2 ? parts[2] : 'Desconocido';
+    const android = AndroidNotificationDetails(
+      'lessnet_sos',
+      'SOS LessNet',
+      channelDescription: 'Alertas de emergencia SOS',
+      importance: Importance.max,
+      priority: Priority.max,
+      fullScreenIntent: true,
+      autoCancel: false,
+      ongoing: true,
+      playSound: true,
+      enableVibration: true,
+      vibrationPattern: Int64List.fromList([0, 500, 200, 500, 200, 500]),
+    );
+    const details = NotificationDetails(android: android);
+    await _plugin.show(
+      7777,
+      'ALERTA SOS - $userId',
+      'Lat: $lat, Lng: $lng - EMERGENCIA',
+      details,
+    );
+  }
 }
 
 // ─── Background service top-level callback ───
@@ -281,30 +347,44 @@ class _LessNetAppState extends State<LessNetApp> with WidgetsBindingObserver {
     _updateChecked = true;
     try {
       final response = await http.get(
-        Uri.parse('https://api.github.com/repos/$kGitHubOwner/$kGitHubRepo/actions/runs?status=success&per_page=1'),
+        Uri.parse('https://api.github.com/repos/$kGitHubOwner/$kGitHubRepo/releases/latest'),
         headers: {'Accept': 'application/vnd.github+json'},
       ).timeout(const Duration(seconds: 10));
       if (response.statusCode != 200) return;
       final data = json.decode(response.body);
-      final runs = data['workflow_runs'] as List?;
-      if (runs == null || runs.isEmpty) return;
-      final run = runs[0];
-      final runId = run['id'].toString();
-      final createdAt = run['created_at'] as String? ?? '';
-      // Check if this is a newer run than what we've seen
-      final prefs = await SharedPreferences.getInstance();
-      final lastSeenRun = prefs.getString('last_update_run_id') ?? '';
-      if (runId == lastSeenRun) return;
-      // There's a new build available
+      final tagName = (data['tag_name'] as String? ?? '').replaceFirst('v', '');
+      if (tagName.isEmpty) return;
+      // Compare versions
+      if (_compareVersions(tagName, kAppVersion) <= 0) return;
+      // Newer version available
+      final htmlUrl = data['html_url'] as String? ?? '';
+      final assets = (data['assets'] as List?) ?? [];
+      String? apkUrl;
+      for (final asset in assets) {
+        final name = (asset['name'] as String? ?? '').toLowerCase();
+        if (name.endsWith('.apk') || name == 'app-release.apk') {
+          apkUrl = asset['browser_download_url'] as String?;
+          break;
+        }
+      }
       if (mounted) {
-        _showUpdateDialog(runId, createdAt);
+        _showUpdateDialog(tagName, htmlUrl, apkUrl);
       }
     } catch (e) {
       debugPrint('Update check error: $e');
     }
   }
 
-  void _showUpdateDialog(String runId, String createdAt) {
+  int _compareVersions(String a, String b) {
+    final aParts = a.split('.').map((p) => int.tryParse(p) ?? 0).toList();
+    final bParts = b.split('.').map((p) => int.tryParse(p) ?? 0).toList();
+    for (int i = 0; i < aParts.length && i < bParts.length; i++) {
+      if (aParts[i] != bParts[i]) return aParts[i].compareTo(bParts[i]);
+    }
+    return aParts.length.compareTo(bParts.length);
+  }
+
+  void _showUpdateDialog(String version, String htmlUrl, String? apkUrl) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -312,35 +392,55 @@ class _LessNetAppState extends State<LessNetApp> with WidgetsBindingObserver {
         backgroundColor: const Color(0xFF1A1A1A),
         title: const Text('Actualizacion disponible', style: TextStyle(color: Colors.white)),
         content: Text(
-          'Hay una nueva version de LessNet disponible.\nCompilado: ${createdAt.substring(0, 10)}',
+          'Nueva version v$version disponible (actual: v$kAppVersion).\n${apkUrl != null ? "Puedes descargar e instalar el APK directamente." : "Visita GitHub para descargar."}',
           style: const TextStyle(color: Colors.white70),
         ),
         actions: [
           TextButton(
-            onPressed: () async {
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.setString('last_update_run_id', runId);
-              if (ctx.mounted) Navigator.pop(ctx);
-            },
+            onPressed: () => Navigator.pop(ctx),
             child: const Text('Mas tarde'),
           ),
+          if (apkUrl != null)
+            FilledButton(
+              onPressed: () async {
+                if (ctx.mounted) Navigator.pop(ctx);
+                _downloadAndInstallApk(apkUrl);
+              },
+              style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black),
+              child: const Text('Descargar APK'),
+            ),
           FilledButton(
             onPressed: () async {
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.setString('last_update_run_id', runId);
               if (ctx.mounted) Navigator.pop(ctx);
-              // Open the GitHub Actions page to download the APK
-              final uri = Uri.parse('https://github.com/$kGitHubOwner/$kGitHubRepo/actions/runs/$runId');
+              final uri = Uri.parse(htmlUrl);
               if (await canLaunchUrl(uri)) {
                 await launchUrl(uri, mode: LaunchMode.externalApplication);
               }
             },
             style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black),
-            child: const Text('Actualizar'),
+            child: const Text('Ver en GitHub'),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _downloadAndInstallApk(String apkUrl) async {
+    try {
+      AppLogger.log('Descargando APK desde: $apkUrl');
+      final response = await http.get(Uri.parse(apkUrl)).timeout(const Duration(minutes: 5));
+      if (response.statusCode != 200) {
+        AppLogger.log('Error descargando APK: ${response.statusCode}');
+        return;
+      }
+      final dir = await getApplicationDocumentsDirectory();
+      final file = File('${dir.path}/lessnet_update.apk');
+      await file.writeAsBytes(response.bodyBytes);
+      AppLogger.log('APK descargado: ${file.path}');
+      await OpenFilex.open(file.path);
+    } catch (e) {
+      AppLogger.log('Error instalando APK: $e');
+    }
   }
 
   @override
@@ -532,6 +632,17 @@ class BtService {
   String _advertisingError = '';
   bool _autoConnectEnabled = true;
   Timer? _autoScanTimer;
+
+  // ─── Mesh relay tracking ───
+  final Map<String, DateTime> _meshSeen = {}; // content hash -> expiry time
+  static const int _kMeshMaxHops = 5;
+  static const Duration _kMeshSeenExpiry = Duration(minutes: 5);
+
+  // ─── Data tracking ───
+  int _bytesSent = 0;
+  int _bytesReceived = 0;
+  int get bytesSent => _bytesSent;
+  int get bytesReceived => _bytesReceived;
 
   final List<ChatMessage> messages = [];
   final _msgController = StreamController<ChatMessage>.broadcast();
@@ -968,6 +1079,60 @@ class BtService {
   }
 
   void _processReceivedText(String text) {
+    // ─── SOS PROTOCOL ───
+    if (text.startsWith('[SOS:')) {
+      AppLogger.log('SOS recibido: $text');
+      try { LessNetNotifications.showSOSNotification(text); } catch (_) {}
+      final msg = ChatMessage(
+        id: DateTime.now().microsecondsSinceEpoch.toString(),
+        text: '🆘 ALERTA SOS recibida: ${text.replaceAll('[SOS:', '').replaceAll(']', '').replaceAll(':', ' ')}',
+        mine: false,
+        time: DateTime.now(),
+        deviceId: kGlobalChatId,
+      );
+      messages.add(msg);
+      _msgController.add(msg);
+      MessageDB.insert(msg);
+      // Relay SOS to other devices
+      _relayGlobalMessage(text, _activeDeviceId);
+      return;
+    }
+
+    // ─── MESH PROTOCOL ───
+    // [MESH:hopCount:originId][GLOBAL]payload or [MESH:hopCount:originId]payload
+    if (text.startsWith('[MESH:')) {
+      final meshHeaderEnd = text.indexOf(']');
+      if (meshHeaderEnd > 6) {
+        final header = text.substring(6, meshHeaderEnd);
+        final headerParts = header.split(':');
+        if (headerParts.length >= 2) {
+          final hopCount = int.tryParse(headerParts[0]) ?? 0;
+          final originId = headerParts.sublist(1).join(':');
+          // Check deduplication
+          final contentHash = sha256.convert(utf8.encode(text)).toString().substring(0, 16);
+          _cleanMeshSeen();
+          if (_meshSeen.containsKey(contentHash)) {
+            AppLogger.log('Mesh: descartando duplicado de $originId');
+            return; // Already seen
+          }
+          _meshSeen[contentHash] = DateTime.now().add(_kMeshSeenExpiry);
+          AppLogger.log('Mesh: mensaje de $originId, hops=$hopCount');
+
+          final innerPayload = text.substring(meshHeaderEnd + 1);
+          // Process the inner payload
+          _processReceivedText(innerPayload);
+
+          // Relay if hop count > 0
+          if (hopCount > 0) {
+            final relayPayload = '[MESH:${hopCount - 1}:$originId]$innerPayload';
+            AppLogger.log('Mesh: retransmitiendo (hops=${hopCount - 1})');
+            _relayGlobalMessage(relayPayload, _activeDeviceId);
+          }
+          return;
+        }
+      }
+    }
+
     // ─── GLOBAL CHAT PROTOCOL ───
     // [GLOBAL][ENC]<base64> — encrypted global message
     if (text.startsWith('[GLOBAL]')) {
@@ -1134,11 +1299,19 @@ class BtService {
 
   // ─── Relay global message to other connected devices (mesh) ───
   Future<void> _relayGlobalMessage(String payload, String excludeDeviceId) async {
+    // Wrap in mesh protocol if not already wrapped
+    final meshPayload = payload.startsWith('[MESH:') ? payload
+        : '[MESH:$_kMeshMaxHops:${connectedDeviceId.isNotEmpty ? connectedDeviceId : "self"}]$payload';
     for (final devId in _centralConnections.keys.toList()) {
       if (devId != excludeDeviceId) {
-        await _sendRawMessage(payload, deviceId: devId);
+        await _sendRawMessage(meshPayload, deviceId: devId);
       }
     }
+  }
+
+  void _cleanMeshSeen() {
+    final now = DateTime.now();
+    _meshSeen.removeWhere((_, expiry) => now.isAfter(expiry));
   }
 
   Future<String> _saveReceivedFile(String type, String fileName, List<int> bytes) async {
@@ -1158,6 +1331,8 @@ class BtService {
   // ─── Send raw BLE message with MTU-aware chunks ───
   Future<void> _sendRawMessage(String text, {String? deviceId}) async {
     final bytes = utf8.encode(text);
+    _bytesSent += bytes.length;
+    AppLogger.log('Enviando ${bytes.length} bytes a ${deviceId ?? "peripheral"}');
     if (_isPeripheral && _peripheralConnected) {
       // Peripheral: send via Kotlin (handles notifications internally)
       await _peripheralChannel.invokeMethod('sendData', {'data': text});
@@ -1614,6 +1789,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   int _index = 0;
   final bt = BtService();
+  bool _showSOSOverlay = false;
 
   @override
   void initState() {
@@ -1633,12 +1809,56 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        index: _index,
-        children: const [
-          ScanPage(),
-          ChatListPage(),
-          VaultHomePage(),
+      body: Stack(
+        children: [
+          IndexedStack(
+            index: _index,
+            children: const [
+              ScanPage(),
+              ChatListPage(),
+              VaultHomePage(),
+              ProfilePage(),
+            ],
+          ),
+          // SOS FAB - always visible
+          if (_index != 3)
+            Positioned(
+              right: 16,
+              bottom: 90,
+              child: FloatingActionButton(
+                onPressed: () {
+                  setState(() => _showSOSOverlay = true);
+                },
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+                mini: false,
+                child: const Text('SOS', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900)),
+              ),
+            ),
+          // SOS Overlay
+          if (_showSOSOverlay)
+            SOSOverlay(
+              onCancel: () => setState(() => _showSOSOverlay = false),
+              onSend: (sosData) {
+                setState(() => _showSOSOverlay = false);
+                bt.sendMessage(sosData, deviceId: kGlobalChatId);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('SOS enviado a todos los dispositivos'),
+                    backgroundColor: Colors.redAccent,
+                    duration: Duration(seconds: 3),
+                  ),
+                );
+              },
+            ),
+          // Debug overlay
+          if (AppLogger.isDebugMode)
+            const Positioned(
+              left: 8,
+              top: 60,
+              right: 8,
+              child: DebugOverlay(),
+            ),
         ],
       ),
       bottomNavigationBar: NavigationBar(
@@ -1660,6 +1880,11 @@ class _HomePageState extends State<HomePage> {
             icon: Icon(Icons.folder_outlined),
             selectedIcon: Icon(Icons.folder),
             label: 'Vault',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.person_outline),
+            selectedIcon: Icon(Icons.person),
+            label: 'Perfil',
           ),
         ],
       ),
@@ -1690,10 +1915,33 @@ class _PermissionsGatePageState extends State<PermissionsGatePage> {
     _PermItem('Bluetooth Advertise', Icons.broadcast_on_personal,
         Permission.bluetoothAdvertise, 'Hacerse visible'),
     _PermItem('Fotos y Videos', Icons.photo_camera,
-        Permission.photos, 'Enviar imagenes y videos'),
-    _PermItem('Microfono', Icons.mic,
-        Permission.microphone, 'Grabar audio y video'),
+        _mediaPermission, 'Enviar imagenes y videos'),
+    _PermItem('Notificaciones', Icons.notifications,
+        Permission.notification, 'Alertas de mensajes y SOS'),
   ];
+
+  Permission get _mediaPermission {
+    // On Android 33+ use granular media permissions
+    // On older versions use storage
+    try {
+      if (Platform.isAndroid) {
+        // permission_handler handles this internally
+        // Permission.photos works on Android 33+
+        // We'll request both and handle gracefully
+        return Permission.photos;
+      }
+    } catch (_) {}
+    return Permission.storage;
+  }
+
+  List<Permission> get _extraMediaPerms {
+    try {
+      if (Platform.isAndroid) {
+        return [Permission.videos, Permission.storage];
+      }
+    } catch (_) {}
+    return [];
+  }
 
   final Map<Permission, PermissionStatus> _statuses = {};
   bool _loading = false;
@@ -1726,6 +1974,15 @@ class _PermissionsGatePageState extends State<PermissionsGatePage> {
             permsToRequest.add(p.permission);
           } else {
             if (mounted) setState(() => _statuses[p.permission] = status);
+          }
+        } catch (_) {}
+      }
+      // Also request extra media perms for Android
+      for (final p in _extraMediaPerms) {
+        try {
+          final status = await p.status;
+          if (!status.isGranted) {
+            permsToRequest.add(p);
           }
         } catch (_) {}
       }
@@ -1923,6 +2180,13 @@ class _ScanPageState extends State<ScanPage> {
   StreamSubscription? _statusSub;
   int _advSec = 0;
   Timer? _advTimer;
+
+  // ─── Hotspot state ───
+  static const _hotspotChannel = MethodChannel(kHotspotChannel);
+  bool _hotspotEnabled = false;
+  int _hotspotClients = 0;
+  String _hotspotSsid = 'LessNet';
+  String _hotspotError = '';
 
   @override
   void initState() {
@@ -2124,6 +2388,67 @@ class _ScanPageState extends State<ScanPage> {
     if (result != null) {
       await DeviceNames.setName(deviceId, result);
       if (mounted) setState(() {});
+    }
+  }
+
+  Future<void> _toggleHotspot() async {
+    if (_hotspotEnabled) {
+      try {
+        await _hotspotChannel.invokeMethod('stopHotspot');
+        if (mounted) setState(() { _hotspotEnabled = false; _hotspotClients = 0; _hotspotError = ''; });
+        AppLogger.log('Hotspot detenido');
+      } catch (e) {
+        if (mounted) setState(() => _hotspotError = 'Error al detener: $e');
+      }
+    } else {
+      try {
+        final ssidCtrl = TextEditingController(text: _hotspotSsid);
+        final ssid = await showDialog<String>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: const Color(0xFF1A1A1A),
+            title: const Text('Iniciar Hotspot', style: TextStyle(color: Colors.white)),
+            content: TextField(
+              controller: ssidCtrl,
+              style: const TextStyle(color: Colors.white),
+              autofocus: true,
+              decoration: const InputDecoration(
+                hintText: 'Nombre del hotspot...',
+                hintStyle: TextStyle(color: Color(0xFF3A3A3A)),
+              ),
+              onSubmitted: (v) => Navigator.pop(ctx, v),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, null),
+                child: const Text('Cancelar'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, ssidCtrl.text),
+                style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black),
+                child: const Text('Iniciar'),
+              ),
+            ],
+          ),
+        );
+        if (ssid == null || ssid.isEmpty) return;
+        _hotspotSsid = ssid;
+        await _hotspotChannel.invokeMethod('startHotspot', {'ssid': ssid, 'password': 'lessnet123'});
+        if (mounted) setState(() { _hotspotEnabled = true; _hotspotError = ''; });
+        AppLogger.log('Hotspot iniciado: $ssid');
+      } catch (e) {
+        if (mounted) setState(() { _hotspotEnabled = false; _hotspotError = 'Hotspot no disponible en este dispositivo'; });
+        AppLogger.log('Error hotspot: $e');
+      }
+    }
+  }
+
+  Future<void> _connectToWifi(String ssid) async {
+    try {
+      await _hotspotChannel.invokeMethod('connectToWifi', {'ssid': ssid, 'password': 'lessnet123'});
+      AppLogger.log('Conectando a WiFi: $ssid');
+    } catch (e) {
+      AppLogger.log('Error WiFi: $e');
     }
   }
 
@@ -2369,6 +2694,49 @@ class _ScanPageState extends State<ScanPage> {
                 ),
               ],
             ),
+
+            // Hotspot toggle
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                icon: Icon(
+                  _hotspotEnabled ? Icons.wifi : Icons.wifi_off,
+                  color: _hotspotEnabled ? Colors.greenAccent : Colors.white38,
+                  size: 18,
+                ),
+                label: Text(
+                  _hotspotEnabled
+                      ? 'Hotspot: $_hotspotSsid ($_hotspotClients clientes)'
+                      : 'Iniciar Hotspot WiFi',
+                  style: TextStyle(
+                    color: _hotspotEnabled ? Colors.greenAccent : Colors.white54,
+                    fontSize: 13,
+                  ),
+                ),
+                onPressed: _toggleHotspot,
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  side: BorderSide(
+                    color: _hotspotEnabled ? Colors.greenAccent.withOpacity(0.3) : const Color(0x1AFFFFFF),
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+            if (_hotspotError.isNotEmpty)
+              Container(
+                margin: const EdgeInsets.only(top: 6),
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0x0DF44336),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(_hotspotError,
+                    style: const TextStyle(color: Colors.redAccent, fontSize: 11)),
+              ),
 
             const SizedBox(height: 16),
 
@@ -4281,6 +4649,13 @@ class _VaultHomePageState extends State<VaultHomePage> {
         Colors.amberAccent,
         const MorseCodePage(),
       ),
+      _VaultSection(
+        Icons.link,
+        'Cargar desde URL',
+        'Obtener contenido JSON externo',
+        Colors.cyanAccent,
+        const VaultUrlPage(),
+      ),
     ];
 
     return SafeArea(
@@ -4492,7 +4867,9 @@ class FirstAidPage extends StatefulWidget {
 
 class _FirstAidPageState extends State<FirstAidPage> {
   List<dynamic> _items = [];
+  List<dynamic> _filtered = [];
   bool _loading = true;
+  final _searchCtrl = TextEditingController();
 
   @override
   void initState() {
@@ -4507,11 +4884,24 @@ class _FirstAidPageState extends State<FirstAidPage> {
       final d = json.decode(s);
       setState(() {
         _items = d['protocolos'] ?? [];
+        _filtered = _items;
         _loading = false;
       });
     } catch (_) {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  void _filter(String q) {
+    setState(() {
+      _filtered = q.isEmpty
+          ? _items
+          : _items.where((t) {
+              final m = t as Map<String, dynamic>;
+              return (m['titulo'] ?? '').toString().toLowerCase().contains(q.toLowerCase()) ||
+                  (m['resumen'] ?? '').toString().toLowerCase().contains(q.toLowerCase());
+            }).toList();
+    });
   }
 
   Color _pColor(String? p) {
@@ -4534,11 +4924,41 @@ class _FirstAidPageState extends State<FirstAidPage> {
       body: _loading
           ? const Center(
               child: CircularProgressIndicator(color: Colors.white))
-          : ListView.builder(
+          : Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+                  child: TextField(
+                    controller: _searchCtrl,
+                    style: const TextStyle(color: Colors.white),
+                    onChanged: _filter,
+                    decoration: InputDecoration(
+                      hintText: 'Buscar protocolo...',
+                      hintStyle: const TextStyle(color: Color(0xFF3A3A3A)),
+                      prefixIcon: const Icon(Icons.search, color: Colors.white38),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: _filtered.isEmpty
+                      ? Center(child: Text('Sin resultados', style: TextStyle(color: Colors.white24)))
+                      : ListView.builder(
               padding: const EdgeInsets.all(16),
-              itemCount: _items.length,
+              itemCount: _filtered.length,
               itemBuilder: (_, i) {
-                final it = _items[i] as Map<String, dynamic>;
+                final it = _filtered[i] as Map<String, dynamic>;
                 final p = it['prioridad'] ?? '';
                 final pc = _pColor(p);
                 return Container(
@@ -4607,6 +5027,9 @@ class _FirstAidPageState extends State<FirstAidPage> {
                 );
               },
             ),
+                ),
+              ],
+            ),
     );
   }
 }
@@ -4623,7 +5046,10 @@ class GuidesPage extends StatefulWidget {
 
 class _GuidesPageState extends State<GuidesPage> {
   List<dynamic> _items = [];
+  List<dynamic> _filtered = [];
   bool _loading = true;
+  String? _selectedCat;
+  Set<String> _categories = {};
 
   @override
   void initState() {
@@ -4638,11 +5064,21 @@ class _GuidesPageState extends State<GuidesPage> {
       final d = json.decode(s);
       setState(() {
         _items = d['guias'] ?? [];
+        _categories = _items.map((g) => (g as Map<String, dynamic>)['categoria'] as String? ?? '').where((c) => c.isNotEmpty).toSet();
+        _filtered = _items;
         _loading = false;
       });
     } catch (_) {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  void _selectCat(String? cat) {
+    _selectedCat = cat;
+    _filtered = cat == null ? _items : _items.where((g) {
+      return (g as Map<String, dynamic>)['categoria'] == cat;
+    }).toList();
+    setState(() {});
   }
 
   @override
@@ -4659,11 +5095,54 @@ class _GuidesPageState extends State<GuidesPage> {
       body: _loading
           ? const Center(
               child: CircularProgressIndicator(color: Colors.white))
-          : ListView.builder(
+          : Column(
+              children: [
+                if (_categories.isNotEmpty)
+                  SizedBox(
+                    height: 44,
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: FilterChip(
+                            label: const Text('Todo'),
+                            selected: _selectedCat == null,
+                            onSelected: (_) => _selectCat(null),
+                            backgroundColor: _kCardBgLight,
+                            selectedColor: _kChipBgActive,
+                            labelStyle: TextStyle(
+                              color: _selectedCat == null ? Colors.white : Colors.white54,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                        ..._categories.map((c) => Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: FilterChip(
+                            label: Text(c[0].toUpperCase() + c.substring(1)),
+                            selected: _selectedCat == c,
+                            onSelected: (_) => _selectCat(c),
+                            backgroundColor: _kCardBgLight,
+                            selectedColor: _kChipBgActive,
+                            labelStyle: TextStyle(
+                              color: _selectedCat == c ? Colors.white : Colors.white54,
+                              fontSize: 12,
+                            ),
+                          ),
+                        )),
+                      ],
+                    ),
+                  ),
+                Expanded(
+                  child: _filtered.isEmpty
+                      ? Center(child: Text('Sin resultados', style: TextStyle(color: Colors.white24)))
+                      : ListView.builder(
               padding: const EdgeInsets.all(16),
-              itemCount: _items.length,
+              itemCount: _filtered.length,
               itemBuilder: (_, i) {
-                final it = _items[i] as Map<String, dynamic>;
+                final it = _filtered[i] as Map<String, dynamic>;
                 final cat = it['categoria'] ?? '';
                 return Container(
                   margin: const EdgeInsets.only(bottom: 8),
@@ -4731,6 +5210,9 @@ class _GuidesPageState extends State<GuidesPage> {
                   ),
                 );
               },
+            ),
+                ),
+              ],
             ),
     );
   }
@@ -5036,8 +5518,10 @@ class WikipediaPage extends StatefulWidget {
 class _WikipediaPageState extends State<WikipediaPage> {
   Map<String, dynamic> _data = {};
   List<dynamic> _articles = [];
+  List<dynamic> _filteredArticles = [];
   bool _loading = true;
   String? _selectedCat;
+  final _searchCtrl = TextEditingController();
 
   @override
   void initState() {
@@ -5078,7 +5562,21 @@ class _WikipediaPageState extends State<WikipediaPage> {
               as Map<String, dynamic>?;
       _articles = c?['articulos'] as List? ?? [];
     }
+    _applySearchFilter();
     setState(() {});
+  }
+
+  void _applySearchFilter() {
+    final q = _searchCtrl.text.toLowerCase().trim();
+    if (q.isEmpty) {
+      _filteredArticles = _articles;
+    } else {
+      _filteredArticles = _articles.where((a) {
+        final m = a as Map<String, dynamic>;
+        return (m['titulo'] ?? '').toString().toLowerCase().contains(q) ||
+            (m['resumen'] ?? '').toString().toLowerCase().contains(q);
+      }).toList();
+    }
   }
 
   @override
@@ -5102,6 +5600,32 @@ class _WikipediaPageState extends State<WikipediaPage> {
               child: CircularProgressIndicator(color: Colors.white))
           : Column(
               children: [
+                // Search bar
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                  child: TextField(
+                    controller: _searchCtrl,
+                    style: const TextStyle(color: Colors.white),
+                    onChanged: (_) => _applySearchFilter(),
+                    decoration: InputDecoration(
+                      hintText: 'Buscar articulo...',
+                      hintStyle: const TextStyle(color: Color(0xFF3A3A3A)),
+                      prefixIcon: const Icon(Icons.search, color: Colors.white38),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                ),
                 SizedBox(
                   height: 44,
                   child: ListView(
@@ -5148,15 +5672,15 @@ class _WikipediaPageState extends State<WikipediaPage> {
                   ),
                 ),
                 Expanded(
-                  child: _articles.isEmpty
+                  child: _filteredArticles.isEmpty
                       ? Center(
                           child: Text('Sin articulos',
                               style:
                                   TextStyle(color: Colors.white24)))
                       : ListView.builder(
-                          itemCount: _articles.length,
+                          itemCount: _filteredArticles.length,
                           itemBuilder: (_, i) {
-                            final it = _articles[i]
+                            final it = _filteredArticles[i]
                                 as Map<String, dynamic>;
                             return Container(
                               margin:
@@ -7520,6 +8044,724 @@ class _MorseCodePageState extends State<MorseCodePage> {
                 fontSize: 10,
               )),
         ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+// SOS OVERLAY — Full-screen red overlay with countdown
+// ─────────────────────────────────────────────
+class SOSOverlay extends StatefulWidget {
+  final VoidCallback onCancel;
+  final void Function(String sosData) onSend;
+  const SOSOverlay({super.key, required this.onCancel, required this.onSend});
+
+  @override
+  State<SOSOverlay> createState() => _SOSOverlayState();
+}
+
+class _SOSOverlayState extends State<SOSOverlay> {
+  int _countdown = 5;
+  Timer? _timer;
+  String _location = '0.0:0.0';
+
+  @override
+  void initState() {
+    super.initState();
+    _getLocation();
+    _timer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (mounted) {
+        setState(() => _countdown--);
+        if (_countdown <= 0) {
+          t.cancel();
+          _sendSOS();
+        }
+      }
+    });
+  }
+
+  Future<void> _getLocation() async {
+    try {
+      final channel = MethodChannel(kLocationChannel);
+      final loc = await channel.invokeMethod<Map>('getLocation');
+      if (loc != null) {
+        _location = '${loc['latitude'] ?? 0.0}:${loc['longitude'] ?? 0.0}';
+      }
+    } catch (_) {
+      _location = '0.0:0.0';
+    }
+  }
+
+  void _sendSOS() {
+    final userId = BtService().connectedDeviceId.isNotEmpty
+        ? BtService().connectedDeviceId : 'unknown';
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final sosData = '[SOS:$_location:$userId:$timestamp]';
+    AppLogger.log('SOS enviado: $sosData');
+    widget.onSend(sosData);
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: Colors.red.withOpacity(0.9),
+      child: SafeArea(
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.warning, color: Colors.white, size: 64),
+              const SizedBox(height: 24),
+              const Text('SOS',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 64,
+                    fontWeight: FontWeight.w900,
+                  )),
+              const SizedBox(height: 16),
+              Text('Enviando en $_countdown...',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w600,
+                  )),
+              const SizedBox(height: 48),
+              SizedBox(
+                width: 200,
+                height: 60,
+                child: FilledButton(
+                  onPressed: () {
+                    _timer?.cancel();
+                    widget.onCancel();
+                  },
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: Colors.red,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  child: const Text('CANCELAR',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                      )),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+// DEBUG OVERLAY — Small draggable overlay with log messages
+// ─────────────────────────────────────────────
+class DebugOverlay extends StatefulWidget {
+  const DebugOverlay({super.key});
+
+  @override
+  State<DebugOverlay> createState() => _DebugOverlayState();
+}
+
+class _DebugOverlayState extends State<DebugOverlay> {
+  final _scrollController = ScrollController();
+  StreamSubscription? _logSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _logSub = AppLogger().onLog.listen((_) {
+      if (mounted) setState(() {});
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scrollController.hasClients) {
+          _scrollController.animateTo(
+            _scrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 100),
+            curve: Curves.easeOut,
+          );
+        }
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _logSub?.cancel();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final logs = AppLogger.getLogs();
+    return Container(
+      constraints: const BoxConstraints(maxHeight: 150),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.85),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.white12),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: const BoxDecoration(
+              color: Color(0xFF1A1A1A),
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(8),
+                topRight: Radius.circular(8),
+              ),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.bug_report, color: Colors.greenAccent, size: 12),
+                const SizedBox(width: 6),
+                const Text('Debug', style: TextStyle(color: Colors.greenAccent, fontSize: 10, fontWeight: FontWeight.w700)),
+                const Spacer(),
+                GestureDetector(
+                  onTap: () => AppLogger.setDebugMode(false),
+                  child: const Icon(Icons.close, color: Colors.white38, size: 12),
+                ),
+              ],
+            ),
+          ),
+          Flexible(
+            child: ListView.builder(
+              controller: _scrollController,
+              shrinkWrap: true,
+              padding: const EdgeInsets.all(4),
+              itemCount: logs.length,
+              itemBuilder: (_, i) {
+                return Text(logs[i],
+                    style: const TextStyle(
+                      color: Colors.white54,
+                      fontSize: 9,
+                      fontFamily: 'monospace',
+                    ));
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+// PROFILE PAGE — Settings and status
+// ─────────────────────────────────────────────
+class ProfilePage extends StatefulWidget {
+  const ProfilePage({super.key});
+
+  @override
+  State<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
+  final bt = BtService();
+  String _userName = '';
+  bool _debugMode = false;
+  bool _internetConnected = false;
+  String _coordinates = 'No disponible';
+  String _hotspotStatus = 'Desconocido';
+  StreamSubscription? _connSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+    _checkInternet();
+    _connSub = bt.onConnectionChange.listen((_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _connSub?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) setState(() {
+      _userName = prefs.getString('user_name') ?? '';
+      _debugMode = prefs.getBool('debug_mode') ?? false;
+    });
+  }
+
+  Future<void> _checkInternet() async {
+    try {
+      final response = await http.get(
+        Uri.parse('https://www.google.com'),
+      ).timeout(const Duration(seconds: 5));
+      if (mounted) setState(() => _internetConnected = response.statusCode == 200);
+    } catch (_) {
+      if (mounted) setState(() => _internetConnected = false);
+    }
+  }
+
+  Future<void> _getCoordinates() async {
+    try {
+      final channel = MethodChannel(kLocationChannel);
+      final loc = await channel.invokeMethod<Map>('getLocation');
+      if (loc != null && mounted) {
+        setState(() {
+          _coordinates = '${loc['latitude']?.toStringAsFixed(4) ?? "?"}, ${loc['longitude']?.toStringAsFixed(4) ?? "?"}';
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _coordinates = 'No disponible');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _Header('Perfil', Icons.person, 'Configuracion y estado'),
+            const SizedBox(height: 20),
+
+            // User name
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: _kCardBg,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: _kBorder),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Nombre de usuario',
+                      style: TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(_userName.isEmpty ? 'Sin nombre' : _userName,
+                            style: TextStyle(
+                              color: _userName.isEmpty ? Colors.white24 : Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            )),
+                      ),
+                      IconButton(
+                        onPressed: () async {
+                          final ctrl = TextEditingController(text: _userName);
+                          final result = await showDialog<String>(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              backgroundColor: const Color(0xFF1A1A1A),
+                              title: const Text('Tu nombre', style: TextStyle(color: Colors.white)),
+                              content: TextField(
+                                controller: ctrl,
+                                style: const TextStyle(color: Colors.white),
+                                autofocus: true,
+                                decoration: const InputDecoration(
+                                  hintText: 'Escribe tu nombre...',
+                                  hintStyle: TextStyle(color: Color(0xFF3A3A3A)),
+                                ),
+                                onSubmitted: (v) => Navigator.pop(ctx, v),
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(ctx, null),
+                                  child: const Text('Cancelar'),
+                                ),
+                                FilledButton(
+                                  onPressed: () => Navigator.pop(ctx, ctrl.text),
+                                  style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black),
+                                  child: const Text('Guardar'),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (result != null) {
+                            final prefs = await SharedPreferences.getInstance();
+                            await prefs.setString('user_name', result);
+                            if (mounted) setState(() => _userName = result);
+                          }
+                        },
+                        icon: const Icon(Icons.edit, color: Colors.white38, size: 18),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Debug mode toggle
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: _kCardBg,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: _kBorder),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.bug_report, color: Colors.white38, size: 20),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Modo Debug',
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14)),
+                        Text('Muestra overlay con logs',
+                            style: TextStyle(color: Colors.white38, fontSize: 11)),
+                      ],
+                    ),
+                  ),
+                  Switch(
+                    value: _debugMode,
+                    onChanged: (v) async {
+                      final prefs = await SharedPreferences.getInstance();
+                      await prefs.setBool('debug_mode', v);
+                      AppLogger.setDebugMode(v);
+                      if (mounted) setState(() => _debugMode = v);
+                    },
+                    activeColor: Colors.white,
+                    activeTrackColor: Colors.white38,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Status panel
+            const Text('Estado',
+                style: TextStyle(color: Colors.white38, fontSize: 12, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            _statusRow(Icons.wifi, 'Internet', _internetConnected ? 'Conectado' : 'Sin conexion',
+                _internetConnected ? Colors.greenAccent : Colors.redAccent),
+            _statusRow(Icons.bluetooth, 'Dispositivos', '${bt.centralConnectionCount} conectado${bt.centralConnectionCount != 1 ? "s" : ""}',
+                bt.isConnected ? Colors.greenAccent : Colors.white38),
+            _statusRow(Icons.location_on, 'Coordenadas', _coordinates, Colors.white38),
+            _statusRow(Icons.upload, 'Datos enviados', _fmtBytes(bt.bytesSent), Colors.white38),
+            _statusRow(Icons.download, 'Datos recibidos', _fmtBytes(bt.bytesReceived), Colors.white38),
+            _statusRow(Icons.bluetooth_connected, 'BLE', bt.isConnected ? 'Conectado' : 'Desconectado',
+                bt.isConnected ? Colors.greenAccent : Colors.white38),
+            _statusRow(Icons.info, 'Version', 'v$kAppVersion', Colors.white38),
+            _statusRow(Icons.wifi_tethering, 'Hotspot', _hotspotStatus, Colors.white38),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () { _checkInternet(); _getCoordinates(); },
+                    icon: const Icon(Icons.refresh, color: Colors.white38, size: 16),
+                    label: const Text('Actualizar', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0x1AFFFFFF)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _statusRow(IconData icon, String label, String value, Color valueColor) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: _kCardBgDim,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: Colors.white38, size: 16),
+          const SizedBox(width: 10),
+          Text(label, style: const TextStyle(color: Colors.white54, fontSize: 13)),
+          const Spacer(),
+          Text(value, style: TextStyle(color: valueColor, fontSize: 13, fontWeight: FontWeight.w500)),
+        ],
+      ),
+    );
+  }
+
+  String _fmtBytes(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    return '${(bytes / 1024 / 1024).toStringAsFixed(1)} MB';
+  }
+}
+
+// ─────────────────────────────────────────────
+// VAULT URL PAGE — Fetch and display JSON from URL
+// ─────────────────────────────────────────────
+class VaultUrlPage extends StatefulWidget {
+  const VaultUrlPage({super.key});
+
+  @override
+  State<VaultUrlPage> createState() => _VaultUrlPageState();
+}
+
+class _VaultUrlPageState extends State<VaultUrlPage> {
+  final _urlCtrl = TextEditingController();
+  bool _loading = false;
+  String _error = '';
+  String _content = '';
+  List<String> _recentUrls = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRecentUrls();
+  }
+
+  @override
+  void dispose() {
+    _urlCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadRecentUrls() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) setState(() {
+      _recentUrls = prefs.getStringList('vault_recent_urls') ?? [];
+    });
+  }
+
+  Future<void> _fetchUrl() async {
+    final url = _urlCtrl.text.trim();
+    if (url.isEmpty) return;
+    setState(() { _loading = true; _error = ''; _content = ''; });
+    try {
+      final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 15));
+      if (response.statusCode != 200) {
+        setState(() { _error = 'Error: ${response.statusCode}'; _loading = false; });
+        return;
+      }
+      final data = json.decode(response.body);
+      // Save to recent
+      final prefs = await SharedPreferences.getInstance();
+      final recent = prefs.getStringList('vault_recent_urls') ?? [];
+      if (!recent.contains(url)) {
+        recent.insert(0, url);
+        if (recent.length > 10) recent.removeLast();
+        await prefs.setStringList('vault_recent_urls', recent);
+      }
+      if (mounted) setState(() {
+        _content = _formatJson(data);
+        _loading = false;
+        _recentUrls = recent;
+      });
+    } catch (e) {
+      if (mounted) setState(() { _error = 'Error: $e'; _loading = false; });
+    }
+  }
+
+  String _formatJson(dynamic data, [int indent = 0]) {
+    final prefix = '  ' * indent;
+    if (data is Map) {
+      if (data.isEmpty) return '{}';
+      final buf = StringBuffer('{\n');
+      int i = 0;
+      for (final key in data.keys) {
+        buf.write('$prefix  "$key": ${_formatJson(data[key], indent + 1)}');
+        if (i < data.length - 1) buf.write(',');
+        buf.write('\n');
+        i++;
+      }
+      buf.write('$prefix}');
+      return buf.toString();
+    } else if (data is List) {
+      if (data.isEmpty) return '[]';
+      final buf = StringBuffer('[\n');
+      for (int i = 0; i < data.length; i++) {
+        buf.write('$prefix  ${_formatJson(data[i], indent + 1)}');
+        if (i < data.length - 1) buf.write(',');
+        buf.write('\n');
+      }
+      buf.write('$prefix]');
+      return buf.toString();
+    } else if (data is String) {
+      return '"${data.replaceAll('"', '\\"')}"';
+    } else {
+      return data.toString();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF0A0A0A),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF111111),
+        title: const Text('Cargar desde URL', style: TextStyle(color: Colors.white)),
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: _kCardBgDim,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline, color: Colors.white24, size: 16),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text('Ingresa una URL que devuelva JSON. El contenido se mostrara formateado.',
+                        style: TextStyle(color: Color(0x66FFFFFF), fontSize: 11)),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _urlCtrl,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: 'https://ejemplo.com/datos.json',
+                hintStyle: const TextStyle(color: Color(0xFF3A3A3A)),
+                prefixIcon: const Icon(Icons.link, color: Colors.white38),
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.arrow_forward, color: Colors.white38),
+                  onPressed: _fetchUrl,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              onSubmitted: (_) => _fetchUrl(),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                icon: _loading
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
+                    : const Icon(Icons.download),
+                label: Text(_loading ? 'Cargando...' : 'Obtener'),
+                onPressed: _loading ? null : _fetchUrl,
+              ),
+            ),
+            if (_recentUrls.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              const Text('URLs recientes',
+                  style: TextStyle(color: Colors.white38, fontSize: 12, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 6),
+              ..._recentUrls.take(5).map((url) => Container(
+                margin: const EdgeInsets.only(bottom: 4),
+                child: Material(
+                  color: _kCardBgDim,
+                  borderRadius: BorderRadius.circular(8),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: () {
+                      _urlCtrl.text = url;
+                      _fetchUrl();
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.history, color: Colors.white24, size: 14),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(url,
+                                style: const TextStyle(color: Colors.white54, fontSize: 11),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              )),
+            ],
+            if (_error.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0x0DF44336),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(_error, style: const TextStyle(color: Colors.redAccent, fontSize: 12)),
+              ),
+            ],
+            if (_content.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  const Text('Contenido',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15)),
+                  const Spacer(),
+                  TextButton.icon(
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: _content));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Copiado!'), backgroundColor: Colors.grey));
+                    },
+                    icon: const Icon(Icons.copy, size: 14),
+                    label: const Text('Copiar', style: TextStyle(fontSize: 11)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0D0D0D),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: _kBorder),
+                ),
+                constraints: const BoxConstraints(maxHeight: 400),
+                child: SingleChildScrollView(
+                  child: Text(_content,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 11,
+                        fontFamily: 'monospace',
+                        height: 1.4,
+                      )),
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
