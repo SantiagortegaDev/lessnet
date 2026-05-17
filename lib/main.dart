@@ -644,22 +644,26 @@ class PermissionsPage extends StatefulWidget {
 }
 
 class _PermissionsPageState extends State<PermissionsPage> {
-  final _perms = [
-    _PermItem('Ubicacion', Icons.location_on,
-        Permission.locationWhenInUse, 'Requerida para BT scan'),
-    _PermItem('Bluetooth Scan', Icons.bluetooth_searching,
-        Permission.bluetoothScan, 'Buscar dispositivos'),
-    _PermItem('Bluetooth Connect', Icons.bluetooth_connected,
-        Permission.bluetoothConnect, 'Conectarse a dispositivos'),
-    _PermItem('Bluetooth Advertise', Icons.broadcast_on_personal,
-        Permission.bluetoothAdvertise, 'Hacerse visible'),
-    _PermItem('Almacenamiento', Icons.folder,
-        Permission.storage, 'Enviar fotos y archivos'),
-    _PermItem('Fotos', Icons.photo_library,
-        Permission.photos, 'Acceder a la galeria'),
-    _PermItem('Videos', Icons.videocam,
-        Permission.videos, 'Acceder a videos'),
-  ];
+  List<_PermItem> get _perms {
+    final items = [
+      _PermItem('Ubicacion', Icons.location_on,
+          Permission.locationWhenInUse, 'Requerida para BT scan'),
+      _PermItem('Bluetooth Scan', Icons.bluetooth_searching,
+          Permission.bluetoothScan, 'Buscar dispositivos'),
+      _PermItem('Bluetooth Connect', Icons.bluetooth_connected,
+          Permission.bluetoothConnect, 'Conectarse a dispositivos'),
+      _PermItem('Bluetooth Advertise', Icons.broadcast_on_personal,
+          Permission.bluetoothAdvertise, 'Hacerse visible'),
+    ];
+    // Android 13+ uses photos/videos, older uses storage
+    items.add(_PermItem('Fotos', Icons.photo_library,
+        Permission.photos, 'Acceder a la galeria'));
+    items.add(_PermItem('Videos', Icons.videocam,
+        Permission.videos, 'Acceder a videos'));
+    items.add(_PermItem('Almacenamiento', Icons.folder,
+        Permission.storage, 'Archivos (Android 12 o menor)'));
+    return items;
+  }
 
   final Map<Permission, PermissionStatus> _statuses = {};
   bool _loading = false;

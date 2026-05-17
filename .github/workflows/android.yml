@@ -25,6 +25,7 @@ jobs:
           cp -r assets /tmp/assets_backup 2>/dev/null || true
           cp pubspec.yaml /tmp/pubspec_backup.yaml
           cp android/app/src/main/AndroidManifest.xml /tmp/AndroidManifest_backup.xml
+          cp android/app/build.gradle /tmp/build_gradle_backup 2>/dev/null || true
 
           # Create a fresh Flutter project with correct name and org
           cd /tmp
@@ -34,8 +35,18 @@ jobs:
           rm -rf "$GITHUB_WORKSPACE/android"
           cp -r /tmp/lessnet_fresh/android "$GITHUB_WORKSPACE/android"
 
-          # Restore our AndroidManifest with BT permissions
+          # Restore our AndroidManifest with BT + storage permissions
           cp /tmp/AndroidManifest_backup.xml "$GITHUB_WORKSPACE/android/app/src/main/AndroidManifest.xml"
+
+          # Patch build.gradle with our SDK versions and permission_handler config
+          if [ -f /tmp/build_gradle_backup ]; then
+            cp /tmp/build_gradle_backup "$GITHUB_WORKSPACE/android/app/build.gradle"
+          else
+            # If no backup, patch the generated one with correct SDK versions
+            GRADLE="$GITHUB_WORKSPACE/android/app/build.gradle"
+            sed -i 's/compileSdk flutter.compileSdkVersion/compileSdk 34/' "$GRADLE"
+            sed -i 's/targetSdk flutter.targetSdkVersion/targetSdk 34/' "$GRADLE"
+          fi
 
           # ── Install our custom native BLE peripheral Kotlin files ──
           # Extract package from the generated build.gradle

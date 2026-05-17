@@ -6,12 +6,12 @@ plugins {
 
 android {
     namespace "com.lessnet.app"
-    compileSdk flutter.compileSdkVersion
+    compileSdk 34
 
     defaultConfig {
         applicationId "com.lessnet.app"
         minSdk 21
-        targetSdk flutter.targetSdkVersion
+        targetSdk 34
         versionCode 1
         versionName "1.0"
     }
