@@ -221,13 +221,30 @@ class _LessNetAppState extends State<LessNetApp> with WidgetsBindingObserver {
         ),
         navigationBarTheme: NavigationBarThemeData(
           backgroundColor: const Color(0xFF111111),
-          indicatorColor: Colors.white.withOpacity(0.15),
+          indicatorColor: const Color(0xFF262626), // was withOpacity(0.15) — yellow on AMOLED
           iconTheme: WidgetStateProperty.all(
             const IconThemeData(color: Colors.grey),
           ),
           labelTextStyle: WidgetStateProperty.all(
             const TextStyle(color: Colors.grey, fontSize: 11),
           ),
+        ),
+        // ─── KILL ALL DEFAULT UNDERLINES GLOBALLY ───
+        inputDecorationTheme: const InputDecorationTheme(
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.all(Radius.circular(12)),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.all(Radius.circular(12)),
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.all(Radius.circular(12)),
+            borderSide: BorderSide.none,
+          ),
+          filled: true,
+          fillColor: Color(0xFF151515),
         ),
       ),
       home: _needsPermissions == null
@@ -401,6 +418,13 @@ class BtService {
       connectedDevice = conn.device;
       rxChar = conn.rxChar;
       txChar = conn.txChar;
+      _connectionController.add(true);
+    } else if (_peripheralConnected && _peripheralDeviceName == deviceId) {
+      // Handle peripheral device — no CentralConnection object, just mark active
+      _activeDeviceId = deviceId;
+      connectedDevice = null;
+      rxChar = null;
+      txChar = null;
       _connectionController.add(true);
     }
   }
@@ -2004,7 +2028,7 @@ class _ScanPageState extends State<ScanPage> {
                   child: Text(
                     'Presiona Buscar o Visible\npara empezar',
                     style:
-                        TextStyle(color: Colors.white.withOpacity(0.15)),
+                        const TextStyle(color: Color(0xFF2F2F2F)),
                     textAlign: TextAlign.center,
                   ),
                 ),
@@ -2172,7 +2196,7 @@ class _ChatListPageState extends State<ChatListPage> {
                     ? Center(
                         child: Text(
                           'Conecta un dispositivo para chatear',
-                          style: TextStyle(color: Colors.white.withOpacity(0.15)),
+                          style: const TextStyle(color: Color(0xFF2F2F2F)),
                           textAlign: TextAlign.center,
                         ),
                       )
@@ -2235,7 +2259,7 @@ class _ChatListPageState extends State<ChatListPage> {
                                             padding: const EdgeInsets.all(10),
                                             decoration: BoxDecoration(
                                               color: isActive
-                                                  ? Colors.white.withOpacity(0.1)
+                                                  ? const Color(0xFF1A1A1A)
                                                   : _kCardBgLight,
                                               borderRadius: BorderRadius.circular(10),
                                             ),
@@ -2262,7 +2286,7 @@ class _ChatListPageState extends State<ChatListPage> {
                                                 Text(
                                                   conv.lastMessage,
                                                   style: TextStyle(
-                                                    color: Colors.white.withOpacity(0.35),
+                                                    color: const Color(0xFF595959),
                                                     fontSize: 12,
                                                   ),
                                                   maxLines: 1,
@@ -2277,7 +2301,7 @@ class _ChatListPageState extends State<ChatListPage> {
                                               Text(
                                                 _fmtTime(conv.lastTime),
                                                 style: TextStyle(
-                                                  color: Colors.white.withOpacity(0.25),
+                                                  color: const Color(0xFF404040),
                                                   fontSize: 11,
                                                 ),
                                               ),
@@ -2346,17 +2370,18 @@ class _ChatPageState extends State<ChatPage> {
   @override
   void initState() {
     super.initState();
-    _connected = bt.isDeviceConnected(widget.deviceId) || bt.isPeripheralConnected;
+    _connected = _checkConnected();
     _loadHistory();
     _msgSub = bt.onMessage.listen((_) {
       if (mounted) setState(() {});
       _toBottom();
     });
     _connSub = bt.onConnectionChange.listen((_) {
-      if (mounted) setState(() => _connected = bt.isDeviceConnected(widget.deviceId) || bt.isPeripheralConnected);
+      if (mounted) setState(() => _connected = _checkConnected());
     });
+    // Also listen for status changes (peripheral connect/disconnect)
     // Set active device when entering chat
-    if (widget.deviceId.isNotEmpty && bt.isDeviceConnected(widget.deviceId)) {
+    if (widget.deviceId.isNotEmpty) {
       bt.setActiveDevice(widget.deviceId);
     }
     _progressSub = bt.onProgress.listen((p) {
@@ -2384,6 +2409,16 @@ class _ChatPageState extends State<ChatPage> {
         });
       }
     });
+  }
+
+  /// Check if THIS chat is connected.
+  /// For peripheral: always connected if a Central is linked to us.
+  /// For central: connected if the specific device is in our connection map.
+  bool _checkConnected() {
+    // If this is a peripheral-side chat, just check if peripheral is connected
+    if (bt.isPeripheralConnected) return true;
+    // Otherwise check if the specific device is connected
+    return bt.isDeviceConnected(widget.deviceId);
   }
 
   void _startSendTimeout() {
@@ -2724,7 +2759,7 @@ class _ChatPageState extends State<ChatPage> {
                     _sendProgress > 0
                         ? 'Enviando ${_sendingFileName.isNotEmpty ? _sendingFileName : "archivo"}... ${(_sendProgress * 100).toStringAsFixed(0)}%'
                         : 'Enviando ${_sendingFileName.isNotEmpty ? _sendingFileName : "archivo"}...',
-                    style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 10),
+                    style: const TextStyle(color: Color(0xFF808080), fontSize: 10),
                   ),
                 ],
               ),
@@ -2738,7 +2773,7 @@ class _ChatPageState extends State<ChatPage> {
                           _connected
                               ? 'Escribe un mensaje'
                               : 'Conecta un dispositivo primero',
-                          style: TextStyle(color: Colors.white.withOpacity(0.15)),
+                          style: const TextStyle(color: Color(0xFF2F2F2F)),
                           textAlign: TextAlign.center,
                         ),
                       )
@@ -2792,13 +2827,12 @@ class _ChatPageState extends State<ChatPage> {
                         style: const TextStyle(color: Colors.white),
                         decoration: InputDecoration(
                           hintText: _connected ? 'Mensaje...' : 'Sin conexion',
-                          hintStyle: TextStyle(color: Colors.white.withOpacity(0.15)),
-                          filled: true,
-                          fillColor: _kInputFill,
+                          hintStyle: const TextStyle(color: Color(0xFF3A3A3A)),
                           isDense: true,
                           contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
                           ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -2806,7 +2840,7 @@ class _ChatPageState extends State<ChatPage> {
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(color: Colors.white24),
+                            borderSide: BorderSide.none,
                           ),
                         ),
                         onSubmitted: (_) => _send(),
@@ -2831,7 +2865,7 @@ class _ChatPageState extends State<ChatPage> {
                     padding: const EdgeInsets.only(top: 4),
                     child: Text(
                       'Max ${_kMaxFileSize ~/ (1024 * 1024)} MB por archivo (BLE)',
-                      style: TextStyle(color: Colors.white.withOpacity(0.2), fontSize: 10),
+                      style: const TextStyle(color: Color(0xFF333333), fontSize: 10),
                     ),
                   ),
               ],
@@ -2883,14 +2917,14 @@ class _ChatPageState extends State<ChatPage> {
               children: [
                 Text(_fmt(m.time),
                     style: TextStyle(
-                      color: m.mine ? Colors.black38 : Colors.white.withOpacity(0.25),
+                      color: m.mine ? Colors.black38 : const Color(0xFF404040),
                       fontSize: 10,
                     )),
                 if (m.fileSize != null) ...[
                   const SizedBox(width: 6),
                   Text(_fmtSize(m.fileSize),
                       style: TextStyle(
-                        color: m.mine ? Colors.black38 : Colors.white.withOpacity(0.25),
+                        color: m.mine ? Colors.black38 : const Color(0xFF404040),
                         fontSize: 10,
                       )),
                 ],
@@ -2958,7 +2992,7 @@ class _ChatPageState extends State<ChatPage> {
                 width: 52,
                 height: 52,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
+                  color: const Color(0xFF333333),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(Icons.play_arrow, color: Colors.white, size: 32),
@@ -2993,7 +3027,7 @@ class _ChatPageState extends State<ChatPage> {
       child: Container(
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: (m.mine ? Colors.black : Colors.white).withOpacity(0.06),
+          color: m.mine ? const Color(0xFF0F0F0F) : const Color(0xFF141414),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
@@ -3014,7 +3048,7 @@ class _ChatPageState extends State<ChatPage> {
                   if (m.fileSize != null)
                     Text(_fmtSize(m.fileSize),
                         style: TextStyle(
-                          color: m.mine ? Colors.black38 : Colors.white.withOpacity(0.4),
+                          color: m.mine ? Colors.black38 : const Color(0xFF666666),
                           fontSize: 10,
                         )),
                 ],
@@ -3891,14 +3925,12 @@ class _DictionaryPageState extends State<DictionaryPage> {
               onChanged: _filter,
               decoration: InputDecoration(
                 hintText: 'Buscar termino...',
-                hintStyle: TextStyle(
-                    color: Colors.white.withOpacity(0.2)),
+                hintStyle: const TextStyle(color: Color(0xFF3A3A3A)),
                 prefixIcon: const Icon(Icons.search,
                     color: Colors.white38),
-                filled: true,
-                fillColor: _kInputFill,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -3906,8 +3938,7 @@ class _DictionaryPageState extends State<DictionaryPage> {
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(
-                      color: Colors.white24),
+                  borderSide: BorderSide.none,
                 ),
               ),
             ),
@@ -4963,11 +4994,10 @@ class _TranslatorPageState extends State<TranslatorPage> {
               maxLines: 4,
               decoration: InputDecoration(
                 hintText: 'Escribe texto para traducir...',
-                hintStyle: TextStyle(color: Colors.white.withOpacity(0.2)),
-                filled: true,
-                fillColor: _kInputFill,
+                hintStyle: const TextStyle(color: Color(0xFF3A3A3A)),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -4975,7 +5005,7 @@ class _TranslatorPageState extends State<TranslatorPage> {
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: Colors.white24),
+                  borderSide: BorderSide.none,
                 ),
               ),
             ),
@@ -5445,8 +5475,7 @@ class _VaultSearchPageState extends State<VaultSearchPage> {
               onSubmitted: _search,
               decoration: InputDecoration(
                 hintText: 'Buscar en todo el vault...',
-                hintStyle: TextStyle(
-                    color: Colors.white.withOpacity(0.2)),
+                hintStyle: const TextStyle(color: Color(0xFF3A3A3A)),
                 prefixIcon: _searching
                     ? const SizedBox(
                         width: 20,
@@ -5463,10 +5492,9 @@ class _VaultSearchPageState extends State<VaultSearchPage> {
                       color: Colors.white38),
                   onPressed: () => _search(_searchCtrl.text),
                 ),
-                filled: true,
-                fillColor: _kInputFill,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -5474,8 +5502,7 @@ class _VaultSearchPageState extends State<VaultSearchPage> {
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(
-                      color: Colors.white24),
+                  borderSide: BorderSide.none,
                 ),
               ),
             ),
@@ -5784,7 +5811,7 @@ class _Header extends StatelessWidget {
               const SizedBox(height: 2),
               Text(subtitle,
                   style: TextStyle(
-                    color: subtitleColor ?? Colors.white.withOpacity(0.35),
+                    color: subtitleColor ?? const Color(0xFF595959),
                     fontSize: 12,
                   )),
             ],
