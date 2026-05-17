@@ -25,6 +25,11 @@ const String lessnetCharTxUuid = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";
 class LessNetNotifications {
   static final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
+  static bool _isAppInForeground = true;
+
+  static void setAppForeground(bool foreground) {
+    _isAppInForeground = foreground;
+  }
 
   static Future<void> init() async {
     const android = AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -38,6 +43,8 @@ class LessNetNotifications {
   }
 
   static Future<void> showMessageNotification(String deviceName, String text) async {
+    // Don't show notifications when the app is in foreground
+    if (_isAppInForeground) return;
     const android = AndroidNotificationDetails(
       'lessnet_messages',
       'Mensajes LessNet',
@@ -110,8 +117,33 @@ void main() async {
 // ─────────────────────────────────────────────
 // APP ROOT — PALETA BLANCO Y NEGRO
 // ─────────────────────────────────────────────
-class LessNetApp extends StatelessWidget {
+class LessNetApp extends StatefulWidget {
   const LessNetApp({super.key});
+
+  @override
+  State<LessNetApp> createState() => _LessNetAppState();
+}
+
+class _LessNetAppState extends State<LessNetApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    LessNetNotifications.setAppForeground(true);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    LessNetNotifications.setAppForeground(
+      state == AppLifecycleState.resumed,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1428,6 +1460,7 @@ class _ScanPageState extends State<ScanPage> {
                   : bt.isAdvertising
                       ? 'Visible'
                       : 'Sin conexion',
+              subtitleColor: conn ? Colors.greenAccent : (bt.isAdvertising ? Colors.blueAccent : Colors.white38),
             ),
             const SizedBox(height: 16),
 
@@ -2349,6 +2382,7 @@ class _ChatPageState extends State<ChatPage> {
                     _connected
                         ? 'Conectado por Bluetooth'
                         : 'Sin conexion',
+                    subtitleColor: _connected ? Colors.greenAccent : Colors.white38,
                   ),
                 ),
                 if (widget.deviceId.isNotEmpty)
@@ -5465,7 +5499,8 @@ class _Header extends StatelessWidget {
   final String title;
   final IconData icon;
   final String subtitle;
-  const _Header(this.title, this.icon, this.subtitle);
+  final Color? subtitleColor;
+  const _Header(this.title, this.icon, this.subtitle, {this.subtitleColor});
 
   @override
   Widget build(BuildContext context) {
@@ -5493,7 +5528,7 @@ class _Header extends StatelessWidget {
               const SizedBox(height: 2),
               Text(subtitle,
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.35),
+                    color: subtitleColor ?? Colors.white.withOpacity(0.35),
                     fontSize: 12,
                   )),
             ],
