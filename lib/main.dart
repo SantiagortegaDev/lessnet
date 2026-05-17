@@ -491,135 +491,6 @@ class _LessNetAppState extends State<LessNetApp> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _showChangelog() async {
-    showDialog(
-      context: context,
-      builder: (ctx) => const AlertDialog(
-        backgroundColor: Color(0xFF1A1A1A),
-        title: Text('Changelog', style: TextStyle(color: Colors.white)),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Descargando releases...', style: TextStyle(color: Colors.white54)),
-            ],
-          ),
-        ),
-      ),
-    );
-    try {
-      final response = await http.get(
-        Uri.parse('https://api.github.com/repos/$kGitHubOwner/$kGitHubRepo/releases?per_page=10'),
-        headers: {'Accept': 'application/vnd.github+json'},
-      ).timeout(const Duration(seconds: 10));
-      if (ctx.mounted) Navigator.pop(ctx);
-      if (response.statusCode != 200) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Error al obtener changelog'), backgroundColor: Colors.redAccent),
-          );
-        }
-        return;
-      }
-      final List releases = json.decode(response.body);
-      if (releases.isEmpty) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No hay releases disponibles'), backgroundColor: Colors.orange),
-          );
-        }
-        return;
-      }
-      if (mounted) {
-        showDialog(
-          context: context,
-          builder: (ctx2) => AlertDialog(
-            backgroundColor: const Color(0xFF1A1A1A),
-            title: const Text('Changelog', style: TextStyle(color: Colors.white)),
-            content: SizedBox(
-              width: double.maxFinite,
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: releases.length,
-                itemBuilder: (context, index) {
-                  final release = releases[index];
-                  final tag = release['tag_name'] ?? '?';
-                  final name = release['name'] ?? tag;
-                  final body = release['body'] ?? '';
-                  final isCurrent = tag.replaceFirst('v', '') == kAppVersion;
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF111111),
-                      borderRadius: BorderRadius.circular(8),
-                      border: isCurrent
-                          ? Border.all(color: Colors.greenAccent.withOpacity(0.5))
-                          : Border.all(color: const Color(0xFF2A2A2A)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Text(name,
-                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14)),
-                            if (isCurrent) ...[
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: Colors.greenAccent.withOpacity(0.15),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: const Text('ACTUAL',
-                                    style: TextStyle(color: Colors.greenAccent, fontSize: 10, fontWeight: FontWeight.w600)),
-                              ),
-                            ],
-                          ],
-                        ),
-                        if (body.trim().isNotEmpty) ...[
-                          const SizedBox(height: 8),
-                          MarkdownBody(
-                            data: body,
-                            selectable: true,
-                            styleSheet: MarkdownStyleSheet(
-                              p: const TextStyle(color: Colors.white54, fontSize: 12, height: 1.5),
-                              h2: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600),
-                              h3: const TextStyle(color: Colors.white60, fontSize: 12, fontWeight: FontWeight.w600),
-                              listBullet: const TextStyle(color: Colors.white54, fontSize: 12),
-                              code: const TextStyle(color: Colors.greenAccent, fontSize: 11, backgroundColor: Color(0xFF1A1A1A)),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx2),
-                child: const Text('Cerrar'),
-              ),
-            ],
-          ),
-        );
-      }
-    } catch (e) {
-      if (context.mounted && ModalRoute.of(context)?.isCurrent != true) {
-        Navigator.pop(context);
-      }
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.redAccent),
-        );
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -8696,6 +8567,135 @@ class _ProfilePageState extends State<ProfilePage> {
     if (bytes < 1024) return '$bytes B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
     return '${(bytes / 1024 / 1024).toStringAsFixed(1)} MB';
+  }
+
+  Future<void> _showChangelog() async {
+    showDialog(
+      context: context,
+      builder: (_) => const AlertDialog(
+        backgroundColor: Color(0xFF1A1A1A),
+        title: Text('Changelog', style: TextStyle(color: Colors.white)),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Descargando releases...', style: TextStyle(color: Colors.white54)),
+            ],
+          ),
+        ),
+      ),
+    );
+    try {
+      final response = await http.get(
+        Uri.parse('https://api.github.com/repos/$kGitHubOwner/$kGitHubRepo/releases?per_page=10'),
+        headers: {'Accept': 'application/vnd.github+json'},
+      ).timeout(const Duration(seconds: 10));
+      if (mounted) Navigator.of(context).pop();
+      if (response.statusCode != 200) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Error al obtener changelog'), backgroundColor: Colors.redAccent),
+          );
+        }
+        return;
+      }
+      final List releases = json.decode(response.body);
+      if (releases.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No hay releases disponibles'), backgroundColor: Colors.orange),
+          );
+        }
+        return;
+      }
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (ctx2) => AlertDialog(
+            backgroundColor: const Color(0xFF1A1A1A),
+            title: const Text('Changelog', style: TextStyle(color: Colors.white)),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: releases.length,
+                itemBuilder: (_, index) {
+                  final release = releases[index];
+                  final tag = release['tag_name'] ?? '?';
+                  final name = release['name'] ?? tag;
+                  final body = release['body'] ?? '';
+                  final isCurrent = tag.replaceFirst('v', '') == kAppVersion;
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF111111),
+                      borderRadius: BorderRadius.circular(8),
+                      border: isCurrent
+                          ? Border.all(color: Colors.greenAccent.withOpacity(0.5))
+                          : Border.all(color: const Color(0xFF2A2A2A)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(name,
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14)),
+                            if (isCurrent) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.greenAccent.withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: const Text('ACTUAL',
+                                    style: TextStyle(color: Colors.greenAccent, fontSize: 10, fontWeight: FontWeight.w600)),
+                              ),
+                            ],
+                          ],
+                        ),
+                        if (body.trim().isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          MarkdownBody(
+                            data: body,
+                            selectable: true,
+                            styleSheet: MarkdownStyleSheet(
+                              p: const TextStyle(color: Colors.white54, fontSize: 12, height: 1.5),
+                              h2: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600),
+                              h3: const TextStyle(color: Colors.white60, fontSize: 12, fontWeight: FontWeight.w600),
+                              listBullet: const TextStyle(color: Colors.white54, fontSize: 12),
+                              code: const TextStyle(color: Colors.greenAccent, fontSize: 11, backgroundColor: Color(0xFF1A1A1A)),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx2),
+                child: const Text('Cerrar'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted && ModalRoute.of(context)?.isCurrent != true) {
+        Navigator.pop(context);
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.redAccent),
+        );
+      }
+    }
   }
 }
 
