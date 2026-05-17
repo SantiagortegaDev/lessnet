@@ -355,13 +355,29 @@ class _LessNetAppState extends State<LessNetApp> with WidgetsBindingObserver {
           onPrimary: Colors.black,
           secondary: Colors.grey,
           onSecondary: Colors.black,
+          tertiary: Color(0xFF444444),
+          onTertiary: Colors.white,
           error: Colors.redAccent,
           onError: Colors.white,
           surface: Color(0xFF0A0A0A),
           onSurface: Colors.white,
+          surfaceVariant: Color(0xFF111111),
+          onSurfaceVariant: Color(0xFF666666),
+          outline: Color(0xFF2A2A2A),
+          outlineVariant: Color(0xFF1E1E1E),
+          shadow: Colors.black,
+          scrim: Colors.black,
+          inverseSurface: Color(0xFFE0E0E0),
+          onInverseSurface: Colors.black,
+          surfaceTint: Colors.transparent,
         ),
         scaffoldBackgroundColor: const Color(0xFF0A0A0A),
         useMaterial3: true,
+        dividerColor: Colors.transparent,
+        dividerTheme: const DividerThemeData(
+          color: Colors.transparent,
+          thickness: 0,
+        ),
         filledButtonTheme: FilledButtonThemeData(
           style: FilledButton.styleFrom(
             backgroundColor: Colors.white,
@@ -545,9 +561,10 @@ class BtService {
   List<String> get connectedDeviceIds {
     final ids = _centralConnections.keys.toList();
     // Also include peripheral connection
-    if (_peripheralConnected && _peripheralDeviceName.isNotEmpty) {
-      if (!ids.contains(_peripheralDeviceName)) {
-        ids.add(_peripheralDeviceName);
+    if (_peripheralConnected) {
+      final pName = _peripheralDeviceName.isNotEmpty ? _peripheralDeviceName : 'Dispositivo';
+      if (!ids.contains(pName)) {
+        ids.add(pName);
       }
     }
     return ids;
@@ -556,7 +573,10 @@ class BtService {
   bool isDeviceConnected(String deviceId) {
     if (_centralConnections.containsKey(deviceId)) return true;
     // Also check peripheral connection
-    if (_peripheralConnected && _peripheralDeviceName == deviceId) return true;
+    if (_peripheralConnected) {
+      final pName = _peripheralDeviceName.isNotEmpty ? _peripheralDeviceName : 'Dispositivo';
+      if (pName == deviceId) return true;
+    }
     return false;
   }
 
@@ -596,8 +616,8 @@ class BtService {
     if (_activeDeviceId.isNotEmpty) {
       return _activeDeviceId;
     }
-    if (_peripheralConnected && _peripheralDeviceName.isNotEmpty) {
-      return _peripheralDeviceName;
+    if (_peripheralConnected) {
+      return _peripheralDeviceName.isNotEmpty ? _peripheralDeviceName : 'Dispositivo';
     }
     return '';
   }
@@ -606,8 +626,11 @@ class BtService {
     if (_centralConnections.containsKey(deviceId)) {
       return _centralConnections[deviceId]!.name;
     }
-    if (_peripheralConnected && _peripheralDeviceName == deviceId) {
-      return _peripheralDeviceName;
+    if (_peripheralConnected) {
+      final pName = _peripheralDeviceName.isNotEmpty ? _peripheralDeviceName : 'Dispositivo';
+      if (pName == deviceId) {
+        return pName;
+      }
     }
     return deviceId.isEmpty ? 'General' : deviceId;
   }
@@ -646,6 +669,13 @@ class BtService {
           _peripheralConnected = true;
           _isAdvertising = false;
           _peripheralDeviceName = call.arguments as String? ?? '';
+          // Set active device for peripheral so ChatPage knows we're connected
+          if (_peripheralDeviceName.isNotEmpty) {
+            _activeDeviceId = _peripheralDeviceName;
+          } else {
+            _activeDeviceId = 'Dispositivo';
+            _peripheralDeviceName = 'Dispositivo';
+          }
           _advertisingController.add(false);
           _connectionController.add(true);
           _statusController.add('Conectado: $_peripheralDeviceName');
@@ -656,6 +686,9 @@ class BtService {
         case 'onDeviceDisconnected':
           _peripheralConnected = false;
           _peripheralDeviceName = '';
+          if (_activeDeviceId == _peripheralDeviceName || _activeDeviceId == 'Dispositivo') {
+            _activeDeviceId = '';
+          }
           _isSending = false;
           _connectionController.add(false);
           _statusController.add('Desconectado');
@@ -1532,6 +1565,42 @@ class DeviceConversation {
   }
 }
 
+// ─── VAULT BOOKMARKS (SharedPreferences) ───
+class VaultBookmarks {
+  static const _key = 'vault_bookmarks';
+
+  static Future<List<String>> getAll() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getStringList(_key) ?? [];
+  }
+
+  static Future<void> add(String bookmarkId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final list = prefs.getStringList(_key) ?? [];
+    if (!list.contains(bookmarkId)) {
+      list.add(bookmarkId);
+      await prefs.setStringList(_key, list);
+    }
+  }
+
+  static Future<void> remove(String bookmarkId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final list = prefs.getStringList(_key) ?? [];
+    list.remove(bookmarkId);
+    await prefs.setStringList(_key, list);
+  }
+
+  static Future<bool> isBookmarked(String bookmarkId) async {
+    final list = await getAll();
+    return list.contains(bookmarkId);
+  }
+
+  static Future<void> clear() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_key);
+  }
+}
+
 // ─────────────────────────────────────────────
 // HOME — 3 tabs: Dispositivos | Chat | Vault
 // ─────────────────────────────────────────────
@@ -1758,7 +1827,7 @@ class _PermissionsGatePageState extends State<PermissionsGatePage> {
                                 const SizedBox(height: 2),
                                 Text(p.desc,
                                     style: TextStyle(
-                                      color: Colors.white.withOpacity(0.4),
+                                      color: Color(0x66FFFFFF),
                                       fontSize: 12,
                                     )),
                               ],
@@ -2107,7 +2176,7 @@ class _ScanPageState extends State<ScanPage> {
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
                     color: devId == bt.activeDeviceId
-                        ? Colors.greenAccent.withOpacity(0.3)
+                        ? Color(0x4D69F0AE)
                         : _kBorder),
               ),
               child: Row(
@@ -2186,7 +2255,7 @@ class _ScanPageState extends State<ScanPage> {
                       child: Text(
                         'Esperando conexion... ${_fmt(_advSec)}',
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.6),
+                          color: Color(0x99FFFFFF),
                           fontSize: 13,
                         ),
                       ),
@@ -2214,13 +2283,13 @@ class _ScanPageState extends State<ScanPage> {
                 margin: const EdgeInsets.only(bottom: 12),
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.05),
+                  color: Color(0x0DF44336),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
                   'Advertising no disponible. Usa ESTE celular para BUSCAR.',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.6),
+                    color: Color(0x99FFFFFF),
                     fontSize: 12,
                   ),
                 ),
@@ -2364,15 +2433,34 @@ class _ScanPageState extends State<ScanPage> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(displayName,
-                                    style: const TextStyle(
-                                      color: Colors.white,
+                                    style: TextStyle(
+                                      color: isLN
+                                          ? Colors.white
+                                          : Colors.white60,
                                       fontWeight: FontWeight.w600,
                                       fontSize: 13,
                                     )),
+                                if (isLN)
+                                  Container(
+                                    padding: const EdgeInsets
+                                        .symmetric(
+                                        horizontal: 5, vertical: 1),
+                                    decoration: BoxDecoration(
+                                      color: Color(0x1FFFFFFF),
+                                      borderRadius:
+                                          BorderRadius.circular(3),
+                                    ),
+                                    child: const Text('LessNet',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 8,
+                                          fontWeight: FontWeight.w700,
+                                        )),
+                                  ),
                                 Text(
                                   r.device.remoteId.toString(),
-                                  style: TextStyle(
-                                    color: Colors.white.withOpacity(0.25),
+                                  style: const TextStyle(
+                                    color: Color(0x40FFFFFF),
                                     fontSize: 10,
                                   ),
                                 ),
@@ -2385,7 +2473,7 @@ class _ScanPageState extends State<ScanPage> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 6, vertical: 3),
                         decoration: BoxDecoration(
-                          color: sig.withOpacity(0.12),
+                          color: Color.fromARGB(31, sig.red, sig.green, sig.blue),
                           borderRadius: BorderRadius.circular(5),
                         ),
                         child: Text('${r.rssi}',
@@ -2825,7 +2913,7 @@ class _ChatListPageState extends State<ChatListPage> {
                                 padding: const EdgeInsets.only(right: 20),
                                 margin: const EdgeInsets.only(bottom: 6),
                                 decoration: BoxDecoration(
-                                  color: Colors.red.withOpacity(0.15),
+                                  color: Color(0x26F44336),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: const Icon(Icons.delete, color: Colors.redAccent),
@@ -2977,6 +3065,7 @@ class _ChatPageState extends State<ChatPage> {
   StreamSubscription? _msgSub;
   StreamSubscription? _connSub;
   StreamSubscription? _progressSub;
+  StreamSubscription? _statusSub;
   bool _connected = false;
   double _sendProgress = 0;
   bool _sending = false;
@@ -2997,6 +3086,9 @@ class _ChatPageState extends State<ChatPage> {
       if (mounted) setState(() => _connected = _checkConnected());
     });
     // Also listen for status changes (peripheral connect/disconnect)
+    _statusSub = bt.onStatusChange.listen((_) {
+      if (mounted) setState(() => _connected = _checkConnected());
+    });
     // Set active device when entering chat
     if (widget.deviceId.isNotEmpty) {
       bt.setActiveDevice(widget.deviceId);
@@ -3255,6 +3347,7 @@ class _ChatPageState extends State<ChatPage> {
     _msgSub?.cancel();
     _connSub?.cancel();
     _progressSub?.cancel();
+    _statusSub?.cancel();
     _sendTimeout?.cancel();
     _ctrl.dispose();
     _scroll.dispose();
@@ -3687,7 +3780,7 @@ class _ChatPageState extends State<ChatPage> {
             // Semi-transparent overlay
             Container(
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.35),
+                color: Color(0x59000000),
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
@@ -4114,8 +4207,26 @@ class _VideoThumbnailState extends State<_VideoThumbnail> {
 // ─────────────────────────────────────────────
 // VAULT HOME — 6 secciones con acceso directo
 // ─────────────────────────────────────────────
-class VaultHomePage extends StatelessWidget {
+class VaultHomePage extends StatefulWidget {
   const VaultHomePage({super.key});
+
+  @override
+  State<VaultHomePage> createState() => _VaultHomePageState();
+}
+
+class _VaultHomePageState extends State<VaultHomePage> {
+  List<String> _bookmarks = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBookmarks();
+  }
+
+  Future<void> _loadBookmarks() async {
+    final b = await VaultBookmarks.getAll();
+    if (mounted) setState(() => _bookmarks = b);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -4172,6 +4283,7 @@ class VaultHomePage extends StatelessWidget {
           children: [
             const _Header('Vault', Icons.folder, 'Recursos offline'),
             const SizedBox(height: 8),
+            // Offline info banner
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
@@ -4187,7 +4299,7 @@ class VaultHomePage extends StatelessWidget {
                     child: Text(
                       'Todo el contenido funciona sin internet. Datos guardados en tu telefono.',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.4),
+                        color: Color(0x66FFFFFF),
                         fontSize: 11,
                       ),
                     ),
@@ -4195,7 +4307,69 @@ class VaultHomePage extends StatelessWidget {
                 ],
               ),
             ),
+            // Favorites section
+            if (_bookmarks.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  const Icon(Icons.bookmark, color: Colors.white38, size: 16),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Favoritos (${_bookmarks.length})',
+                    style: const TextStyle(
+                      color: Colors.white38,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Container(
+                constraints: const BoxConstraints(maxHeight: 120),
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: _bookmarks.take(8).map((b) {
+                    final parts = b.split('||');
+                    final title = parts.isNotEmpty ? parts[0] : b;
+                    final type = parts.length > 1 ? parts[1] : '';
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: _kCardBgLight,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: _kBorderDim),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            type == 'first_aid' ? Icons.local_hospital :
+                            type == 'guide' ? Icons.terrain :
+                            type == 'dict' ? Icons.book :
+                            type == 'wiki' ? Icons.article : Icons.bookmark,
+                            color: Colors.white38,
+                            size: 12,
+                          ),
+                          const SizedBox(width: 4),
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 100),
+                            child: Text(title,
+                                style: const TextStyle(color: Colors.white, fontSize: 11),
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ],
             const SizedBox(height: 16),
+            // Vault sections
             ...sections.map((s) => Container(
                   margin: const EdgeInsets.only(bottom: 10),
                   child: Material(
@@ -4207,7 +4381,7 @@ class VaultHomePage extends StatelessWidget {
                         context,
                         MaterialPageRoute(
                             builder: (_) => s.page),
-                      ),
+                      ).then((_) => _loadBookmarks()),
                       child: Padding(
                         padding: const EdgeInsets.all(16),
                         child: Row(
@@ -4215,7 +4389,7 @@ class VaultHomePage extends StatelessWidget {
                             Container(
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: s.color.withOpacity(0.1),
+                                color: Color.fromARGB(26, s.color.red, s.color.green, s.color.blue),
                                 borderRadius:
                                     BorderRadius.circular(12),
                               ),
@@ -4237,8 +4411,7 @@ class VaultHomePage extends StatelessWidget {
                                   const SizedBox(height: 2),
                                   Text(s.subtitle,
                                       style: TextStyle(
-                                        color: Colors.white
-                                            .withOpacity(0.35),
+                                        color: Color(0x59FFFFFF),
                                         fontSize: 12,
                                       )),
                                 ],
@@ -4289,7 +4462,7 @@ class _VaultSearchButton extends StatelessWidget {
         ),
         style: OutlinedButton.styleFrom(
           padding: const EdgeInsets.symmetric(vertical: 14),
-          side: BorderSide(color: Colors.white.withOpacity(0.1)),
+          side: BorderSide(color: Color(0x1AFFFFFF)),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
@@ -4359,6 +4532,7 @@ class _FirstAidPageState extends State<FirstAidPage> {
               itemBuilder: (_, i) {
                 final it = _items[i] as Map<String, dynamic>;
                 final p = it['prioridad'] ?? '';
+                final pc = _pColor(p);
                 return Container(
                   margin: const EdgeInsets.only(bottom: 8),
                   child: Material(
@@ -4371,7 +4545,7 @@ class _FirstAidPageState extends State<FirstAidPage> {
                       leading: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: _pColor(p).withOpacity(0.1),
+                          color: Color.fromARGB(26, pc.red, pc.green, pc.blue),
                           borderRadius:
                               BorderRadius.circular(8),
                         ),
@@ -4387,7 +4561,7 @@ class _FirstAidPageState extends State<FirstAidPage> {
                       subtitle: Text(it['resumen'] ?? '',
                           style: TextStyle(
                             color:
-                                Colors.white.withOpacity(0.3),
+                                Color(0x4DFFFFFF),
                             fontSize: 11,
                           ),
                           maxLines: 2,
@@ -4399,8 +4573,7 @@ class _FirstAidPageState extends State<FirstAidPage> {
                                       horizontal: 5,
                                       vertical: 1),
                               decoration: BoxDecoration(
-                                color: _pColor(p)
-                                    .withOpacity(0.15),
+                                color: Color.fromARGB(38, pc.red, pc.green, pc.blue),
                                 borderRadius:
                                     BorderRadius.circular(3),
                               ),
@@ -4512,7 +4685,7 @@ class _GuidesPageState extends State<GuidesPage> {
                       subtitle: Text(it['resumen'] ?? '',
                           style: TextStyle(
                             color:
-                                Colors.white.withOpacity(0.3),
+                                Color(0x4DFFFFFF),
                             fontSize: 11,
                           ),
                           maxLines: 2,
@@ -4542,6 +4715,7 @@ class _GuidesPageState extends State<GuidesPage> {
                           builder: (_) => _DetailPage(
                             title: it['titulo'] ?? '',
                             item: it,
+                            bookmarkType: 'guide',
                           ),
                         ),
                       ),
@@ -4686,8 +4860,7 @@ class _DictionaryPageState extends State<DictionaryPage> {
                                 subtitle: Text(
                                     it['definicion'] ?? '',
                                     style: TextStyle(
-                                      color: Colors.white
-                                          .withOpacity(0.4),
+                                      color: Color(0x66FFFFFF),
                                       fontSize: 11,
                                     ),
                                     maxLines: 2,
@@ -4733,9 +4906,38 @@ class _DictionaryPageState extends State<DictionaryPage> {
   }
 }
 
-class _DictDetail extends StatelessWidget {
+class _DictDetail extends StatefulWidget {
   final Map<String, dynamic> item;
   const _DictDetail({required this.item});
+
+  @override
+  State<_DictDetail> createState() => _DictDetailState();
+}
+
+class _DictDetailState extends State<_DictDetail> {
+  bool _isBookmarked = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkBookmark();
+  }
+
+  String get _bookmarkId => '${widget.item['palabra'] ?? ''}||dict';
+
+  Future<void> _checkBookmark() async {
+    final b = await VaultBookmarks.isBookmarked(_bookmarkId);
+    if (mounted) setState(() => _isBookmarked = b);
+  }
+
+  Future<void> _toggleBookmark() async {
+    if (_isBookmarked) {
+      await VaultBookmarks.remove(_bookmarkId);
+    } else {
+      await VaultBookmarks.add(_bookmarkId);
+    }
+    if (mounted) setState(() => _isBookmarked = !_isBookmarked);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -4743,30 +4945,40 @@ class _DictDetail extends StatelessWidget {
       backgroundColor: const Color(0xFF0A0A0A),
       appBar: AppBar(
         backgroundColor: const Color(0xFF111111),
-        title: Text(item['palabra'] ?? '',
+        title: Text(widget.item['palabra'] ?? '',
             style: const TextStyle(color: Colors.white)),
         iconTheme:
             const IconThemeData(color: Colors.white),
+        actions: [
+          IconButton(
+            onPressed: _toggleBookmark,
+            icon: Icon(
+              _isBookmarked ? Icons.bookmark : Icons.bookmark_border,
+              color: _isBookmarked ? Colors.white : Colors.white38,
+            ),
+            tooltip: _isBookmarked ? 'Quitar de favoritos' : 'Agregar a favoritos',
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(item['palabra'] ?? '',
+            Text(widget.item['palabra'] ?? '',
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 22,
                   fontWeight: FontWeight.w700,
                 )),
             const SizedBox(height: 12),
-            Text(item['definicion'] ?? '',
+            Text(widget.item['definicion'] ?? '',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.7),
+                  color: Color(0xB3FFFFFF),
                   fontSize: 14,
                   height: 1.6,
                 )),
-            if ((item['sinonimos'] as List?)?.isNotEmpty ??
+            if ((widget.item['sinonimos'] as List?)?.isNotEmpty ??
                 false) ...[
               const SizedBox(height: 16),
               const Text('Sinonimos:',
@@ -4777,7 +4989,7 @@ class _DictDetail extends StatelessWidget {
               const SizedBox(height: 6),
               Wrap(
                 spacing: 6,
-                children: (item['sinonimos'] as List)
+                children: (widget.item['sinonimos'] as List)
                     .map((s) => Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 4),
@@ -4789,7 +5001,7 @@ class _DictDetail extends StatelessWidget {
                           child: Text(s.toString(),
                               style: TextStyle(
                                 color:
-                                    Colors.white.withOpacity(0.6),
+                                    Color(0x99FFFFFF),
                                 fontSize: 12,
                               )),
                         ))
@@ -4944,8 +5156,7 @@ class _WikipediaPageState extends State<WikipediaPage> {
                                       horizontal: 12,
                                       vertical: 3),
                               child: Material(
-                                color: Colors.white
-                                    .withOpacity(0.04),
+                                color: Color(0x0AFFFFFF),
                                 borderRadius:
                                     BorderRadius.circular(10),
                                 child: ListTile(
@@ -4964,8 +5175,7 @@ class _WikipediaPageState extends State<WikipediaPage> {
                                   subtitle: Text(
                                       it['resumen'] ?? '',
                                       style: TextStyle(
-                                        color: Colors.white
-                                            .withOpacity(0.35),
+                                        color: Color(0x59FFFFFF),
                                         fontSize: 11,
                                       ),
                                       maxLines: 2,
@@ -4990,31 +5200,70 @@ class _WikipediaPageState extends State<WikipediaPage> {
   }
 }
 
-class _WikiDetail extends StatelessWidget {
+class _WikiDetail extends StatefulWidget {
   final Map<String, dynamic> item;
   const _WikiDetail({required this.item});
 
   @override
+  State<_WikiDetail> createState() => _WikiDetailState();
+}
+
+class _WikiDetailState extends State<_WikiDetail> {
+  bool _isBookmarked = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkBookmark();
+  }
+
+  String get _bookmarkId => '${widget.item['titulo'] ?? ''}||wiki';
+
+  Future<void> _checkBookmark() async {
+    final b = await VaultBookmarks.isBookmarked(_bookmarkId);
+    if (mounted) setState(() => _isBookmarked = b);
+  }
+
+  Future<void> _toggleBookmark() async {
+    if (_isBookmarked) {
+      await VaultBookmarks.remove(_bookmarkId);
+    } else {
+      await VaultBookmarks.add(_bookmarkId);
+    }
+    if (mounted) setState(() => _isBookmarked = !_isBookmarked);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final sections = item['secciones'] as List? ?? [];
+    final sections = widget.item['secciones'] as List? ?? [];
     return Scaffold(
       backgroundColor: const Color(0xFF0A0A0A),
       appBar: AppBar(
         backgroundColor: const Color(0xFF111111),
-        title: Text(item['titulo'] ?? '',
+        title: Text(widget.item['titulo'] ?? '',
             style: const TextStyle(
                 color: Colors.white, fontSize: 16)),
         iconTheme:
             const IconThemeData(color: Colors.white),
+        actions: [
+          IconButton(
+            onPressed: _toggleBookmark,
+            icon: Icon(
+              _isBookmarked ? Icons.bookmark : Icons.bookmark_border,
+              color: _isBookmarked ? Colors.white : Colors.white38,
+            ),
+            tooltip: _isBookmarked ? 'Quitar de favoritos' : 'Agregar a favoritos',
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(item['resumen'] ?? '',
+            Text(widget.item['resumen'] ?? '',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.7),
+                  color: Color(0xB3FFFFFF),
                   fontSize: 14,
                   height: 1.6,
                 )),
@@ -5033,7 +5282,7 @@ class _WikiDetail extends StatelessWidget {
                   const SizedBox(height: 6),
                   Text(sec['contenido'] ?? '',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.65),
+                        color: Color(0xA6FFFFFF),
                         fontSize: 13,
                         height: 1.5,
                       )),
@@ -5177,8 +5426,7 @@ class _EmergencyMapPageState extends State<EmergencyMapPage> {
                                       horizontal: 12,
                                       vertical: 3),
                               child: Material(
-                                color: Colors.white
-                                    .withOpacity(0.04),
+                                color: Color(0x0AFFFFFF),
                                 borderRadius:
                                     BorderRadius.circular(10),
                                 child: ListTile(
@@ -5195,8 +5443,7 @@ class _EmergencyMapPageState extends State<EmergencyMapPage> {
                                   subtitle: Text(
                                     '${p['departamento'] ?? ''} - ${p['descripcion'] ?? ''}',
                                     style: TextStyle(
-                                      color: Colors.white
-                                          .withOpacity(0.3),
+                                      color: Color(0x4DFFFFFF),
                                       fontSize: 11,
                                     ),
                                     maxLines: 1,
@@ -5213,8 +5460,7 @@ class _EmergencyMapPageState extends State<EmergencyMapPage> {
                                                   vertical: 1),
                                           decoration:
                                               BoxDecoration(
-                                            color: Colors.red
-                                                .withOpacity(0.12),
+                                            color: Color(0x1FF44336),
                                             borderRadius:
                                                 BorderRadius
                                                     .circular(3),
@@ -5299,13 +5545,13 @@ class _MapDetailPage extends StatelessWidget {
             if (props['departamento'] != null)
               Text(props['departamento'],
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.5),
+                    color: Color(0x80FFFFFF),
                     fontSize: 14,
                   )),
             const SizedBox(height: 12),
             Text(props['descripcion'] ?? '',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.7),
+                  color: Color(0xB3FFFFFF),
                   fontSize: 14,
                   height: 1.6,
                 )),
@@ -5340,7 +5586,7 @@ class _MapDetailPage extends StatelessWidget {
           const SizedBox(width: 10),
           Text(label,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.4),
+                color: Color(0x66FFFFFF),
                 fontSize: 13,
               )),
           const SizedBox(width: 8),
@@ -5628,7 +5874,7 @@ class _TranslatorPageState extends State<TranslatorPage> {
                     child: Text(
                       'Traductor offline con IA. Descarga los modelos de idioma primero tocando el icono de descarga arriba.',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.4),
+                        color: Color(0x66FFFFFF),
                         fontSize: 11,
                       ),
                     ),
@@ -5645,9 +5891,9 @@ class _TranslatorPageState extends State<TranslatorPage> {
                 padding: const EdgeInsets.all(12),
                 margin: const EdgeInsets.only(bottom: 16),
                 decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.1),
+                  color: Color(0x1AFF9800),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                  border: Border.all(color: Color(0x4DFF9800)),
                 ),
                 child: Row(
                   children: [
@@ -5657,7 +5903,7 @@ class _TranslatorPageState extends State<TranslatorPage> {
                       child: Text(
                         'Faltan modelos de idioma. Toca el icono de descarga arriba para descargarlos.',
                         style: TextStyle(
-                          color: Colors.orange.withOpacity(0.8),
+                          color: Color(0xCCFF9800),
                           fontSize: 12,
                         ),
                       ),
@@ -5748,7 +5994,7 @@ class _TranslatorPageState extends State<TranslatorPage> {
                   children: [
                     Text('Traduccion:',
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.4),
+                          color: Color(0x66FFFFFF),
                           fontSize: 11,
                         )),
                     const SizedBox(height: 6),
@@ -5793,7 +6039,7 @@ class _TranslatorPageState extends State<TranslatorPage> {
       children: [
         Text(label,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.4),
+              color: Color(0x66FFFFFF),
               fontSize: 11,
             )),
         const SizedBox(height: 4),
@@ -5804,7 +6050,7 @@ class _TranslatorPageState extends State<TranslatorPage> {
             borderRadius: BorderRadius.circular(8),
             border: _modelStatus[value] == 'downloaded'
                 ? Border.all(color: Colors.white12)
-                : Border.all(color: Colors.orange.withOpacity(0.3)),
+                : Border.all(color: Color(0x4DFF9800)),
           ),
           child: DropdownButton<String>(
             value: value,
@@ -5903,7 +6149,7 @@ class _ModelManagerPage extends StatelessWidget {
                           style: TextStyle(color: Colors.white, fontSize: 14)),
                       Text('$downloaded de $total idiomas disponibles',
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.4),
+                            color: Color(0x66FFFFFF),
                             fontSize: 12,
                           )),
                     ],
@@ -5912,7 +6158,7 @@ class _ModelManagerPage extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   decoration: BoxDecoration(
-                    color: downloaded > 0 ? Colors.green.withOpacity(0.2) : Colors.orange.withOpacity(0.2),
+                    color: downloaded > 0 ? Color(0x334CAF50) : Color(0x33FF9800),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
@@ -5946,7 +6192,7 @@ class _ModelManagerPage extends StatelessWidget {
                       color: status == 'downloaded'
                           ? _kBorderDim
                           : status == 'downloading'
-                              ? Colors.blue.withOpacity(0.3)
+                              ? Color(0x4D2196F3)
                               : _kCardBgDim,
                     ),
                   ),
@@ -5984,7 +6230,7 @@ class _ModelManagerPage extends StatelessWidget {
                               Text(
                                 'Listo para traducir',
                                 style: TextStyle(
-                                  color: Colors.greenAccent.withOpacity(0.6),
+                                  color: Color(0x9969F0AE),
                                   fontSize: 11,
                                 ),
                               )
@@ -5992,7 +6238,7 @@ class _ModelManagerPage extends StatelessWidget {
                               Text(
                                 'Descargando... ${(progress != null ? (progress * 100).toStringAsFixed(0) : '0')}%',
                                 style: TextStyle(
-                                  color: Colors.blueAccent.withOpacity(0.8),
+                                  color: Color(0xCC448AFF),
                                   fontSize: 11,
                                 ),
                               )
@@ -6000,7 +6246,7 @@ class _ModelManagerPage extends StatelessWidget {
                               Text(
                                 'Toca para descargar (~30 MB)',
                                 style: TextStyle(
-                                  color: Colors.white.withOpacity(0.3),
+                                  color: Color(0x4DFFFFFF),
                                   fontSize: 11,
                                 ),
                               ),
@@ -6030,7 +6276,7 @@ class _ModelManagerPage extends StatelessWidget {
                         FilledButton(
                           onPressed: () => onDownload(code),
                           style: FilledButton.styleFrom(
-                            backgroundColor: Colors.white.withOpacity(0.1),
+                            backgroundColor: Color(0x1AFFFFFF),
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                             minimumSize: Size.zero,
@@ -6255,8 +6501,7 @@ class _VaultSearchPageState extends State<VaultSearchPage> {
                                     )),
                                 subtitle: Text(sub,
                                     style: TextStyle(
-                                      color: Colors.white
-                                          .withOpacity(0.3),
+                                      color: Color(0x4DFFFFFF),
                                       fontSize: 11,
                                     ),
                                     maxLines: 1,
@@ -6289,6 +6534,7 @@ class _VaultSearchPageState extends State<VaultSearchPage> {
                                             _DetailPage(
                                           title: title,
                                           item: r,
+                                          bookmarkType: type == 'first_aid' ? 'first_aid' : 'guide',
                                         ),
                                       ),
                                     );
@@ -6325,37 +6571,77 @@ class _VaultSearchPageState extends State<VaultSearchPage> {
 // ─────────────────────────────────────────────
 // DETAIL PAGE GENERIC (Primeros Auxilios + Guias)
 // ─────────────────────────────────────────────
-class _DetailPage extends StatelessWidget {
+class _DetailPage extends StatefulWidget {
   final String title;
   final Map<String, dynamic> item;
-  const _DetailPage({required this.title, required this.item});
+  final String bookmarkType;
+  const _DetailPage({required this.title, required this.item, this.bookmarkType = 'first_aid'});
+
+  @override
+  State<_DetailPage> createState() => _DetailPageState();
+}
+
+class _DetailPageState extends State<_DetailPage> {
+  bool _isBookmarked = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkBookmark();
+  }
+
+  String get _bookmarkId => '${widget.title}||${widget.bookmarkType}';
+
+  Future<void> _checkBookmark() async {
+    final b = await VaultBookmarks.isBookmarked(_bookmarkId);
+    if (mounted) setState(() => _isBookmarked = b);
+  }
+
+  Future<void> _toggleBookmark() async {
+    if (_isBookmarked) {
+      await VaultBookmarks.remove(_bookmarkId);
+    } else {
+      await VaultBookmarks.add(_bookmarkId);
+    }
+    if (mounted) setState(() => _isBookmarked = !_isBookmarked);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final steps = item['pasos'] as List? ?? [];
-    final warnings = item['advertencias'] as List? ?? [];
-    final references = item['referencias'] as List? ?? [];
-    final help = item['cuando_buscar_ayuda'] ?? '';
+    final steps = widget.item['pasos'] as List? ?? [];
+    final warnings = widget.item['advertencias'] as List? ?? [];
+    final references = widget.item['referencias'] as List? ?? [];
+    final help = widget.item['cuando_buscar_ayuda'] ?? '';
 
     return Scaffold(
       backgroundColor: const Color(0xFF0A0A0A),
       appBar: AppBar(
         backgroundColor: const Color(0xFF111111),
-        title: Text(title,
+        title: Text(widget.title,
             style: const TextStyle(
                 color: Colors.white, fontSize: 16)),
         iconTheme:
             const IconThemeData(color: Colors.white),
+        actions: [
+          IconButton(
+            onPressed: _toggleBookmark,
+            icon: Icon(
+              _isBookmarked ? Icons.bookmark : Icons.bookmark_border,
+              color: _isBookmarked ? Colors.white : Colors.white38,
+            ),
+            tooltip: _isBookmarked ? 'Quitar de favoritos' : 'Agregar a favoritos',
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (item['resumen'] != null) ...[
-              Text(item['resumen'],
+            if (widget.item['resumen'] != null) ...[
+              Text(widget.item['resumen'],
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.7),
+                    color: Color(0xB3FFFFFF),
                     fontSize: 14,
                     height: 1.6,
                   )),
@@ -6397,7 +6683,7 @@ class _DetailPage extends StatelessWidget {
                           child: Text(e.value.toString(),
                               style: TextStyle(
                                 color:
-                                    Colors.white.withOpacity(0.7),
+                                    Color(0xB3FFFFFF),
                                 fontSize: 13,
                               )),
                         ),
@@ -6418,7 +6704,7 @@ class _DetailPage extends StatelessWidget {
                     margin: const EdgeInsets.only(bottom: 6),
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(0.04),
+                      color: Color(0x0AF44336),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
@@ -6430,7 +6716,7 @@ class _DetailPage extends StatelessWidget {
                           child: Text(w.toString(),
                               style: TextStyle(
                                 color:
-                                    Colors.white.withOpacity(0.6),
+                                    Color(0x99FFFFFF),
                                 fontSize: 12,
                               )),
                         ),
@@ -6449,7 +6735,7 @@ class _DetailPage extends StatelessWidget {
               const SizedBox(height: 6),
               Text(help.toString(),
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.6),
+                    color: Color(0x99FFFFFF),
                     fontSize: 13,
                     height: 1.5,
                   )),
@@ -6468,7 +6754,7 @@ class _DetailPage extends StatelessWidget {
                     child: Text('- $r',
                         style: TextStyle(
                           color:
-                              Colors.white.withOpacity(0.35),
+                              Color(0x59FFFFFF),
                           fontSize: 11,
                         )),
                   )),
