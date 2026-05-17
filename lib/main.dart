@@ -724,7 +724,7 @@ class BtService {
           await conn!.rxChar!.write(Uint8List.fromList(chunk), withoutResponse: false);
         }
         // Null terminator
-        await conn.rxChar!.write(Uint8List.fromList([0x00]), withoutResponse: false);
+        await conn!.rxChar!.write(Uint8List.fromList([0x00]), withoutResponse: false);
       }
     }
   }
@@ -803,7 +803,7 @@ class BtService {
           }
 
           // Null terminator
-          await conn.rxChar!.write(Uint8List.fromList([0x00]), withoutResponse: false);
+          await conn!.rxChar!.write(Uint8List.fromList([0x00]), withoutResponse: false);
           _progressController.add({'progress': 1.0, 'msgId': msgId, 'fileName': fileName});
         }
       }
