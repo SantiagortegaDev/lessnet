@@ -38,7 +38,7 @@ jobs:
           cp /tmp/AndroidManifest_backup.xml "$GITHUB_WORKSPACE/android/app/src/main/AndroidManifest.xml"
 
           # ── Install our custom native BLE peripheral Kotlin files ──
-          # Find the gradle file (could be .gradle or .gradle.kts)
+          # Extract package from the generated build.gradle
           GRADLE_FILE=""
           if [ -f "$GITHUB_WORKSPACE/android/app/build.gradle.kts" ]; then
             GRADLE_FILE="$GITHUB_WORKSPACE/android/app/build.gradle.kts"
@@ -46,15 +46,13 @@ jobs:
             GRADLE_FILE="$GITHUB_WORKSPACE/android/app/build.gradle"
           fi
 
-          echo "Gradle file: $GRADLE_FILE"
-          echo "Gradle contents (first 30 lines):"
-          head -30 "$GRADLE_FILE" || true
-
-          # Extract package name: try namespace first, then applicationId
           PACKAGE=""
           if [ -n "$GRADLE_FILE" ]; then
-            # Extract the value inside quotes after namespace or applicationId
-            PACKAGE=$(grep -E "namespace|applicationId" "$GRADLE_FILE" | head -1 | sed -E 's/[^"]*"([^"]+)".*/\1/' | tr -d ' ')
+            # Try namespace first, then applicationId
+            PACKAGE=$(grep -E "^\s*namespace" "$GRADLE_FILE" | head -1 | sed -E 's/[^"]*"([^"]+)".*/\1/' | tr -d ' ')
+            if [ -z "$PACKAGE" ]; then
+              PACKAGE=$(grep -E "^\s*applicationId" "$GRADLE_FILE" | head -1 | sed -E 's/[^"]*"([^"]+)".*/\1/' | tr -d ' ')
+            fi
           fi
 
           # Fallback: find it from the generated MainActivity.kt
@@ -65,27 +63,25 @@ jobs:
             fi
           fi
 
+          # Hard fallback
           if [ -z "$PACKAGE" ]; then
-            echo "ERROR: Could not detect package name!"
-            find "$GITHUB_WORKSPACE/android/app/src/main/kotlin" -type f 2>/dev/null || true
-            exit 1
+            PACKAGE="com.lessnet.lessnet"
           fi
 
           echo "Detected package: $PACKAGE"
 
-          # Compute the Kotlin directory from the package name
-          KOTLIN_DIR="$GITHUB_WORKSPACE/android/app/src/main/kotlin/$(echo $PACKAGE | tr '.' '/')"
-          echo "Kotlin dir: $KOTLIN_DIR"
+          # NUKE the entire kotlin directory to remove any stale files from flutter create
+          rm -rf "$GITHUB_WORKSPACE/android/app/src/main/kotlin"
 
-          # Remove any existing files and ensure directory exists
-          rm -rf "$KOTLIN_DIR"
+          # Recreate only the correct package directory
+          KOTLIN_DIR="$GITHUB_WORKSPACE/android/app/src/main/kotlin/$(echo $PACKAGE | tr '.' '/')"
           mkdir -p "$KOTLIN_DIR"
 
           # Replace package placeholder and copy our custom Kotlin files
           sed "s/PACKAGE_PLACEHOLDER/$PACKAGE/g" "$GITHUB_WORKSPACE/native/BlePeripheralPlugin.kt" > "$KOTLIN_DIR/BlePeripheralPlugin.kt"
           sed "s/PACKAGE_PLACEHOLDER/$PACKAGE/g" "$GITHUB_WORKSPACE/native/MainActivity.kt" > "$KOTLIN_DIR/MainActivity.kt"
 
-          echo "Installed custom Kotlin files:"
+          echo "Installed custom Kotlin files at: $KOTLIN_DIR"
           ls -la "$KOTLIN_DIR/"
           echo "--- MainActivity.kt head ---"
           head -3 "$KOTLIN_DIR/MainActivity.kt"
