@@ -2796,19 +2796,13 @@ class _TranslatorPageState extends State<TranslatorPage> {
 
   Future<void> _checkModels() async {
     final Map<String, String> statuses = {};
+    final manager = OnDeviceTranslatorModelManager();
     for (final lang in _supportedLangs) {
       final code = lang['code']!;
       try {
-        final model = TranslateLanguageModel(_codeToLang(code));
-        final manager = OnDeviceTranslatorModelManager();
-        final isDownloaded = await manager.isModelDownloaded(model.bcpCode);
-        if (isDownloaded) {
-          // Check if model needs update
-          final needsUpdate = await manager.isModelDownloaded(model.bcpCode);
-          statuses[code] = 'downloaded';
-        } else {
-          statuses[code] = 'not_downloaded';
-        }
+        final bcpCode = _codeToLang(code).bcpCode;
+        final isDownloaded = await manager.isModelDownloaded(bcpCode);
+        statuses[code] = isDownloaded ? 'downloaded' : 'not_downloaded';
       } catch (e) {
         statuses[code] = 'not_downloaded';
       }
@@ -2825,9 +2819,9 @@ class _TranslatorPageState extends State<TranslatorPage> {
     });
 
     try {
-      final model = TranslateLanguageModel(_codeToLang(code));
+      final bcpCode = _codeToLang(code).bcpCode;
       final manager = OnDeviceTranslatorModelManager();
-      await manager.downloadModel(model.bcpCode, isWifiRequired: false);
+      await manager.downloadModel(bcpCode, isWifiRequired: false);
       if (mounted) {
         setState(() {
           _modelStatus[code] = 'downloaded';
@@ -2854,9 +2848,9 @@ class _TranslatorPageState extends State<TranslatorPage> {
 
   Future<void> _deleteModel(String code) async {
     try {
-      final model = TranslateLanguageModel(_codeToLang(code));
+      final bcpCode = _codeToLang(code).bcpCode;
       final manager = OnDeviceTranslatorModelManager();
-      await manager.deleteModel(model.bcpCode);
+      await manager.deleteModel(bcpCode);
       if (mounted) {
         setState(() => _modelStatus[code] = 'not_downloaded');
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
