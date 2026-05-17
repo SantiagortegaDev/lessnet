@@ -1,11 +1,16 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:google_mlkit_translation/google_mlkit_translation.dart';
+import 'package:sqflite/sqflite.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
 
 // ─── UUIDs del servicio BLE de LessNet ───
 const String lessnetServiceUuid = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
@@ -130,10 +135,7 @@ class BtService {
         case 'onDataReceived':
           final text = call.arguments as String? ?? '';
           if (text.isNotEmpty) {
-            final msg =
-                ChatMessage(text: text, mine: false, time: DateTime.now());
-            messages.add(msg);
-            _msgController.add(msg);
+            _processReceivedText(text);
           }
           break;
         case 'onDeviceConnected':
@@ -260,10 +262,7 @@ class BtService {
           final text = utf8.decode(_receiveBuffer, allowMalformed: true);
           _receiveBuffer.clear();
           if (text.isNotEmpty) {
-            final msg =
-                ChatMessage(text: text, mine: false, time: DateTime.now());
-            messages.add(msg);
-            _msgController.add(msg);
+            _processReceivedText(text);
           }
         }
         i++;
@@ -273,23 +272,78 @@ class BtService {
       }
     }
     // Safety flush
-    if (_receiveBuffer.length > 5000) {
+    if (_receiveBuffer.length > 100000) {
       final text = utf8.decode(_receiveBuffer, allowMalformed: true);
       _receiveBuffer.clear();
       if (text.isNotEmpty) {
-        final msg =
-            ChatMessage(text: text, mine: false, time: DateTime.now());
-        messages.add(msg);
-        _msgController.add(msg);
+        _processReceivedText(text);
       }
     }
   }
 
-  Future<void> sendMessage(String text) async {
-    if (text.isEmpty) return;
-    final msg = ChatMessage(text: text, mine: true, time: DateTime.now());
+  void _processReceivedText(String text) {
+    // Protocol: [TYPE:FILENAME:FILESIZE:BASE64_DATA] or plain text
+    if (text.startsWith('[IMG:') || text.startsWith('[VID:') || text.startsWith('[FILE:')) {
+      try {
+        final firstBracket = text.indexOf('[');
+        final headerEnd = text.indexOf(']', firstBracket);
+        if (firstBracket >= 0 && headerEnd > firstBracket) {
+          final header = text.substring(firstBracket + 1, headerEnd);
+          final parts = header.split(':');
+          final msgType = parts[0].toLowerCase(); // img, vid, file
+          final fileName = parts.length > 1 ? parts[1] : 'file';
+          final fileSize = parts.length > 2 ? int.tryParse(parts[2]) ?? 0 : 0;
+          final b64Data = text.substring(headerEnd + 1);
+
+          // Decode and save file
+          final bytes = base64Decode(b64Data);
+          _saveReceivedFile(msgType, fileName, bytes).then((savedPath) {
+            final msg = ChatMessage(
+              id: DateTime.now().microsecondsSinceEpoch.toString(),
+              text: fileName,
+              mine: false,
+              time: DateTime.now(),
+              type: msgType == 'img' ? 'image' : (msgType == 'vid' ? 'video' : 'file'),
+              fileName: fileName,
+              filePath: savedPath,
+              fileSize: fileSize,
+            );
+            messages.add(msg);
+            _msgController.add(msg);
+            MessageDB.insert(msg);
+          });
+          return;
+        }
+      } catch (e) {
+        // If parsing fails, treat as plain text
+      }
+    }
+    final msg = ChatMessage(id: DateTime.now().microsecondsSinceEpoch.toString(), text: text, mine: false, time: DateTime.now());
     messages.add(msg);
     _msgController.add(msg);
+    MessageDB.insert(msg);
+  }
+
+  Future<String> _saveReceivedFile(String type, String fileName, List<int> bytes) async {
+    final dir = await getApplicationDocumentsDirectory();
+    final lessnetDir = Directory('${dir.path}/lessnet_files');
+    if (!await lessnetDir.exists()) {
+      await lessnetDir.create(recursive: true);
+    }
+    final ext = fileName.contains('.') ? '' : (type == 'img' ? '.jpg' : (type == 'vid' ? '.mp4' : '.bin'));
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final savedName = '${timestamp}_$fileName$ext';
+    final file = File('${lessnetDir.path}/$savedName');
+    await file.writeAsBytes(bytes);
+    return file.path;
+  }
+
+  Future<void> sendMessage(String text) async {
+    if (text.isEmpty) return;
+    final msg = ChatMessage(id: DateTime.now().microsecondsSinceEpoch.toString(), text: text, mine: true, time: DateTime.now());
+    messages.add(msg);
+    _msgController.add(msg);
+    MessageDB.insert(msg);
 
     if (_isPeripheral && _peripheralConnected) {
       try {
@@ -312,6 +366,65 @@ class BtService {
       }
       await rxChar!.write(Uint8List.fromList([0x00]),
           withoutResponse: false);
+    }
+  }
+
+  // Send file over BLE with progress tracking
+  final _progressController = StreamController<Map<String, double>>.broadcast();
+  Stream<Map<String, double>> get onProgress => _progressController.stream;
+
+  Future<void> sendFile({
+    required String localPath,
+    required String msgType, // 'image', 'video', 'file'
+    required String fileName,
+  }) async {
+    final file = File(localPath);
+    final bytes = await file.readAsBytes();
+    final fileSize = bytes.length;
+
+    // BLE protocol header: [IMG:filename:size]base64data
+    // or [VID:filename:size]base64data or [FILE:filename:size]base64data
+    final typeCode = msgType == 'image' ? 'IMG' : (msgType == 'video' ? 'VID' : 'FILE');
+    final b64 = base64Encode(bytes);
+    final payload = '[$typeCode:$fileName:$fileSize]$b64';
+
+    // Create local message
+    final msg = ChatMessage(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      text: fileName,
+      mine: true,
+      time: DateTime.now(),
+      type: msgType,
+      fileName: fileName,
+      filePath: localPath,
+      fileSize: fileSize,
+    );
+    messages.add(msg);
+    _msgController.add(msg);
+    MessageDB.insert(msg);
+
+    // Send over BLE
+    if (_isPeripheral && _peripheralConnected) {
+      try {
+        await _peripheralChannel.invokeMethod('sendData', {'data': payload});
+      } catch (e) {
+        rethrow;
+      }
+    } else if (rxChar != null) {
+      final dataBytes = utf8.encode(payload);
+      final totalChunks = (dataBytes.length / 20).ceil();
+      for (int i = 0; i < dataBytes.length; i += 20) {
+        final end = i + 20 > dataBytes.length ? dataBytes.length : i + 20;
+        final chunk = dataBytes.sublist(i, end);
+        await rxChar!.write(Uint8List.fromList(chunk), withoutResponse: false);
+        final progress = (i + 20) / dataBytes.length;
+        _progressController.add({'sent': progress.clamp(0.0, 1.0)});
+        if (i + 20 < dataBytes.length) {
+          await Future.delayed(const Duration(milliseconds: 10));
+        }
+      }
+      await rxChar!.write(Uint8List.fromList([0x00]), withoutResponse: false);
+      _progressController.add({'sent': 1.0});
     }
   }
 
@@ -361,15 +474,107 @@ class BtService {
     _connectionController.close();
     _advertisingController.close();
     _statusController.close();
+    _progressController.close();
   }
 }
 
 class ChatMessage {
+  final String id;
   final String text;
   final bool mine;
   final DateTime time;
-  ChatMessage(
-      {required this.text, required this.mine, required this.time});
+  final String type; // 'text', 'image', 'video', 'file'
+  final String? fileName;
+  final String? filePath; // local file path for received/sent files
+  final int? fileSize;
+
+  ChatMessage({
+    required this.id,
+    required this.text,
+    required this.mine,
+    required this.time,
+    this.type = 'text',
+    this.fileName,
+    this.filePath,
+    this.fileSize,
+  });
+
+  Map<String, dynamic> toMap() => {
+    'id': id,
+    'text': text,
+    'mine': mine ? 1 : 0,
+    'time': time.millisecondsSinceEpoch,
+    'type': type,
+    'fileName': fileName,
+    'filePath': filePath,
+    'fileSize': fileSize,
+  };
+
+  factory ChatMessage.fromMap(Map<String, dynamic> m) => ChatMessage(
+    id: m['id'] as String,
+    text: m['text'] as String,
+    mine: (m['mine'] as int) == 1,
+    time: DateTime.fromMillisecondsSinceEpoch(m['time'] as int),
+    type: m['type'] as String? ?? 'text',
+    fileName: m['fileName'] as String?,
+    filePath: m['filePath'] as String?,
+    fileSize: m['fileSize'] as int?,
+  );
+}
+
+// ─── MESSAGE DATABASE ───
+class MessageDB {
+  static Database? _db;
+
+  static Future<Database> get db async {
+    if (_db != null) return _db!;
+    _db = await _init();
+    return _db!;
+  }
+
+  static Future<Database> _init() async {
+    final path = await getDatabasesPath();
+    return openDatabase(
+      '$path/lessnet_messages.db',
+      version: 1,
+      onCreate: (db, ver) async {
+        await db.execute('''
+          CREATE TABLE messages (
+            id TEXT PRIMARY KEY,
+            text TEXT,
+            mine INTEGER,
+            time INTEGER,
+            type TEXT,
+            fileName TEXT,
+            filePath TEXT,
+            fileSize INTEGER
+          )
+        ''');
+      },
+    );
+  }
+
+  static Future<void> insert(ChatMessage msg) async {
+    final d = await db;
+    await d.insert('messages', msg.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  static Future<List<ChatMessage>> getAll() async {
+    final d = await db;
+    final rows = await d.query('messages', orderBy: 'time ASC');
+    return rows.map((m) => ChatMessage.fromMap(m)).toList();
+  }
+
+  static Future<void> deleteAll() async {
+    final d = await db;
+    await d.delete('messages');
+  }
+
+  static Future<void> deleteMessage(String id) async {
+    final d = await db;
+    await d.delete('messages', where: 'id = ?', whereArgs: [id]);
+  }
 }
 
 // ─────────────────────────────────────────────
@@ -448,6 +653,12 @@ class _PermissionsPageState extends State<PermissionsPage> {
         Permission.bluetoothConnect, 'Conectarse a dispositivos'),
     _PermItem('Bluetooth Advertise', Icons.broadcast_on_personal,
         Permission.bluetoothAdvertise, 'Hacerse visible'),
+    _PermItem('Almacenamiento', Icons.folder,
+        Permission.storage, 'Enviar fotos y archivos'),
+    _PermItem('Fotos', Icons.photo_library,
+        Permission.photos, 'Acceder a la galeria'),
+    _PermItem('Videos', Icons.videocam,
+        Permission.videos, 'Acceder a videos'),
   ];
 
   final Map<Permission, PermissionStatus> _statuses = {};
@@ -1232,12 +1443,17 @@ class _ChatPageState extends State<ChatPage> {
   final bt = BtService();
   StreamSubscription? _msgSub;
   StreamSubscription? _connSub;
+  StreamSubscription? _progressSub;
   bool _connected = false;
+  double _sendProgress = 0;
+  bool _sending = false;
+  bool _loadingHistory = true;
 
   @override
   void initState() {
     super.initState();
     _connected = bt.isConnected;
+    _loadHistory();
     _msgSub = bt.onMessage.listen((_) {
       if (mounted) setState(() {});
       _toBottom();
@@ -1245,6 +1461,28 @@ class _ChatPageState extends State<ChatPage> {
     _connSub = bt.onConnectionChange.listen((_) {
       if (mounted) setState(() => _connected = bt.isConnected);
     });
+    _progressSub = bt.onProgress.listen((p) {
+      if (mounted && p.containsKey('sent')) {
+        setState(() {
+          _sendProgress = p['sent']!;
+          if (_sendProgress >= 1.0) {
+            _sending = false;
+            _sendProgress = 0;
+          }
+        });
+      }
+    });
+  }
+
+  Future<void> _loadHistory() async {
+    try {
+      final saved = await MessageDB.getAll();
+      if (saved.isNotEmpty && bt.messages.isEmpty) {
+        bt.messages.addAll(saved);
+      }
+    } catch (_) {}
+    if (mounted) setState(() => _loadingHistory = false);
+    _toBottom();
   }
 
   void _toBottom() {
@@ -1270,13 +1508,134 @@ class _ChatPageState extends State<ChatPage> {
     _toBottom();
   }
 
+  Future<void> _pickImage() async {
+    try {
+      final picker = ImagePicker();
+      final xfile = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 60,
+      );
+      if (xfile == null) return;
+      final size = await xfile.length();
+      if (size > 500 * 1024) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Imagen muy grande (${(size / 1024).toStringAsFixed(0)} KB). Max 500 KB para BLE.'),
+            backgroundColor: Colors.red[900],
+          ));
+        }
+        return;
+      }
+      setState(() => _sending = true);
+      await bt.sendFile(
+        localPath: xfile.path,
+        msgType: 'image',
+        fileName: xfile.name,
+      );
+      if (mounted) setState(() => _sending = false);
+      _toBottom();
+    } catch (e) {
+      if (mounted) {
+        setState(() => _sending = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Colors.red[900],
+        ));
+      }
+    }
+  }
+
+  Future<void> _pickVideo() async {
+    try {
+      final picker = ImagePicker();
+      final xfile = await picker.pickVideo(
+        source: ImageSource.gallery,
+        maxDuration: const Duration(seconds: 15),
+      );
+      if (xfile == null) return;
+      final size = await xfile.length();
+      if (size > 500 * 1024) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Video muy grande (${(size / 1024 / 1024).toStringAsFixed(1)} MB). Max 500 KB para BLE.'),
+            backgroundColor: Colors.red[900],
+          ));
+        }
+        return;
+      }
+      setState(() => _sending = true);
+      await bt.sendFile(
+        localPath: xfile.path,
+        msgType: 'video',
+        fileName: xfile.name,
+      );
+      if (mounted) setState(() => _sending = false);
+      _toBottom();
+    } catch (e) {
+      if (mounted) {
+        setState(() => _sending = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Colors.red[900],
+        ));
+      }
+    }
+  }
+
+  Future<void> _pickFile() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.any,
+      );
+      if (result == null || result.files.isEmpty) return;
+      final file = result.files.first;
+      if (file.path == null) return;
+      final size = file.size;
+      if (size > 500 * 1024) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Archivo muy grande (${(size / 1024).toStringAsFixed(0)} KB). Max 500 KB para BLE.'),
+            backgroundColor: Colors.red[900],
+          ));
+        }
+        return;
+      }
+      setState(() => _sending = true);
+      await bt.sendFile(
+        localPath: file.path!,
+        msgType: 'file',
+        fileName: file.name,
+      );
+      if (mounted) setState(() => _sending = false);
+      _toBottom();
+    } catch (e) {
+      if (mounted) {
+        setState(() => _sending = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Colors.red[900],
+        ));
+      }
+    }
+  }
+
   String _fmt(DateTime t) =>
       '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+  String _fmtSize(int? bytes) {
+    if (bytes == null) return '';
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    return '${(bytes / 1024 / 1024).toStringAsFixed(1)} MB';
+  }
 
   @override
   void dispose() {
     _msgSub?.cancel();
     _connSub?.cancel();
+    _progressSub?.cancel();
     _ctrl.dispose();
     _scroll.dispose();
     super.dispose();
@@ -1300,148 +1659,341 @@ class _ChatPageState extends State<ChatPage> {
           ),
           if (_connected)
             Container(
-              margin:
-                  const EdgeInsets.symmetric(horizontal: 20),
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 12, vertical: 5),
+              margin: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.05),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.bluetooth_connected,
-                      color: Colors.white, size: 14),
+                  const Icon(Icons.bluetooth_connected, color: Colors.white, size: 14),
                   const SizedBox(width: 6),
                   Text(
                     'Conectado a ${bt.connectedName}',
-                    style: const TextStyle(
-                        color: Colors.white, fontSize: 11),
+                    style: const TextStyle(color: Colors.white, fontSize: 11),
                   ),
                 ],
               ),
             ),
+          // Send progress bar
+          if (_sending)
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: _sendProgress,
+                  backgroundColor: Colors.white12,
+                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              ),
+            ),
           Expanded(
-            child: msgs.isEmpty
-                ? Center(
-                    child: Text(
-                      _connected
-                          ? 'Escribe un mensaje'
-                          : 'Conecta un dispositivo primero',
-                      style: TextStyle(
-                          color: Colors.white.withOpacity(0.15)),
-                      textAlign: TextAlign.center,
-                    ),
-                  )
-                : ListView.builder(
-                    controller: _scroll,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 20),
-                    itemCount: msgs.length,
-                    itemBuilder: (_, i) {
-                      final m = msgs[i];
-                      return Align(
-                        alignment: m.mine
-                            ? Alignment.centerRight
-                            : Alignment.centerLeft,
-                        child: Container(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 10),
-                          constraints: const BoxConstraints(
-                              maxWidth: 280),
-                          decoration: BoxDecoration(
-                            color: m.mine
-                                ? Colors.white
-                                : Colors.white.withOpacity(0.08),
-                            borderRadius: BorderRadius.only(
-                              topLeft:
-                                  const Radius.circular(14),
-                              topRight:
-                                  const Radius.circular(14),
-                              bottomLeft: Radius.circular(
-                                  m.mine ? 14 : 4),
-                              bottomRight: Radius.circular(
-                                  m.mine ? 4 : 14),
-                            ),
+            child: _loadingHistory
+                ? const Center(child: CircularProgressIndicator(color: Colors.white))
+                : msgs.isEmpty
+                    ? Center(
+                        child: Text(
+                          _connected
+                              ? 'Escribe un mensaje'
+                              : 'Conecta un dispositivo primero',
+                          style: TextStyle(color: Colors.white.withOpacity(0.15)),
+                          textAlign: TextAlign.center,
+                        ),
+                      )
+                    : ListView.builder(
+                        controller: _scroll,
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        itemCount: msgs.length,
+                        itemBuilder: (_, i) {
+                          final m = msgs[i];
+                          return _buildMessage(m);
+                        },
+                      ),
+          ),
+          // Input area with multimedia buttons
+          Container(
+            padding: const EdgeInsets.fromLTRB(8, 8, 8, 16),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    // Attach buttons
+                    if (_connected) ...[
+                      IconButton(
+                        onPressed: _sending ? null : _pickImage,
+                        icon: const Icon(Icons.photo, size: 22),
+                        style: IconButton.styleFrom(
+                          foregroundColor: Colors.white54,
+                        ),
+                        tooltip: 'Foto',
+                      ),
+                      IconButton(
+                        onPressed: _sending ? null : _pickVideo,
+                        icon: const Icon(Icons.videocam, size: 22),
+                        style: IconButton.styleFrom(
+                          foregroundColor: Colors.white54,
+                        ),
+                        tooltip: 'Video',
+                      ),
+                      IconButton(
+                        onPressed: _sending ? null : _pickFile,
+                        icon: const Icon(Icons.attach_file, size: 22),
+                        style: IconButton.styleFrom(
+                          foregroundColor: Colors.white54,
+                        ),
+                        tooltip: 'Archivo',
+                      ),
+                    ],
+                    Expanded(
+                      child: TextField(
+                        controller: _ctrl,
+                        style: const TextStyle(color: Colors.white),
+                        decoration: InputDecoration(
+                          hintText: _connected ? 'Mensaje...' : 'Sin conexion',
+                          hintStyle: TextStyle(color: Colors.white.withOpacity(0.15)),
+                          filled: true,
+                          fillColor: Colors.white.withOpacity(0.04),
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                          child: Column(
-                            crossAxisAlignment:
-                                CrossAxisAlignment.end,
-                            children: [
-                              Text(m.text,
-                                  style: TextStyle(
-                                    color: m.mine
-                                        ? Colors.black
-                                        : Colors.white,
-                                    fontSize: 14,
-                                  )),
-                              const SizedBox(height: 4),
-                              Text(_fmt(m.time),
-                                  style: TextStyle(
-                                    color: m.mine
-                                        ? Colors.black38
-                                        : Colors.white
-                                            .withOpacity(0.25),
-                                    fontSize: 10,
-                                  )),
-                            ],
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: Colors.white24),
                           ),
                         ),
-                      );
-                    },
-                  ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _ctrl,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      hintText: _connected
-                          ? 'Mensaje...'
-                          : 'Sin conexion',
-                      hintStyle: TextStyle(
-                          color: Colors.white.withOpacity(0.15)),
-                      filled: true,
-                      fillColor: Colors.white.withOpacity(0.04),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide:
-                            const BorderSide(color: Colors.white24),
+                        onSubmitted: (_) => _send(),
                       ),
                     ),
-                    onSubmitted: (_) => _send(),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                FilledButton(
-                  onPressed: _connected ? _send : null,
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.all(14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                    const SizedBox(width: 6),
+                    FilledButton(
+                      onPressed: _connected ? _send : null,
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.all(10),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        disabledBackgroundColor: Colors.white12,
+                      ),
+                      child: const Icon(Icons.send, size: 18),
                     ),
-                    disabledBackgroundColor: Colors.white12,
-                  ),
-                  child: const Icon(Icons.send, size: 20),
+                  ],
                 ),
+                if (_connected)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      'Max 500 KB por archivo (BLE lento)',
+                      style: TextStyle(color: Colors.white.withOpacity(0.2), fontSize: 10),
+                    ),
+                  ),
               ],
             ),
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildMessage(ChatMessage m) {
+    return Align(
+      alignment: m.mine ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        constraints: const BoxConstraints(maxWidth: 280),
+        decoration: BoxDecoration(
+          color: m.mine ? Colors.white : Colors.white.withOpacity(0.08),
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(14),
+            topRight: const Radius.circular(14),
+            bottomLeft: Radius.circular(m.mine ? 14 : 4),
+            bottomRight: Radius.circular(m.mine ? 4 : 14),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Media content
+            if (m.type == 'image' && m.filePath != null)
+              _buildImageContent(m),
+            if (m.type == 'video' && m.filePath != null)
+              _buildVideoContent(m),
+            if (m.type == 'file' && m.fileName != null)
+              _buildFileContent(m),
+            // Text content (for text messages or caption)
+            if (m.type == 'text')
+              Text(m.text,
+                  style: TextStyle(
+                    color: m.mine ? Colors.black : Colors.white,
+                    fontSize: 14,
+                  )),
+            const SizedBox(height: 4),
+            // Time + size
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(_fmt(m.time),
+                    style: TextStyle(
+                      color: m.mine ? Colors.black38 : Colors.white.withOpacity(0.25),
+                      fontSize: 10,
+                    )),
+                if (m.fileSize != null) ...[
+                  const SizedBox(width: 6),
+                  Text(_fmtSize(m.fileSize),
+                      style: TextStyle(
+                        color: m.mine ? Colors.black38 : Colors.white.withOpacity(0.25),
+                        fontSize: 10,
+                      )),
+                ],
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildImageContent(ChatMessage m) {
+    final file = File(m.filePath!);
+    return GestureDetector(
+      onTap: () => _showImagePreview(m.filePath!),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: FutureBuilder<bool>(
+          future: file.exists(),
+          builder: (_, snap) {
+            if (snap.data == true) {
+              return Image.file(
+                file,
+                width: 240,
+                height: 180,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => _buildMediaPlaceholder(Icons.broken_image, m.fileName ?? 'Imagen'),
+              );
+            }
+            return _buildMediaPlaceholder(Icons.image, m.fileName ?? 'Imagen');
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVideoContent(ChatMessage m) {
+    return GestureDetector(
+      onTap: () => _openFile(m.filePath),
+      child: Container(
+        width: 240,
+        height: 120,
+        decoration: BoxDecoration(
+          color: Colors.black26,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.play_circle_fill, color: Colors.white70, size: 40),
+            const SizedBox(height: 4),
+            Text(m.fileName ?? 'Video',
+                style: const TextStyle(color: Colors.white70, fontSize: 11),
+                overflow: TextOverflow.ellipsis),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFileContent(ChatMessage m) {
+    return GestureDetector(
+      onTap: () => _openFile(m.filePath),
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: (m.mine ? Colors.black : Colors.white).withOpacity(0.06),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.insert_drive_file, color: m.mine ? Colors.black54 : Colors.white54, size: 24),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(m.fileName ?? 'Archivo',
+                      style: TextStyle(
+                        color: m.mine ? Colors.black87 : Colors.white,
+                        fontSize: 13,
+                      ),
+                      overflow: TextOverflow.ellipsis),
+                  if (m.fileSize != null)
+                    Text(_fmtSize(m.fileSize),
+                        style: TextStyle(
+                          color: m.mine ? Colors.black38 : Colors.white.withOpacity(0.4),
+                          fontSize: 10,
+                        )),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(Icons.download, color: m.mine ? Colors.black38 : Colors.white38, size: 18),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMediaPlaceholder(IconData icon, String label) {
+    return Container(
+      width: 240,
+      height: 120,
+      decoration: BoxDecoration(
+        color: Colors.black26,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, color: Colors.white38, size: 32),
+          const SizedBox(height: 4),
+          Text(label, style: const TextStyle(color: Colors.white38, fontSize: 11)),
+        ],
+      ),
+    );
+  }
+
+  void _showImagePreview(String path) {
+    Navigator.push(context, MaterialPageRoute(builder: (_) {
+      return Scaffold(
+        backgroundColor: Colors.black,
+        appBar: AppBar(
+          backgroundColor: Colors.black,
+          iconTheme: const IconThemeData(color: Colors.white),
+        ),
+        body: Center(
+          child: InteractiveViewer(
+            child: Image.file(File(path), fit: BoxFit.contain),
+          ),
+        ),
+      );
+    }));
+  }
+
+  Future<void> _openFile(String? path) async {
+    if (path == null) return;
+    // Just show the path for now - can add open_file dependency later
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text('Archivo guardado en: $path'),
+      backgroundColor: Colors.grey[800],
+    ));
   }
 }
 
