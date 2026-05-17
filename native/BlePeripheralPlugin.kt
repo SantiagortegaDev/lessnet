@@ -21,9 +21,8 @@ class BlePeripheralPlugin(private val context: Context) : MethodChannel.MethodCa
         val CHAR_TX_UUID: UUID = UUID.fromString("6e400003-b5a3-f393-e0a9-e50e24dcca9e")
         val CCCD_UUID: UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
         private const val TAG = "BlePeripheralPlugin"
-        private const val BLE_CHUNK_SIZE = 20
-        private const val CHUNK_DELAY_MS = 20L  // ms between BLE notification chunks
-        private const val CONFIRM_DELAY_MS = 30L // ms after sending notification to confirm delivery
+        private const val NOTIFY_CHUNK_SIZE = 200 // bytes per notification (MTU-safe)
+        private const val NOTIFY_DELAY_MS = 10L   // ms between notifications
     }
 
     private var bluetoothManager: BluetoothManager? = null
@@ -43,7 +42,7 @@ class BlePeripheralPlugin(private val context: Context) : MethodChannel.MethodCa
     // Track if notifications are enabled by the client
     private var notificationsEnabled = false
 
-    // Track if a send operation is in progress to prevent concurrent sends
+    // Track if a send operation is in progress
     private var isSending = false
 
     fun setChannel(ch: MethodChannel) {
@@ -58,6 +57,10 @@ class BlePeripheralPlugin(private val context: Context) : MethodChannel.MethodCa
             "sendData" -> {
                 val data = call.argument<String>("data") ?: ""
                 sendData(data, result)
+            }
+            "sendFile" -> {
+                val data = call.argument<String>("data") ?: ""
+                sendFile(data, result)
             }
             "isAdvertising" -> result.success(isCurrentlyAdvertising)
             "supportsAdvertising" -> {
@@ -75,7 +78,6 @@ class BlePeripheralPlugin(private val context: Context) : MethodChannel.MethodCa
             if (btAdapter == null || !btAdapter.isEnabled) return false
 
             val adv = btAdapter.bluetoothLeAdvertiser
-            // Check if multiple advertisement is supported
             return adv != null && btAdapter.isMultipleAdvertisementSupported
         } catch (e: Exception) {
             return false
@@ -92,28 +94,24 @@ class BlePeripheralPlugin(private val context: Context) : MethodChannel.MethodCa
                 return
             }
 
-            // Check advertising support first
             advertiser = bluetoothAdapter?.bluetoothLeAdvertiser
             if (advertiser == null) {
                 result.error("ADV_ERROR", "Este dispositivo NO soporta BLE advertising. Muchos celulares OPPO, Realme y gamas bajas no lo soportan. Usa este celular para BUSCAR.", null)
                 return
             }
 
-            // Start GATT server first (must be ready before advertising)
             if (!startGattServer()) {
                 result.error("GATT_ERROR", "No se pudo crear el servidor GATT", null)
                 return
             }
 
-            // Start BLE advertising with LOW_LATENCY for faster discovery
             val settings = AdvertiseSettings.Builder()
                 .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
                 .setConnectable(true)
-                .setTimeout(0) // No timeout - keep advertising indefinitely
+                .setTimeout(0)
                 .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
                 .build()
 
-            // Include service UUID so scanners can identify us
             val data = AdvertiseData.Builder()
                 .setIncludeDeviceName(true)
                 .addServiceUuid(ParcelUuid(SERVICE_UUID))
@@ -137,14 +135,6 @@ class BlePeripheralPlugin(private val context: Context) : MethodChannel.MethodCa
 
         override fun onStartFailure(errorCode: Int) {
             isCurrentlyAdvertising = false
-            val errorMsg = when (errorCode) {
-                ADVERTISE_FAILED_DATA_TOO_LARGE -> "Datos de advertising demasiado grandes"
-                ADVERTISE_FAILED_TOO_MANY_ADVERTISERS -> "Demasiados advertisers activos"
-                ADVERTISE_FAILED_ALREADY_STARTED -> "Advertising ya esta activo"
-                ADVERTISE_FAILED_INTERNAL_ERROR -> "Error interno de BLE"
-                ADVERTISE_FAILED_FEATURE_UNSUPPORTED -> "BLE advertising no soportado por este dispositivo"
-                else -> "Error desconocido: $errorCode"
-            }
             mainHandler.post {
                 channel?.invokeMethod("onAdvertiseStatus", false)
             }
@@ -157,21 +147,18 @@ class BlePeripheralPlugin(private val context: Context) : MethodChannel.MethodCa
 
             val service = BluetoothGattService(SERVICE_UUID, BluetoothGattService.SERVICE_TYPE_PRIMARY)
 
-            // RX characteristic - clients WRITE messages here
             val rxChar = BluetoothGattCharacteristic(
                 CHAR_RX_UUID,
                 BluetoothGattCharacteristic.PROPERTY_WRITE or BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE,
                 BluetoothGattCharacteristic.PERMISSION_WRITE
             )
 
-            // TX characteristic - clients READ/NOTIFY from here
             txCharacteristic = BluetoothGattCharacteristic(
                 CHAR_TX_UUID,
                 BluetoothGattCharacteristic.PROPERTY_READ or BluetoothGattCharacteristic.PROPERTY_NOTIFY,
                 BluetoothGattCharacteristic.PERMISSION_READ
             )
 
-            // Client Characteristic Configuration Descriptor (for notifications)
             val cccd = BluetoothGattDescriptor(
                 CCCD_UUID,
                 BluetoothGattDescriptor.PERMISSION_READ or BluetoothGattDescriptor.PERMISSION_WRITE
@@ -195,7 +182,6 @@ class BlePeripheralPlugin(private val context: Context) : MethodChannel.MethodCa
                 connectedDevice = device
                 messageBuffer.clear()
                 isSending = false
-                // Stop advertising when a device connects (one connection at a time)
                 try {
                     advertiser?.stopAdvertising(advertiseCallback)
                 } catch (e: Exception) {}
@@ -212,7 +198,6 @@ class BlePeripheralPlugin(private val context: Context) : MethodChannel.MethodCa
                 mainHandler.post {
                     channel?.invokeMethod("onDeviceDisconnected", true)
                 }
-                // Resume advertising so other devices can find us
                 restartAdvertising()
             }
         }
@@ -228,7 +213,6 @@ class BlePeripheralPlugin(private val context: Context) : MethodChannel.MethodCa
         ) {
             if (characteristic.uuid == CHAR_RX_UUID) {
                 if (value.size == 1 && value[0] == 0x00.toByte()) {
-                    // End of message marker - deliver complete message
                     if (messageBuffer.isNotEmpty()) {
                         val completeMessage = String(messageBuffer.toByteArray(), Charsets.UTF_8)
                         messageBuffer.clear()
@@ -237,13 +221,10 @@ class BlePeripheralPlugin(private val context: Context) : MethodChannel.MethodCa
                         }
                     }
                 } else {
-                    // Buffer the data — respect offset for prepared writes
                     if (preparedWrite && offset > 0) {
-                        // Ensure buffer is large enough for the offset
                         while (messageBuffer.size < offset) {
                             messageBuffer.add(0)
                         }
-                        // Replace bytes at offset or append
                         for (i in value.indices) {
                             val pos = offset + i
                             if (pos < messageBuffer.size) {
@@ -253,7 +234,6 @@ class BlePeripheralPlugin(private val context: Context) : MethodChannel.MethodCa
                             }
                         }
                     } else {
-                        // Normal write — just append
                         for (b in value) {
                             messageBuffer.add(b)
                         }
@@ -313,11 +293,7 @@ class BlePeripheralPlugin(private val context: Context) : MethodChannel.MethodCa
         }
 
         override fun onNotificationSent(device: BluetoothDevice, status: Int) {
-            // Called when a notification has been sent successfully (API 21+)
-            // This is crucial for flow control — we know the client received the data
-            if (status == BluetoothGatt.GATT_SUCCESS) {
-                // Notification sent successfully
-            } else {
+            if (status != BluetoothGatt.GATT_SUCCESS) {
                 Log.w(TAG, "Notification send failed with status: $status")
             }
         }
@@ -349,13 +325,8 @@ class BlePeripheralPlugin(private val context: Context) : MethodChannel.MethodCa
 
     /**
      * Send data reliably over BLE notifications.
-     *
-     * KEY FIX: Instead of posting all chunks asynchronously via mainHandler.post
-     * (which can cause notifications to be queued and lost), we now:
-     * 1. Send each notification SYNCHRONOUSLY on the main thread
-     * 2. Wait for proper confirmation between chunks
-     * 3. Use a CountDownLatch to ensure each notification is sent before the next
-     * 4. Increase delays between chunks for reliability
+     * Uses CountDownLatch for synchronous notification sending.
+     * Uses 200-byte chunks with 10ms delay for speed + reliability.
      */
     private fun sendData(data: String, result: MethodChannel.Result) {
         if (connectedDevice == null || txCharacteristic == null) {
@@ -375,47 +346,36 @@ class BlePeripheralPlugin(private val context: Context) : MethodChannel.MethodCa
 
         try {
             val bytes = data.toByteArray(Charsets.UTF_8)
-            Log.d(TAG, "sendData: sending ${bytes.size} bytes in chunks of $BLE_CHUNK_SIZE")
+            Log.d(TAG, "sendData: sending ${bytes.size} bytes")
 
             Thread {
                 try {
                     var i = 0
                     while (i < bytes.size) {
-                        val end = minOf(i + BLE_CHUNK_SIZE, bytes.size)
+                        val end = minOf(i + NOTIFY_CHUNK_SIZE, bytes.size)
                         val chunk = bytes.copyOfRange(i, end)
 
-                        // Use a latch to ensure each notification is sent on the main thread
-                        // before proceeding to the next chunk
                         val latch = CountDownLatch(1)
                         mainHandler.post {
                             try {
                                 txCharacteristic?.value = chunk
-                                val notifyResult = gattServer?.notifyCharacteristicChanged(
-                                    connectedDevice, txCharacteristic, false
-                                )
-                                if (notifyResult == false) {
-                                    Log.w(TAG, "notifyCharacteristicChanged returned false at chunk offset $i")
-                                }
+                                gattServer?.notifyCharacteristicChanged(connectedDevice, txCharacteristic, false)
                             } catch (e: Exception) {
-                                Log.e(TAG, "Error sending notification chunk at offset $i: ${e.message}")
+                                Log.e(TAG, "Error sending notification at offset $i: ${e.message}")
                             } finally {
                                 latch.countDown()
                             }
                         }
 
-                        // Wait for the notification to be posted on main thread
                         latch.await(2, TimeUnit.SECONDS)
-
                         i = end
 
-                        // Delay between chunks to prevent BLE buffer overflow
-                        // This is critical — without proper delays, BLE notifications get dropped
                         if (i < bytes.size) {
-                            Thread.sleep(CHUNK_DELAY_MS)
+                            Thread.sleep(NOTIFY_DELAY_MS)
                         }
                     }
 
-                    // Send null terminator as end-of-message marker
+                    // Null terminator
                     val termLatch = CountDownLatch(1)
                     mainHandler.post {
                         try {
@@ -429,14 +389,115 @@ class BlePeripheralPlugin(private val context: Context) : MethodChannel.MethodCa
                     }
                     termLatch.await(2, TimeUnit.SECONDS)
 
-                    Log.d(TAG, "sendData: completed sending ${bytes.size} bytes")
-
+                    Log.d(TAG, "sendData: completed ${bytes.size} bytes")
                     mainHandler.post {
                         isSending = false
                         result.success(true)
                     }
                 } catch (e: Exception) {
                     Log.e(TAG, "sendData thread error: ${e.message}")
+                    mainHandler.post {
+                        isSending = false
+                        result.error("SEND_ERROR", e.message, null)
+                    }
+                }
+            }.start()
+        } catch (e: Exception) {
+            isSending = false
+            result.error("SEND_ERROR", e.message, null)
+        }
+    }
+
+    /**
+     * Send file data with progress reporting.
+     * Reports progress every 10% via onSendProgress callback.
+     */
+    private fun sendFile(data: String, result: MethodChannel.Result) {
+        if (connectedDevice == null || txCharacteristic == null) {
+            result.error("SEND_ERROR", "No hay dispositivo conectado", null)
+            return
+        }
+        if (!notificationsEnabled) {
+            result.error("SEND_ERROR", "El cliente no tiene notificaciones activadas", null)
+            return
+        }
+        if (isSending) {
+            result.error("SEND_ERROR", "Ya hay un envio en progreso", null)
+            return
+        }
+
+        isSending = true
+
+        try {
+            val bytes = data.toByteArray(Charsets.UTF_8)
+            val totalBytes = bytes.size
+            Log.d(TAG, "sendFile: sending $totalBytes bytes with progress")
+
+            Thread {
+                try {
+                    var i = 0
+                    var lastReportedPercent = -1
+
+                    while (i < bytes.size) {
+                        val end = minOf(i + NOTIFY_CHUNK_SIZE, bytes.size)
+                        val chunk = bytes.copyOfRange(i, end)
+
+                        val latch = CountDownLatch(1)
+                        mainHandler.post {
+                            try {
+                                txCharacteristic?.value = chunk
+                                gattServer?.notifyCharacteristicChanged(connectedDevice, txCharacteristic, false)
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Error at offset $i: ${e.message}")
+                            } finally {
+                                latch.countDown()
+                            }
+                        }
+
+                        latch.await(2, TimeUnit.SECONDS)
+                        i = end
+
+                        // Report progress every 5%
+                        val percent = ((i * 100) / totalBytes / 5) * 5
+                        if (percent != lastReportedPercent) {
+                            lastReportedPercent = percent
+                            val progress = i.toDouble() / totalBytes.toDouble()
+                            mainHandler.post {
+                                channel?.invokeMethod("onSendProgress", progress)
+                            }
+                        }
+
+                        if (i < bytes.size) {
+                            Thread.sleep(NOTIFY_DELAY_MS)
+                        }
+                    }
+
+                    // Null terminator
+                    val termLatch = CountDownLatch(1)
+                    mainHandler.post {
+                        try {
+                            txCharacteristic?.value = byteArrayOf(0x00)
+                            gattServer?.notifyCharacteristicChanged(connectedDevice, txCharacteristic, false)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error sending terminator: ${e.message}")
+                        } finally {
+                            termLatch.countDown()
+                        }
+                    }
+                    termLatch.await(2, TimeUnit.SECONDS)
+
+                    // Report 100%
+                    mainHandler.post {
+                        channel?.invokeMethod("onSendProgress", 1.0)
+                    }
+
+                    Log.d(TAG, "sendFile: completed $totalBytes bytes")
+                    mainHandler.post {
+                        isSending = false
+                        result.success(true)
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "sendFile thread error: ${e.message}")
                     mainHandler.post {
                         isSending = false
                         result.error("SEND_ERROR", e.message, null)

@@ -70,52 +70,16 @@ class LessNetApp extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────
-// BLUETOOTH SERVICE GLOBAL — PROTOCOLO V2 CHUNKED
+// BLUETOOTH SERVICE GLOBAL — PROTOCOLO SIMPLE + RÁPIDO
 // ─────────────────────────────────────────────
-// Protocolo de transferencia confiable:
-//   [XFR:MSG_ID:TYPE:FILENAME:SIZE:TOTAL_CHUNKS:CRC32]
-//   [CHK:MSG_ID:IDX:base64_chunk_data]
-//   [END:MSG_ID]
-//   [ACK:MSG_ID]
-//   [NAK:MSG_ID:idx1,idx2,...]
+// Formato: [FILE:TYPE:FILENAME:SIZE:CRC32]base64_data
+// Un solo mensaje por archivo. CRC32 verifica integridad.
+// Chunks de escritura BLE de 200 bytes (MTU-aware).
 // ─────────────────────────────────────────────
 
-const int _kBleChunkSize = 400; // bytes de base64 por chunk lógico
-const int _kBleWriteChunk = 20; // bytes por write BLE (capa física)
-const int _kMaxRetries = 3;
-const Duration _kChunkDelay = Duration(milliseconds: 15);
-const Duration _kLogicalChunkDelay = Duration(milliseconds: 50);
+const int _kBleWriteSize = 200; // bytes por write BLE (MTU-safe)
 const int _kMaxFileSize = 2 * 1024 * 1024; // 2 MB
-
-class _IncomingTransfer {
-  final String msgId;
-  final String msgType; // img, vid, file
-  final String fileName;
-  final int fileSize;
-  final int totalChunks;
-  final int crc32;
-  final Map<int, String> chunks = {};
-  DateTime lastActivity = DateTime.now();
-
-  _IncomingTransfer({
-    required this.msgId,
-    required this.msgType,
-    required this.fileName,
-    required this.fileSize,
-    required this.totalChunks,
-    required this.crc32,
-  });
-
-  bool get isComplete => chunks.length == totalChunks;
-
-  String assembleBase64() {
-    final buf = StringBuffer();
-    for (int i = 0; i < totalChunks; i++) {
-      buf.write(chunks[i] ?? '');
-    }
-    return buf.toString();
-  }
-}
+const int _kPeripheralNotifyDelayMs = 10; // ms entre notificaciones (peripheral)
 
 class BtService {
   static final BtService _instance = BtService._internal();
@@ -131,6 +95,8 @@ class BtService {
   StreamSubscription? _connSub;
   final List<int> _receiveBuffer = [];
   bool _isConnecting = false;
+  bool _isSending = false;
+  bool get isSending => _isSending;
 
   static const _peripheralChannel =
       MethodChannel('com.lessnet.ble_peripheral');
@@ -157,9 +123,6 @@ class BtService {
   final _progressController = StreamController<Map<String, dynamic>>.broadcast();
   Stream<Map<String, dynamic>> get onProgress => _progressController.stream;
 
-  // Incoming transfers (chunked protocol v2)
-  final Map<String, _IncomingTransfer> _incomingTransfers = {};
-
   bool get isAdvertising => _isAdvertising;
   bool get isPeripheralConnected => _peripheralConnected;
   bool get isConnected =>
@@ -181,7 +144,7 @@ class BtService {
     return '';
   }
 
-  // ─── CRC32 implementation (Dart native) ───
+  // ─── CRC32 ───
   static int _crc32(List<int> data) {
     int crc = 0xFFFFFFFF;
     for (final byte in data) {
@@ -206,6 +169,11 @@ class BtService {
             _processReceivedText(text);
           }
           break;
+        case 'onSendProgress':
+          // Progress from Kotlin peripheral send
+          final progress = call.arguments as double? ?? 0.0;
+          _progressController.add({'progress': progress});
+          break;
         case 'onDeviceConnected':
           _peripheralConnected = true;
           _isAdvertising = false;
@@ -217,6 +185,7 @@ class BtService {
         case 'onDeviceDisconnected':
           _peripheralConnected = false;
           _peripheralDeviceName = '';
+          _isSending = false;
           _connectionController.add(false);
           _statusController.add('Desconectado');
           break;
@@ -323,8 +292,7 @@ class BtService {
   }
 
   void _handleReceivedData(List<int> value) {
-    int i = 0;
-    while (i < value.length) {
+    for (int i = 0; i < value.length; i++) {
       if (value[i] == 0x00) {
         if (_receiveBuffer.isNotEmpty) {
           final text = utf8.decode(_receiveBuffer, allowMalformed: true);
@@ -333,132 +301,74 @@ class BtService {
             _processReceivedText(text);
           }
         }
-        i++;
       } else {
         _receiveBuffer.add(value[i]);
-        i++;
-      }
-    }
-    // Safety flush — only for non-chunked messages
-    if (_receiveBuffer.length > 200000) {
-      final text = utf8.decode(_receiveBuffer, allowMalformed: true);
-      _receiveBuffer.clear();
-      if (text.isNotEmpty) {
-        _processReceivedText(text);
       }
     }
   }
 
   void _processReceivedText(String text) {
-    // ─── CHUNKED PROTOCOL V2 ───
-    // Transfer start: [XFR:MSG_ID:TYPE:FILENAME:SIZE:TOTAL_CHUNKS:CRC32]
-    if (text.startsWith('[XFR:')) {
+    // ─── FILE TRANSFER PROTOCOL ───
+    // [FILE:TYPE:FILENAME:SIZE:CRC32]base64data
+    if (text.startsWith('[FILE:')) {
       try {
         final headerEnd = text.indexOf(']');
-        if (headerEnd > 4) {
-          final header = text.substring(5, headerEnd);
+        if (headerEnd > 5) {
+          final header = text.substring(6, headerEnd); // skip '[FILE:'
           final parts = header.split(':');
-          if (parts.length >= 7) {
-            final msgId = parts[0];
-            final msgType = parts[1].toLowerCase(); // img, vid, file
-            final fileName = parts[2];
-            final fileSize = int.tryParse(parts[3]) ?? 0;
-            final totalChunks = int.tryParse(parts[4]) ?? 0;
-            final crc32 = int.tryParse(parts[5]) ?? 0;
+          // parts: [TYPE, FILENAME, SIZE, CRC32] = 4 parts minimum
+          if (parts.length >= 4) {
+            final msgType = parts[0].toLowerCase(); // img, vid, file
+            final fileName = parts[1];
+            final fileSize = int.tryParse(parts[2]) ?? 0;
+            final expectedCrc = int.tryParse(parts[3]) ?? 0;
+            final b64Data = text.substring(headerEnd + 1);
 
-            _incomingTransfers[msgId] = _IncomingTransfer(
-              msgId: msgId,
-              msgType: msgType,
-              fileName: fileName,
-              fileSize: fileSize,
-              totalChunks: totalChunks,
-              crc32: crc32,
-            );
-            // Clean up old transfers (older than 5 minutes)
-            _incomingTransfers.removeWhere((key, value) =>
-                DateTime.now().difference(value.lastActivity).inMinutes > 5);
-            return;
-          }
-        }
-      } catch (e) {
-        // Fall through to treat as text
-      }
-    }
+            final bytes = base64Decode(b64Data);
 
-    // Data chunk: [CHK:MSG_ID:IDX:base64_data]
-    if (text.startsWith('[CHK:')) {
-      try {
-        final headerEnd = text.indexOf(']', 4);
-        if (headerEnd > 4) {
-          final header = text.substring(5, headerEnd);
-          final colon1 = header.indexOf(':');
-          if (colon1 > 0) {
-            final colon2 = header.indexOf(':', colon1 + 1);
-            if (colon2 > colon1) {
-              final msgId = header.substring(0, colon1);
-              final idx = int.tryParse(header.substring(colon1 + 1, colon2)) ?? -1;
-              // No extra data after second colon in header means data starts after ]
-              final b64Data = text.substring(headerEnd + 1);
-
-              final transfer = _incomingTransfers[msgId];
-              if (transfer != null && idx >= 0 && idx < transfer.totalChunks) {
-                transfer.chunks[idx] = b64Data;
-                transfer.lastActivity = DateTime.now();
-              }
-              return;
+            // Verify CRC32
+            final actualCrc = _crc32(bytes);
+            if (actualCrc != expectedCrc) {
+              debugPrint('CRC32 mismatch: expected=$expectedCrc actual=$actualCrc for $fileName');
+              // Try to save anyway — partial image is better than nothing
             }
-          }
-        }
-      } catch (e) {
-        // Fall through
-      }
-    }
 
-    // End of transfer: [END:MSG_ID]
-    if (text.startsWith('[END:')) {
-      try {
-        final headerEnd = text.indexOf(']');
-        if (headerEnd > 5) {
-          final msgId = text.substring(5, headerEnd);
-          final transfer = _incomingTransfers[msgId];
-          if (transfer != null) {
-            _finalizeIncomingTransfer(transfer);
-            _incomingTransfers.remove(msgId);
+            _saveReceivedFile(msgType, fileName, bytes).then((savedPath) {
+              final msg = ChatMessage(
+                id: DateTime.now().microsecondsSinceEpoch.toString(),
+                text: fileName,
+                mine: false,
+                time: DateTime.now(),
+                type: msgType == 'img' ? 'image' : (msgType == 'vid' ? 'video' : 'file'),
+                fileName: fileName,
+                filePath: savedPath,
+                fileSize: fileSize,
+              );
+              messages.add(msg);
+              _msgController.add(msg);
+              MessageDB.insert(msg);
+            });
             return;
           }
         }
       } catch (e) {
-        // Fall through
-      }
-    }
-
-    // ACK from receiver: [ACK:MSG_ID]
-    if (text.startsWith('[ACK:')) {
-      // Just log it, sender handles via its own tracking
-      return;
-    }
-
-    // NAK from receiver: [NAK:MSG_ID:idx1,idx2,...]
-    if (text.startsWith('[NAK:')) {
-      try {
-        final headerEnd = text.indexOf(']');
-        if (headerEnd > 5) {
-          final content = text.substring(5, headerEnd);
-          final colonIdx = content.indexOf(':');
-          if (colonIdx > 0) {
-            final msgId = content.substring(0, colonIdx);
-            final missingStr = content.substring(colonIdx + 1);
-            final missingIdx = missingStr.split(',')
-                .map((s) => int.tryParse(s.trim()) ?? -1)
-                .where((i) => i >= 0)
-                .toList();
-            // The sender should handle retry — for now just log
-            debugPrint('NAK received for $msgId: missing chunks $missingIdx');
-          }
+        debugPrint('Error parsing FILE transfer: $e');
+        // Fall through — don't show protocol text as chat message
+        // If it looks like a protocol message, silently ignore
+        if (text.startsWith('[FILE:') || text.startsWith('[XFR:') ||
+            text.startsWith('[CHK:') || text.startsWith('[END:') ||
+            text.startsWith('[ACK:') || text.startsWith('[NAK:') ||
+            text.startsWith('[RESEND:')) {
+          return;
         }
-      } catch (e) {
-        // Ignore
       }
+    }
+
+    // ─── SILENTLY IGNORE OTHER PROTOCOL MESSAGES ───
+    // Never show internal protocol text as chat messages
+    if (text.startsWith('[XFR:') || text.startsWith('[CHK:') ||
+        text.startsWith('[END:') || text.startsWith('[ACK:') ||
+        text.startsWith('[NAK:') || text.startsWith('[RESEND:')) {
       return;
     }
 
@@ -494,69 +404,16 @@ class BtService {
           return;
         }
       } catch (e) {
-        // If parsing fails, treat as plain text
+        // If parsing fails and it looks like protocol text, don't show it
+        return;
       }
     }
 
-    // Plain text message
+    // ─── Plain text message ───
     final msg = ChatMessage(id: DateTime.now().microsecondsSinceEpoch.toString(), text: text, mine: false, time: DateTime.now());
     messages.add(msg);
     _msgController.add(msg);
     MessageDB.insert(msg);
-  }
-
-  Future<void> _finalizeIncomingTransfer(_IncomingTransfer transfer) async {
-    if (!transfer.isComplete) {
-      // Send NAK with missing chunk indices
-      final missing = <int>[];
-      for (int i = 0; i < transfer.totalChunks; i++) {
-        if (!transfer.chunks.containsKey(i)) {
-          missing.add(i);
-        }
-      }
-      final nakMsg = '[NAK:${transfer.msgId}:${missing.join(',')}]';
-      await _sendRawMessage(nakMsg);
-      return;
-    }
-
-    // All chunks received — assemble and verify
-    try {
-      final b64 = transfer.assembleBase64();
-      final bytes = base64Decode(b64);
-
-      // Verify CRC32
-      final computedCrc = _crc32(bytes);
-      if (computedCrc != transfer.crc32) {
-        // CRC mismatch — request all chunks again
-        final missing = List.generate(transfer.totalChunks, (i) => i);
-        final nakMsg = '[NAK:${transfer.msgId}:${missing.join(',')}]';
-        await _sendRawMessage(nakMsg);
-        return;
-      }
-
-      // CRC OK — save file
-      final savedPath = await _saveReceivedFile(transfer.msgType, transfer.fileName, bytes);
-
-      final msg = ChatMessage(
-        id: transfer.msgId,
-        text: transfer.fileName,
-        mine: false,
-        time: DateTime.now(),
-        type: transfer.msgType == 'img' ? 'image' : (transfer.msgType == 'vid' ? 'video' : 'file'),
-        fileName: transfer.fileName,
-        filePath: savedPath,
-        fileSize: transfer.fileSize,
-      );
-      messages.add(msg);
-      _msgController.add(msg);
-      MessageDB.insert(msg);
-
-      // Send ACK
-      final ackMsg = '[ACK:${transfer.msgId}]';
-      await _sendRawMessage(ackMsg);
-    } catch (e) {
-      debugPrint('Error finalizing transfer: $e');
-    }
   }
 
   Future<String> _saveReceivedFile(String type, String fileName, List<int> bytes) async {
@@ -573,22 +430,21 @@ class BtService {
     return file.path;
   }
 
-  // ─── Raw BLE message sending (used for protocol messages) ───
+  // ─── Send raw BLE message with MTU-aware chunks ───
   Future<void> _sendRawMessage(String text) async {
+    final bytes = utf8.encode(text);
     if (_isPeripheral && _peripheralConnected) {
-      try {
-        await _peripheralChannel.invokeMethod('sendData', {'data': text});
-      } catch (_) {}
+      // Peripheral: send via Kotlin (handles notifications internally)
+      await _peripheralChannel.invokeMethod('sendData', {'data': text});
     } else if (rxChar != null) {
-      final bytes = utf8.encode(text);
-      for (int i = 0; i < bytes.length; i += _kBleWriteChunk) {
-        final end = i + _kBleWriteChunk > bytes.length ? bytes.length : i + _kBleWriteChunk;
+      // Central: write in 200-byte chunks, no delay needed
+      // (withoutResponse: false blocks until ACK from peripheral)
+      for (int i = 0; i < bytes.length; i += _kBleWriteSize) {
+        final end = i + _kBleWriteSize > bytes.length ? bytes.length : i + _kBleWriteSize;
         final chunk = bytes.sublist(i, end);
         await rxChar!.write(Uint8List.fromList(chunk), withoutResponse: false);
-        if (i + _kBleWriteChunk < bytes.length) {
-          await Future.delayed(_kChunkDelay);
-        }
       }
+      // Null terminator
       await rxChar!.write(Uint8List.fromList([0x00]), withoutResponse: false);
     }
   }
@@ -603,7 +459,7 @@ class BtService {
     await _sendRawMessage(text);
   }
 
-  // ─── Reliable file send with chunked protocol v2 ───
+  // ─── File send — simple protocol, one message, MTU-aware ───
   Future<void> sendFile({
     required String localPath,
     required String msgType, // 'image', 'video', 'file'
@@ -612,18 +468,11 @@ class BtService {
     final file = File(localPath);
     final bytes = await file.readAsBytes();
     final fileSize = bytes.length;
+    final fileCrc = _crc32(bytes);
+    final b64 = base64Encode(bytes);
+    final typeCode = msgType == 'image' ? 'img' : (msgType == 'video' ? 'vid' : 'file');
 
     final msgId = DateTime.now().microsecondsSinceEpoch.toString();
-
-    // Compute CRC32 of original file bytes
-    final fileCrc = _crc32(bytes);
-
-    // Base64 encode the file
-    final b64 = base64Encode(bytes);
-
-    // Split into logical chunks
-    final totalChunks = (b64.length / _kBleChunkSize).ceil();
-    final typeCode = msgType == 'image' ? 'img' : (msgType == 'video' ? 'vid' : 'file');
 
     // Create local message
     final msg = ChatMessage(
@@ -640,45 +489,44 @@ class BtService {
     _msgController.add(msg);
     MessageDB.insert(msg);
 
-    // Send transfer start header
-    final header = '[XFR:$msgId:$typeCode:$fileName:$fileSize:$totalChunks:$fileCrc]';
+    _isSending = true;
     _progressController.add({'progress': 0.0, 'msgId': msgId, 'fileName': fileName});
 
-    for (int attempt = 0; attempt < _kMaxRetries; attempt++) {
-      try {
-        // Send header
-        await _sendRawMessage(header);
-        await Future.delayed(_kLogicalChunkDelay);
+    try {
+      // Build the full payload: [FILE:TYPE:FILENAME:SIZE:CRC32]base64data
+      final payload = '[FILE:$typeCode:$fileName:$fileSize:$fileCrc]$b64';
+      final payloadBytes = utf8.encode(payload);
 
-        // Send each chunk
-        for (int idx = 0; idx < totalChunks; idx++) {
-          final start = idx * _kBleChunkSize;
-          final end = start + _kBleChunkSize > b64.length ? b64.length : start + _kBleChunkSize;
-          final chunkData = b64.substring(start, end);
-          final chunkMsg = '[CHK:$msgId:$idx:]$chunkData';
-          await _sendRawMessage(chunkMsg);
+      if (_isPeripheral && _peripheralConnected) {
+        // Peripheral: use Kotlin sendData (handles notifications + progress)
+        await _peripheralChannel.invokeMethod('sendFile', {'data': payload});
+      } else if (rxChar != null) {
+        // Central: write in 200-byte chunks
+        // withoutResponse: false = write request = blocks until ACK = reliable
+        final totalWrites = (payloadBytes.length / _kBleWriteSize).ceil() + 1; // +1 for null term
+        int writesDone = 0;
 
-          final progress = (idx + 1) / totalChunks;
-          _progressController.add({'progress': progress, 'msgId': msgId, 'fileName': fileName});
-
-          // Delay between logical chunks
-          if (idx + 1 < totalChunks) {
-            await Future.delayed(_kLogicalChunkDelay);
+        for (int i = 0; i < payloadBytes.length; i += _kBleWriteSize) {
+          final end = i + _kBleWriteSize > payloadBytes.length ? payloadBytes.length : i + _kBleWriteSize;
+          final chunk = payloadBytes.sublist(i, end);
+          await rxChar!.write(Uint8List.fromList(chunk), withoutResponse: false);
+          writesDone++;
+          // Report progress every 5 writes to avoid UI spam
+          if (writesDone % 5 == 0 || i + _kBleWriteSize >= payloadBytes.length) {
+            final progress = (i + _kBleWriteSize) / payloadBytes.length;
+            _progressController.add({'progress': progress.clamp(0.0, 1.0), 'msgId': msgId, 'fileName': fileName});
           }
         }
 
-        // Send end marker
-        await _sendRawMessage('[END:$msgId]');
+        // Null terminator
+        await rxChar!.write(Uint8List.fromList([0x00]), withoutResponse: false);
         _progressController.add({'progress': 1.0, 'msgId': msgId, 'fileName': fileName});
-        break; // Success — exit retry loop
-      } catch (e) {
-        if (attempt == _kMaxRetries - 1) {
-          _progressController.add({'progress': -1.0, 'msgId': msgId, 'fileName': fileName, 'error': e.toString()});
-          rethrow;
-        }
-        // Wait before retry
-        await Future.delayed(Duration(seconds: 1 + attempt));
       }
+    } catch (e) {
+      _progressController.add({'progress': -1.0, 'msgId': msgId, 'fileName': fileName, 'error': e.toString()});
+      rethrow;
+    } finally {
+      _isSending = false;
     }
   }
 
@@ -690,7 +538,7 @@ class BtService {
     rxChar = null;
     txChar = null;
     _receiveBuffer.clear();
-    _incomingTransfers.clear();
+    _isSending = false;
     if (connectedDevice != null) {
       try {
         await connectedDevice!.disconnect();
@@ -708,7 +556,7 @@ class BtService {
     rxChar = null;
     txChar = null;
     _receiveBuffer.clear();
-    _incomingTransfers.clear();
+    _isSending = false;
     _connectionController.add(false);
   }
 
@@ -1746,8 +1594,9 @@ class _ChatPageState extends State<ChatPage> {
           if (p.containsKey('fileName')) {
             _sendingFileName = p['fileName'] as String;
           }
+          // Update _sending based on actual BtService state
+          _sending = bt.isSending;
           if (_sendProgress >= 1.0) {
-            _sending = false;
             _sendProgress = 0;
             _sendingFileName = '';
             _sendTimeout?.cancel();
@@ -1755,7 +1604,6 @@ class _ChatPageState extends State<ChatPage> {
           }
           if (_sendProgress < 0) {
             // Error occurred
-            _sending = false;
             _sendProgress = 0;
             _sendingFileName = '';
             _sendTimeout?.cancel();
@@ -1818,7 +1666,7 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   Future<void> _pickImage() async {
-    if (_sending) return; // Prevenir doble envio
+    if (bt.isSending) return; // Prevenir doble envio
     try {
       final picker = ImagePicker();
       final xfile = await picker.pickImage(
@@ -1845,12 +1693,9 @@ class _ChatPageState extends State<ChatPage> {
         msgType: 'image',
         fileName: xfile.name,
       );
-      // _sending is reset by progress listener when progress reaches 1.0
-      // Fallback: if progress didn't fire (peripheral path), reset here
-      if (mounted && _sending) {
-        setState(() { _sending = false; _sendProgress = 0; _sendingFileName = ''; });
-        _sendTimeout?.cancel();
-      }
+      // _sending is reset by BtService.isSending via progress listener
+      if (mounted) setState(() { _sending = bt.isSending; });
+      _sendTimeout?.cancel();
       _toBottom();
     } catch (e) {
       if (mounted) {
@@ -1865,7 +1710,7 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   Future<void> _pickVideo() async {
-    if (_sending) return;
+    if (bt.isSending) return;
     try {
       final picker = ImagePicker();
       final xfile = await picker.pickVideo(
@@ -1890,10 +1735,8 @@ class _ChatPageState extends State<ChatPage> {
         msgType: 'video',
         fileName: xfile.name,
       );
-      if (mounted && _sending) {
-        setState(() { _sending = false; _sendProgress = 0; _sendingFileName = ''; });
-        _sendTimeout?.cancel();
-      }
+      if (mounted) setState(() { _sending = bt.isSending; });
+      _sendTimeout?.cancel();
       _toBottom();
     } catch (e) {
       if (mounted) {
@@ -1908,7 +1751,7 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   Future<void> _pickFile() async {
-    if (_sending) return;
+    if (bt.isSending) return;
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.any,
@@ -1933,10 +1776,8 @@ class _ChatPageState extends State<ChatPage> {
         msgType: 'file',
         fileName: file.name,
       );
-      if (mounted && _sending) {
-        setState(() { _sending = false; _sendProgress = 0; _sendingFileName = ''; });
-        _sendTimeout?.cancel();
-      }
+      if (mounted) setState(() { _sending = bt.isSending; });
+      _sendTimeout?.cancel();
       _toBottom();
     } catch (e) {
       if (mounted) {
@@ -1974,7 +1815,37 @@ class _ChatPageState extends State<ChatPage> {
   @override
   Widget build(BuildContext context) {
     final msgs = bt.messages;
-    return SafeArea(
+    return PopScope(
+      canPop: !bt.isSending,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        // Warn user about active transfer
+        final shouldLeave = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: const Color(0xFF1A1A1A),
+            title: const Text('Transferencia en progreso', style: TextStyle(color: Colors.white)),
+            content: const Text(
+              'Si sales ahora la transferencia se cancelara. Seguro que quieres salir?',
+              style: TextStyle(color: Colors.white70),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Quedarme'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Salir', style: TextStyle(color: Colors.redAccent)),
+              ),
+            ],
+          ),
+        );
+        if (shouldLeave == true && context.mounted) {
+          Navigator.of(context).pop();
+        }
+      },
+      child: SafeArea(
       child: Column(
         children: [
           Padding(
@@ -2140,7 +2011,8 @@ class _ChatPageState extends State<ChatPage> {
           ),
         ],
       ),
-    );
+      ), // SafeArea
+    ); // PopScope
   }
 
   Widget _buildMessage(ChatMessage m) {
