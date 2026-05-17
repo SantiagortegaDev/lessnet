@@ -198,6 +198,24 @@ const int _kBleWriteSize = 200; // bytes por write BLE (MTU-safe)
 const int _kMaxFileSize = 2 * 1024 * 1024; // 2 MB
 const int _kPeripheralNotifyDelayMs = 10; // ms entre notificaciones (peripheral)
 
+// ─── Per-connection data for Central mode ───
+class _CentralConnection {
+  final BluetoothDevice device;
+  BluetoothCharacteristic? rxChar;
+  BluetoothCharacteristic? txChar;
+  StreamSubscription? txSub;
+  StreamSubscription? connSub;
+  final List<int> receiveBuffer = [];
+
+  _CentralConnection(this.device);
+
+  String get id => device.platformName.isNotEmpty
+      ? device.platformName
+      : device.remoteId.toString();
+
+  String get name => device.platformName.isEmpty ? 'Dispositivo' : device.platformName;
+}
+
 class BtService {
   static final BtService _instance = BtService._internal();
   factory BtService() => _instance;
@@ -205,11 +223,18 @@ class BtService {
     _setupPeripheralChannel();
   }
 
-  BluetoothDevice? connectedDevice;
-  BluetoothCharacteristic? rxChar;
-  BluetoothCharacteristic? txChar;
-  StreamSubscription? _txSub;
-  StreamSubscription? _connSub;
+  // ─── Multi-connection: Central connections map ───
+  final Map<String, _CentralConnection> _centralConnections = {};
+
+  // Keep "active" device = last connected / currently focused
+  String _activeDeviceId = '';
+
+  // ─── Legacy single-connection fields (kept for backward compat) ───
+  BluetoothDevice? connectedDevice; // points to active device
+  BluetoothCharacteristic? rxChar;   // points to active device's rx
+  BluetoothCharacteristic? txChar;   // points to active device's tx
+  StreamSubscription? _txSub;        // active device tx sub
+  StreamSubscription? _connSub;      // active device conn sub
   final List<int> _receiveBuffer = [];
   bool _isConnecting = false;
   bool _isSending = false;
@@ -243,15 +268,31 @@ class BtService {
   bool get isAdvertising => _isAdvertising;
   bool get isPeripheralConnected => _peripheralConnected;
   bool get isConnected =>
-      connectedDevice != null || _peripheralConnected;
+      _centralConnections.isNotEmpty || _peripheralConnected;
   bool get connecting => _isConnecting;
   String get advertisingError => _advertisingError;
 
+  // ─── Multi-connection helpers ───
+  List<String> get connectedDeviceIds => _centralConnections.keys.toList();
+  int get centralConnectionCount => _centralConnections.length;
+  bool isDeviceConnected(String deviceId) => _centralConnections.containsKey(deviceId);
+
+  String get activeDeviceId => _activeDeviceId;
+
+  void setActiveDevice(String deviceId) {
+    if (_centralConnections.containsKey(deviceId)) {
+      _activeDeviceId = deviceId;
+      final conn = _centralConnections[deviceId]!;
+      connectedDevice = conn.device;
+      rxChar = conn.rxChar;
+      txChar = conn.txChar;
+      _connectionController.add(true);
+    }
+  }
+
   String get connectedName {
-    if (connectedDevice != null) {
-      return connectedDevice!.platformName.isEmpty
-          ? 'Dispositivo'
-          : connectedDevice!.platformName;
+    if (_activeDeviceId.isNotEmpty && _centralConnections.containsKey(_activeDeviceId)) {
+      return _centralConnections[_activeDeviceId]!.name;
     }
     if (_peripheralConnected) {
       return _peripheralDeviceName.isEmpty
@@ -262,15 +303,23 @@ class BtService {
   }
 
   String get connectedDeviceId {
-    if (connectedDevice != null) {
-      return connectedDevice!.platformName.isNotEmpty
-          ? connectedDevice!.platformName
-          : connectedDevice!.remoteId.toString();
+    if (_activeDeviceId.isNotEmpty) {
+      return _activeDeviceId;
     }
     if (_peripheralConnected && _peripheralDeviceName.isNotEmpty) {
       return _peripheralDeviceName;
     }
     return '';
+  }
+
+  String getDeviceName(String deviceId) {
+    if (_centralConnections.containsKey(deviceId)) {
+      return _centralConnections[deviceId]!.name;
+    }
+    if (_peripheralConnected && _peripheralDeviceName == deviceId) {
+      return _peripheralDeviceName;
+    }
+    return deviceId.isEmpty ? 'General' : deviceId;
   }
 
   // ─── CRC32 ───
@@ -371,59 +420,144 @@ class BtService {
     _statusController.add('Conectando...');
 
     try {
-      await _cleanupPreConnect();
+      final deviceId = device.platformName.isNotEmpty
+          ? device.platformName
+          : device.remoteId.toString();
+
+      // Check if already connected to this device
+      if (_centralConnections.containsKey(deviceId)) {
+        _statusController.add('Ya conectado a ${_centralConnections[deviceId]!.name}');
+        return;
+      }
+
+      // DON'T disconnect existing connections — support multi-connect!
+      // Only clean up if connecting to the same device
+      if (_centralConnections.containsKey(deviceId)) {
+        await _cleanupSingleConnection(deviceId);
+      }
+
       await device.connect(timeout: const Duration(seconds: 20));
-      connectedDevice = device;
-      _connectionController.add(true);
 
       try {
         await device.requestMtu(512);
       } catch (_) {}
 
       final services = await device.discoverServices();
+      BluetoothCharacteristic? foundRx;
+      BluetoothCharacteristic? foundTx;
       for (final service in services) {
         if (service.uuid.str128.toLowerCase() ==
             lessnetServiceUuid.toLowerCase()) {
           for (final char in service.characteristics) {
             if (char.uuid.str128.toLowerCase() ==
                 lessnetCharRxUuid.toLowerCase()) {
-              rxChar = char;
+              foundRx = char;
             } else if (char.uuid.str128.toLowerCase() ==
                 lessnetCharTxUuid.toLowerCase()) {
-              txChar = char;
+              foundTx = char;
             }
           }
         }
       }
 
-      if (txChar != null) {
-        _receiveBuffer.clear();
-        final notifyOk = await txChar!.setNotifyValue(true);
+      // Store in multi-connection map
+      final conn = _CentralConnection(device);
+      conn.rxChar = foundRx;
+      conn.txChar = foundTx;
+      _centralConnections[deviceId] = conn;
+
+      // Set as active device
+      _activeDeviceId = deviceId;
+      connectedDevice = device;
+      rxChar = foundRx;
+      txChar = foundTx;
+
+      if (foundTx != null) {
+        conn.receiveBuffer.clear();
+        final notifyOk = await foundTx.setNotifyValue(true);
         if (!notifyOk) {
           await Future.delayed(const Duration(milliseconds: 200));
-          await txChar!.setNotifyValue(true);
+          await foundTx.setNotifyValue(true);
         }
-        _txSub = txChar!.onValueChangedStream.listen((value) {
+        conn.txSub = foundTx.onValueChangedStream.listen((value) {
           if (value.isNotEmpty) {
-            _handleReceivedData(value);
+            _handleReceivedDataForDevice(value, deviceId);
           }
         });
       }
 
-      _connSub = device.connectionState.listen((state) {
+      conn.connSub = device.connectionState.listen((state) {
         if (state == BluetoothConnectionState.disconnected) {
-          _statusController.add('Desconectado');
-          _cleanup();
+          _centralConnections.remove(deviceId);
+          if (_activeDeviceId == deviceId) {
+            _activeDeviceId = _centralConnections.keys.isNotEmpty
+                ? _centralConnections.keys.first
+                : '';
+            if (_activeDeviceId.isNotEmpty) {
+              setActiveDevice(_activeDeviceId);
+            } else {
+              connectedDevice = null;
+              rxChar = null;
+              txChar = null;
+            }
+          }
+          _statusController.add('Desconectado: ${conn.name}');
+          _connectionController.add(isConnected);
         }
       });
 
-      _statusController.add('Conectado');
+      _connectionController.add(true);
+      _statusController.add('Conectado: ${conn.name}');
     } catch (e) {
       _statusController.add('Error: $e');
-      _cleanup();
       rethrow;
     } finally {
       _isConnecting = false;
+    }
+  }
+
+  void _handleReceivedDataForDevice(List<int> value, String deviceId) {
+    final conn = _centralConnections[deviceId];
+    if (conn == null) return;
+    for (int i = 0; i < value.length; i++) {
+      if (value[i] == 0x00) {
+        if (conn.receiveBuffer.isNotEmpty) {
+          final text = utf8.decode(conn.receiveBuffer, allowMalformed: true);
+          conn.receiveBuffer.clear();
+          if (text.isNotEmpty) {
+            // Temporarily set active device for _processReceivedText
+            final prevActive = _activeDeviceId;
+            _activeDeviceId = deviceId;
+            _processReceivedText(text);
+            _activeDeviceId = prevActive;
+          }
+        }
+      } else {
+        conn.receiveBuffer.add(value[i]);
+      }
+    }
+  }
+
+  Future<void> _cleanupSingleConnection(String deviceId) async {
+    final conn = _centralConnections.remove(deviceId);
+    if (conn != null) {
+      conn.txSub?.cancel();
+      conn.connSub?.cancel();
+      try {
+        await conn.device.disconnect();
+      } catch (_) {}
+    }
+    if (_activeDeviceId == deviceId) {
+      _activeDeviceId = _centralConnections.keys.isNotEmpty
+          ? _centralConnections.keys.first
+          : '';
+      if (_activeDeviceId.isNotEmpty) {
+        setActiveDevice(_activeDeviceId);
+      } else {
+        connectedDevice = null;
+        rxChar = null;
+        txChar = null;
+      }
     }
   }
 
@@ -574,32 +708,36 @@ class BtService {
   }
 
   // ─── Send raw BLE message with MTU-aware chunks ───
-  Future<void> _sendRawMessage(String text) async {
+  Future<void> _sendRawMessage(String text, {String? deviceId}) async {
     final bytes = utf8.encode(text);
     if (_isPeripheral && _peripheralConnected) {
       // Peripheral: send via Kotlin (handles notifications internally)
       await _peripheralChannel.invokeMethod('sendData', {'data': text});
-    } else if (rxChar != null) {
-      // Central: write in 200-byte chunks, no delay needed
-      // (withoutResponse: false blocks until ACK from peripheral)
-      for (int i = 0; i < bytes.length; i += _kBleWriteSize) {
-        final end = i + _kBleWriteSize > bytes.length ? bytes.length : i + _kBleWriteSize;
-        final chunk = bytes.sublist(i, end);
-        await rxChar!.write(Uint8List.fromList(chunk), withoutResponse: false);
+    } else {
+      // Central: find the right connection
+      final targetId = deviceId ?? _activeDeviceId;
+      final conn = _centralConnections[targetId];
+      if (conn?.rxChar != null) {
+        for (int i = 0; i < bytes.length; i += _kBleWriteSize) {
+          final end = i + _kBleWriteSize > bytes.length ? bytes.length : i + _kBleWriteSize;
+          final chunk = bytes.sublist(i, end);
+          await conn!.rxChar!.write(Uint8List.fromList(chunk), withoutResponse: false);
+        }
+        // Null terminator
+        await conn.rxChar!.write(Uint8List.fromList([0x00]), withoutResponse: false);
       }
-      // Null terminator
-      await rxChar!.write(Uint8List.fromList([0x00]), withoutResponse: false);
     }
   }
 
-  Future<void> sendMessage(String text) async {
+  Future<void> sendMessage(String text, {String? deviceId}) async {
     if (text.isEmpty) return;
-    final msg = ChatMessage(id: DateTime.now().microsecondsSinceEpoch.toString(), text: text, mine: true, time: DateTime.now(), deviceId: connectedDeviceId);
+    final targetId = deviceId ?? _activeDeviceId;
+    final msg = ChatMessage(id: DateTime.now().microsecondsSinceEpoch.toString(), text: text, mine: true, time: DateTime.now(), deviceId: targetId);
     messages.add(msg);
     _msgController.add(msg);
     MessageDB.insert(msg);
 
-    await _sendRawMessage(text);
+    await _sendRawMessage(text, deviceId: deviceId);
   }
 
   // ─── File send — simple protocol, one message, MTU-aware ───
@@ -607,6 +745,7 @@ class BtService {
     required String localPath,
     required String msgType, // 'image', 'video', 'file'
     required String fileName,
+    String? deviceId,
   }) async {
     final file = File(localPath);
     final bytes = await file.readAsBytes();
@@ -616,6 +755,7 @@ class BtService {
     final typeCode = msgType == 'image' ? 'img' : (msgType == 'video' ? 'vid' : 'file');
 
     final msgId = DateTime.now().microsecondsSinceEpoch.toString();
+    final targetId = deviceId ?? _activeDeviceId;
 
     // Create local message
     final msg = ChatMessage(
@@ -627,7 +767,7 @@ class BtService {
       fileName: fileName,
       filePath: localPath,
       fileSize: fileSize,
-      deviceId: connectedDeviceId,
+      deviceId: targetId,
     );
     messages.add(msg);
     _msgController.add(msg);
@@ -644,27 +784,28 @@ class BtService {
       if (_isPeripheral && _peripheralConnected) {
         // Peripheral: use Kotlin sendData (handles notifications + progress)
         await _peripheralChannel.invokeMethod('sendFile', {'data': payload});
-      } else if (rxChar != null) {
-        // Central: write in 200-byte chunks
-        // withoutResponse: false = write request = blocks until ACK = reliable
-        final totalWrites = (payloadBytes.length / _kBleWriteSize).ceil() + 1; // +1 for null term
-        int writesDone = 0;
+      } else {
+        // Central: find the right connection
+        final conn = _centralConnections[targetId];
+        if (conn?.rxChar != null) {
+          final totalWrites = (payloadBytes.length / _kBleWriteSize).ceil() + 1;
+          int writesDone = 0;
 
-        for (int i = 0; i < payloadBytes.length; i += _kBleWriteSize) {
-          final end = i + _kBleWriteSize > payloadBytes.length ? payloadBytes.length : i + _kBleWriteSize;
-          final chunk = payloadBytes.sublist(i, end);
-          await rxChar!.write(Uint8List.fromList(chunk), withoutResponse: false);
-          writesDone++;
-          // Report progress every 5 writes to avoid UI spam
-          if (writesDone % 5 == 0 || i + _kBleWriteSize >= payloadBytes.length) {
-            final progress = (i + _kBleWriteSize) / payloadBytes.length;
-            _progressController.add({'progress': progress.clamp(0.0, 1.0), 'msgId': msgId, 'fileName': fileName});
+          for (int i = 0; i < payloadBytes.length; i += _kBleWriteSize) {
+            final end = i + _kBleWriteSize > payloadBytes.length ? payloadBytes.length : i + _kBleWriteSize;
+            final chunk = payloadBytes.sublist(i, end);
+            await conn!.rxChar!.write(Uint8List.fromList(chunk), withoutResponse: false);
+            writesDone++;
+            if (writesDone % 5 == 0 || i + _kBleWriteSize >= payloadBytes.length) {
+              final progress = (i + _kBleWriteSize) / payloadBytes.length;
+              _progressController.add({'progress': progress.clamp(0.0, 1.0), 'msgId': msgId, 'fileName': fileName});
+            }
           }
-        }
 
-        // Null terminator
-        await rxChar!.write(Uint8List.fromList([0x00]), withoutResponse: false);
-        _progressController.add({'progress': 1.0, 'msgId': msgId, 'fileName': fileName});
+          // Null terminator
+          await conn.rxChar!.write(Uint8List.fromList([0x00]), withoutResponse: false);
+          _progressController.add({'progress': 1.0, 'msgId': msgId, 'fileName': fileName});
+        }
       }
     } catch (e) {
       _progressController.add({'progress': -1.0, 'msgId': msgId, 'fileName': fileName, 'error': e.toString()});
@@ -675,6 +816,7 @@ class BtService {
   }
 
   Future<void> _cleanupPreConnect() async {
+    // Clean up legacy single-connection subscriptions only
     _txSub?.cancel();
     _txSub = null;
     _connSub?.cancel();
@@ -683,12 +825,7 @@ class BtService {
     txChar = null;
     _receiveBuffer.clear();
     _isSending = false;
-    if (connectedDevice != null) {
-      try {
-        await connectedDevice!.disconnect();
-      } catch (_) {}
-      connectedDevice = null;
-    }
+    // DON'T disconnect existing central connections here
   }
 
   void _cleanup() {
@@ -701,18 +838,22 @@ class BtService {
     txChar = null;
     _receiveBuffer.clear();
     _isSending = false;
-    _connectionController.add(false);
+    _connectionController.add(isConnected);
+  }
+
+  Future<void> disconnectDevice(String deviceId) async {
+    await _cleanupSingleConnection(deviceId);
+    _connectionController.add(isConnected);
   }
 
   Future<void> disconnect() async {
     _statusController.add('Desconectando...');
-    if (connectedDevice != null) {
-      try {
-        await connectedDevice!.disconnect();
-      } catch (_) {}
+    // Disconnect all central connections
+    for (final deviceId in _centralConnections.keys.toList()) {
+      await _cleanupSingleConnection(deviceId);
     }
     if (_isPeripheral) await stopAdvertising();
-    _cleanup();
+    _connectionController.add(false);
   }
 
   void dispose() {
@@ -1435,7 +1576,6 @@ class _ScanPageState extends State<ScanPage> {
 
   @override
   Widget build(BuildContext context) {
-    final conn = bt.isConnected;
     final sorted = List<ScanResult>.from(_results)..sort((a, b) {
       final aL = a.advertisementData.serviceUuids.any(
           (u) => u.str128.toLowerCase() == lessnetServiceUuid.toLowerCase());
@@ -1455,49 +1595,55 @@ class _ScanPageState extends State<ScanPage> {
             _Header(
               'Dispositivos',
               Icons.bluetooth_searching,
-              conn
-                  ? 'Conectado: ${bt.connectedName}'
+              bt.centralConnectionCount > 0
+                  ? '${bt.centralConnectionCount} conectado${bt.centralConnectionCount > 1 ? 's' : ''}'
                   : bt.isAdvertising
                       ? 'Visible'
                       : 'Sin conexion',
-              subtitleColor: conn ? Colors.greenAccent : (bt.isAdvertising ? Colors.blueAccent : Colors.white38),
+              subtitleColor: bt.isConnected ? Colors.greenAccent : (bt.isAdvertising ? Colors.blueAccent : Colors.white38),
             ),
             const SizedBox(height: 16),
 
-            // Connected device card
-            if (conn)
-              Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.08),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                      color: Colors.white.withOpacity(0.15)),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.bluetooth_connected,
-                        color: Colors.white, size: 22),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(bt.connectedName,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                          )),
-                    ),
-                    TextButton(
-                      onPressed: () => bt.disconnect(),
-                      child: const Text('Desconectar',
-                          style: TextStyle(color: Colors.redAccent)),
-                    ),
-                  ],
-                ),
+            // Connected devices cards (show all)
+            ...bt.connectedDeviceIds.map((devId) => Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                    color: devId == bt.activeDeviceId
+                        ? Colors.greenAccent.withOpacity(0.3)
+                        : Colors.white.withOpacity(0.15)),
               ),
+              child: Row(
+                children: [
+                  Icon(
+                    devId == bt.activeDeviceId
+                        ? Icons.bluetooth_connected
+                        : Icons.bluetooth,
+                    color: devId == bt.activeDeviceId ? Colors.greenAccent : Colors.white,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(bt.getDeviceName(devId),
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: devId == bt.activeDeviceId ? FontWeight.w600 : FontWeight.w400,
+                        )),
+                  ),
+                  TextButton(
+                    onPressed: () => bt.disconnectDevice(devId),
+                    child: const Text('Desconectar',
+                        style: TextStyle(color: Colors.redAccent)),
+                  ),
+                ],
+              ),
+            )),
 
             // Advertising indicator
-            if (bt.isAdvertising && !conn)
+            if (bt.isAdvertising && !bt.isConnected)
               Container(
                 margin: const EdgeInsets.only(bottom: 12),
                 padding: const EdgeInsets.all(14),
@@ -1611,7 +1757,7 @@ class _ScanPageState extends State<ScanPage> {
                           : 'Visible',
                       style: const TextStyle(fontSize: 13),
                     ),
-                    onPressed: conn
+                    onPressed: bt.isPeripheralConnected
                         ? null
                         : (bt.isAdvertising
                             ? () {
@@ -1774,7 +1920,7 @@ class _ScanPageState extends State<ScanPage> {
               }),
             ] else if (!_scanning &&
                 !bt.isAdvertising &&
-                !conn)
+                !bt.isConnected)
               Center(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 30),
@@ -1887,13 +2033,9 @@ class _ChatListPageState extends State<ChatListPage> {
 
   @override
   Widget build(BuildContext context) {
-    final currentDeviceId = bt.connectedDeviceId;
+    final currentDeviceId = bt.activeDeviceId;
 
-    // If connected, open the chat for that device directly
-    if (bt.isConnected && currentDeviceId.isNotEmpty) {
-      return ChatPage(deviceId: currentDeviceId);
-    }
-
+    // Show conversation list always (even when connected, for multi-device navigation)
     return SafeArea(
       child: Column(
         children: [
@@ -1904,9 +2046,48 @@ class _ChatListPageState extends State<ChatListPage> {
               Icons.chat_bubble,
               _conversations.isEmpty
                   ? 'Sin conversaciones'
-                  : '${_conversations.length} conversacion${_conversations.length > 1 ? 'es' : ''}',
+                  : bt.centralConnectionCount > 0
+                      ? '${bt.centralConnectionCount} dispositivo${bt.centralConnectionCount > 1 ? 's' : ''} conectado${bt.centralConnectionCount > 1 ? 's' : ''}'
+                      : '${_conversations.length} conversacion${_conversations.length > 1 ? 'es' : ''}',
+              subtitleColor: bt.isConnected ? Colors.greenAccent : Colors.white38,
             ),
           ),
+          // Show currently connected devices as quick-access chips
+          if (bt.centralConnectionCount > 0)
+            Container(
+              height: 44,
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: bt.connectedDeviceIds.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (_, i) {
+                  final devId = bt.connectedDeviceIds[i];
+                  final isActive = devId == currentDeviceId;
+                  return ActionChip(
+                    label: Text(bt.getDeviceName(devId)),
+                    onPressed: () {
+                      bt.setActiveDevice(devId);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ChatPage(deviceId: devId),
+                        ),
+                      ).then((_) => _loadConversations());
+                    },
+                    backgroundColor: isActive ? Colors.white.withOpacity(0.15) : Colors.white.withOpacity(0.05),
+                    labelStyle: TextStyle(
+                      color: isActive ? Colors.white : Colors.white60,
+                      fontSize: 12,
+                      fontWeight: isActive ? FontWeight.w700 : FontWeight.w400,
+                    ),
+                    side: BorderSide(
+                      color: isActive ? Colors.white.withOpacity(0.3) : Colors.white.withOpacity(0.08),
+                    ),
+                  );
+                },
+              ),
+            ),
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator(color: Colors.white))
@@ -2088,15 +2269,19 @@ class _ChatPageState extends State<ChatPage> {
   @override
   void initState() {
     super.initState();
-    _connected = bt.isConnected;
+    _connected = bt.isDeviceConnected(widget.deviceId) || (widget.deviceId.isEmpty && bt.isConnected);
     _loadHistory();
     _msgSub = bt.onMessage.listen((_) {
       if (mounted) setState(() {});
       _toBottom();
     });
     _connSub = bt.onConnectionChange.listen((_) {
-      if (mounted) setState(() => _connected = bt.isConnected);
+      if (mounted) setState(() => _connected = bt.isDeviceConnected(widget.deviceId) || (widget.deviceId.isEmpty && bt.isConnected));
     });
+    // Set active device when entering chat
+    if (widget.deviceId.isNotEmpty && bt.isDeviceConnected(widget.deviceId)) {
+      bt.setActiveDevice(widget.deviceId);
+    }
     _progressSub = bt.onProgress.listen((p) {
       if (mounted && p.containsKey('progress')) {
         setState(() {
@@ -2180,7 +2365,7 @@ class _ChatPageState extends State<ChatPage> {
     if (t.isEmpty) return;
     _ctrl.clear();
     try {
-      await bt.sendMessage(t);
+      await bt.sendMessage(t, deviceId: widget.deviceId);
     } catch (_) {}
     if (mounted) setState(() {});
     _toBottom();
@@ -2213,6 +2398,7 @@ class _ChatPageState extends State<ChatPage> {
         localPath: xfile.path,
         msgType: 'image',
         fileName: xfile.name,
+        deviceId: widget.deviceId,
       );
       // _sending is reset by BtService.isSending via progress listener
       if (mounted) setState(() { _sending = bt.isSending; });
@@ -2255,6 +2441,7 @@ class _ChatPageState extends State<ChatPage> {
         localPath: xfile.path,
         msgType: 'video',
         fileName: xfile.name,
+        deviceId: widget.deviceId,
       );
       if (mounted) setState(() { _sending = bt.isSending; });
       _sendTimeout?.cancel();
@@ -2296,6 +2483,7 @@ class _ChatPageState extends State<ChatPage> {
         localPath: file.path!,
         msgType: 'file',
         fileName: file.name,
+        deviceId: widget.deviceId,
       );
       if (mounted) setState(() { _sending = bt.isSending; });
       _sendTimeout?.cancel();
