@@ -30,6 +30,15 @@ jobs:
           cp android/app/src/main/AndroidManifest.xml /tmp/AndroidManifest_backup.xml
           cp android/app/build.gradle /tmp/build_gradle_backup 2>/dev/null || true
 
+          # Backup custom app icon and splash resources
+          cp -r android/app/src/main/res/mipmap-mdpi /tmp/mipmap_mdpi 2>/dev/null || true
+          cp -r android/app/src/main/res/mipmap-hdpi /tmp/mipmap_hdpi 2>/dev/null || true
+          cp -r android/app/src/main/res/mipmap-xhdpi /tmp/mipmap_xhdpi 2>/dev/null || true
+          cp -r android/app/src/main/res/mipmap-xxhdpi /tmp/mipmap_xxhdpi 2>/dev/null || true
+          cp -r android/app/src/main/res/mipmap-xxxhdpi /tmp/mipmap_xxxhdpi 2>/dev/null || true
+          cp -r android/app/src/main/res/drawable /tmp/drawable_backup 2>/dev/null || true
+          cp android/app/src/main/res/values/styles.xml /tmp/styles_backup.xml 2>/dev/null || true
+
           # Create a fresh Flutter project with correct name and org
           cd /tmp
           flutter create --org com.lessnet --project-name app lessnet_fresh
@@ -40,6 +49,22 @@ jobs:
 
           # Restore our AndroidManifest with BT + storage permissions
           cp /tmp/AndroidManifest_backup.xml "$GITHUB_WORKSPACE/android/app/src/main/AndroidManifest.xml"
+
+          # Restore custom app icon (mipmap) and splash screen (drawable + styles)
+          RES_DIR="$GITHUB_WORKSPACE/android/app/src/main/res"
+          for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+            if [ -d "/tmp/mipmap_${density}" ]; then
+              rm -rf "$RES_DIR/mipmap-${density}"
+              cp -r "/tmp/mipmap_${density}" "$RES_DIR/mipmap-${density}"
+            fi
+          done
+          if [ -d "/tmp/drawable_backup" ]; then
+            rm -rf "$RES_DIR/drawable"
+            cp -r /tmp/drawable_backup "$RES_DIR/drawable"
+          fi
+          if [ -f "/tmp/styles_backup.xml" ]; then
+            cp /tmp/styles_backup.xml "$RES_DIR/values/styles.xml"
+          fi
 
           # Patch build.gradle with our SDK versions and permission_handler config
           if [ -f /tmp/build_gradle_backup ]; then
