@@ -1689,6 +1689,10 @@ class _PermissionsGatePageState extends State<PermissionsGatePage> {
         Permission.bluetoothConnect, 'Conectarse a dispositivos'),
     _PermItem('Bluetooth Advertise', Icons.broadcast_on_personal,
         Permission.bluetoothAdvertise, 'Hacerse visible'),
+    _PermItem('Fotos y Videos', Icons.photo_camera,
+        Permission.photos, 'Enviar imagenes y videos'),
+    _PermItem('Microfono', Icons.mic,
+        Permission.microphone, 'Grabar audio y video'),
   ];
 
   final Map<Permission, PermissionStatus> _statuses = {};
@@ -2433,30 +2437,27 @@ class _ScanPageState extends State<ScanPage> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(displayName,
-                                    style: TextStyle(
-                                      color: isLN
-                                          ? Colors.white
-                                          : Colors.white60,
+                                    style: const TextStyle(
+                                      color: Colors.white,
                                       fontWeight: FontWeight.w600,
                                       fontSize: 13,
                                     )),
-                                if (isLN)
-                                  Container(
-                                    padding: const EdgeInsets
-                                        .symmetric(
-                                        horizontal: 5, vertical: 1),
-                                    decoration: BoxDecoration(
-                                      color: Color(0x1FFFFFFF),
-                                      borderRadius:
-                                          BorderRadius.circular(3),
-                                    ),
-                                    child: const Text('LessNet',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 8,
-                                          fontWeight: FontWeight.w700,
-                                        )),
+                                Container(
+                                  padding: const EdgeInsets
+                                      .symmetric(
+                                      horizontal: 5, vertical: 1),
+                                  decoration: BoxDecoration(
+                                    color: Color(0x1FFFFFFF),
+                                    borderRadius:
+                                        BorderRadius.circular(3),
                                   ),
+                                  child: const Text('LessNet',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 8,
+                                        fontWeight: FontWeight.w700,
+                                      )),
+                                ),
                                 Text(
                                   r.device.remoteId.toString(),
                                   style: const TextStyle(
@@ -4262,7 +4263,7 @@ class _VaultHomePageState extends State<VaultHomePage> {
       _VaultSection(
         Icons.map,
         'Mapa de Emergencias',
-        '54 puntos en Colombia',
+        '74 puntos en Colombia (incluye hospitales)',
         Colors.greenAccent,
         const EmergencyMapPage(),
       ),
@@ -4272,6 +4273,13 @@ class _VaultHomePageState extends State<VaultHomePage> {
         'Traduccion con IA, descarga modelos',
         Colors.blueAccent,
         const TranslatorPage(),
+      ),
+      _VaultSection(
+        Icons.flashlight_on,
+        'Codigo Morse',
+        'Señal de luz con linterna',
+        Colors.amberAccent,
+        const MorseCodePage(),
       ),
     ];
 
@@ -5310,6 +5318,10 @@ class _EmergencyMapPageState extends State<EmergencyMapPage> {
   List<dynamic> _features = [];
   bool _loading = true;
   String _filter = 'all';
+  bool _showMap = true;
+  Offset _offset = Offset.zero;
+  double _scale = 1.0;
+  int? _selectedIdx;
 
   @override
   void initState() {
@@ -5370,10 +5382,22 @@ class _EmergencyMapPageState extends State<EmergencyMapPage> {
                 t == 'capital_departamento';
           }
           if (_filter == 'hospitales') {
-            return t == 'hospital_referencia';
+            return t == 'hospital_referencia' || (p?['hospital'] == true);
+          }
+          if (_filter == 'ciudades') {
+            return t == 'municipio' || t == 'ciudad_principal';
           }
           return true;
         }).toList();
+
+  // Convert lat/lng to screen coordinates within a bounding box
+  // Colombia bounds: lat ~-4.5 to ~13.5, lng ~-79.5 to ~-66.5
+  Offset _latLngToOffset(double lng, double lat, Size size) {
+    const minLng = -79.5, maxLng = -66.5, minLat = -4.5, maxLat = 13.5;
+    final x = ((lng - minLng) / (maxLng - minLng)) * size.width;
+    final y = (1.0 - (lat - minLat) / (maxLat - minLat)) * size.height;
+    return Offset(x, y);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -5381,10 +5405,17 @@ class _EmergencyMapPageState extends State<EmergencyMapPage> {
       backgroundColor: const Color(0xFF0A0A0A),
       appBar: AppBar(
         backgroundColor: const Color(0xFF111111),
-        title: const Text('Emergencias Colombia',
+        title: const Text('Mapa Colombia',
             style: TextStyle(color: Colors.white)),
         iconTheme:
             const IconThemeData(color: Colors.white),
+        actions: [
+          IconButton(
+            onPressed: () => setState(() => _showMap = !_showMap),
+            icon: Icon(_showMap ? Icons.list : Icons.map, color: Colors.white),
+            tooltip: _showMap ? 'Vista lista' : 'Vista mapa',
+          ),
+        ],
       ),
       body: _loading
           ? const Center(
@@ -5406,95 +5437,191 @@ class _EmergencyMapPageState extends State<EmergencyMapPage> {
                   ),
                 ),
                 Expanded(
-                  child: _filtered.isEmpty
-                      ? Center(
-                          child: Text('Sin resultados',
-                              style: TextStyle(
-                                  color: Colors.white24)))
-                      : ListView.builder(
-                          itemCount: _filtered.length,
-                          itemBuilder: (_, i) {
-                            final f = _filtered[i]
-                                as Map<String, dynamic>;
-                            final p = f['properties']
-                                    as Map<String, dynamic>? ??
-                                {};
-                            final t = p['tipo'] ?? '';
-                            return Container(
-                              margin:
-                                  const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 3),
-                              child: Material(
-                                color: Color(0x0AFFFFFF),
-                                borderRadius:
-                                    BorderRadius.circular(10),
-                                child: ListTile(
-                                  dense: true,
-                                  leading: Icon(_typeIcon(t),
-                                      color: _typeColor(t),
-                                      size: 20),
-                                  title: Text(p['nombre'] ?? '',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 13,
-                                      )),
-                                  subtitle: Text(
-                                    '${p['departamento'] ?? ''} - ${p['descripcion'] ?? ''}',
-                                    style: TextStyle(
-                                      color: Color(0x4DFFFFFF),
-                                      fontSize: 11,
-                                    ),
-                                    maxLines: 1,
-                                    overflow:
-                                        TextOverflow.ellipsis,
-                                  ),
-                                  trailing: p['emergencia'] !=
-                                          null
-                                      ? Container(
-                                          padding:
-                                              const EdgeInsets
-                                                  .symmetric(
-                                                  horizontal: 5,
-                                                  vertical: 1),
-                                          decoration:
-                                              BoxDecoration(
-                                            color: Color(0x1FF44336),
-                                            borderRadius:
-                                                BorderRadius
-                                                    .circular(3),
-                                          ),
-                                          child: Text(
-                                            '${p['emergencia']}',
-                                            style:
-                                                const TextStyle(
-                                              color:
-                                                  Colors.redAccent,
-                                              fontSize: 9,
-                                              fontWeight:
-                                                  FontWeight.w700,
-                                            ),
-                                          ),
-                                        )
-                                      : null,
-                                  onTap: () => Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) =>
-                                          _MapDetailPage(
-                                              props: p),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
+                  child: _showMap ? _buildMapView() : _buildListView(),
                 ),
               ],
             ),
     );
+  }
+
+  Widget _buildMapView() {
+    final filtered = _filtered;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final mapSize = Size(constraints.maxWidth, constraints.maxHeight);
+        return GestureDetector(
+          onScaleStart: (_) {},
+          onScaleUpdate: (details) {
+            setState(() {
+              _scale = (_scale * details.scale).clamp(0.5, 5.0);
+              _offset += details.focalPointDelta;
+            });
+          },
+          onTapUp: (details) {
+            final tapPos = (details.localPosition - _offset) / _scale;
+            // Find closest point
+            int? closest;
+            double minDist = 20; // min tap distance in pixels
+            for (int i = 0; i < filtered.length; i++) {
+              final f = filtered[i] as Map<String, dynamic>;
+              final geom = f['geometry'] as Map<String, dynamic>?;
+              final coords = geom?['coordinates'] as List?;
+              if (coords == null || coords.length < 2) continue;
+              final lng = (coords[0] as num).toDouble();
+              final lat = (coords[1] as num).toDouble();
+              final pos = _latLngToOffset(lng, lat, mapSize);
+              final dist = (pos - tapPos).distance;
+              if (dist < minDist) {
+                minDist = dist;
+                closest = i;
+              }
+            }
+            setState(() => _selectedIdx = closest);
+          },
+          child: ClipRect(
+            child: Stack(
+              children: [
+                Transform.translate(
+                  offset: _offset,
+                  child: Transform.scale(
+                    scale: _scale,
+                    alignment: Alignment.topLeft,
+                    child: CustomPaint(
+                      size: mapSize,
+                      painter: _ColombiaMapPainter(
+                        features: filtered,
+                        selectedIdx: _selectedIdx,
+                      ),
+                    ),
+                  ),
+                ),
+                // Selected point info
+                if (_selectedIdx != null && _selectedIdx! < filtered.length)
+                  Positioned(
+                    left: 12,
+                    bottom: 12,
+                    right: 12,
+                    child: _MapPointCard(
+                      feature: filtered[_selectedIdx!] as Map<String, dynamic>,
+                      onTap: () {
+                        final f = filtered[_selectedIdx!] as Map<String, dynamic>;
+                        final p = f['properties'] as Map<String, dynamic>? ?? {};
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => _MapDetailPage(props: p),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                // Legend
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Color(0xDD000000),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _legendDot(Colors.white, 'Capital'),
+                        const SizedBox(height: 4),
+                        _legendDot(Colors.grey, 'Cap. Depto'),
+                        const SizedBox(height: 4),
+                        _legendDot(Colors.redAccent, 'Hospital'),
+                        const SizedBox(height: 4),
+                        _legendDot(Colors.greenAccent, 'Ciudad'),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _legendDot(Color color, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+        const SizedBox(width: 4),
+        Text(label, style: const TextStyle(color: Colors.white70, fontSize: 10)),
+      ],
+    );
+  }
+
+  Widget _buildListView() {
+    final filtered = _filtered;
+    return filtered.isEmpty
+        ? Center(
+            child: Text('Sin resultados',
+                style: TextStyle(color: Colors.white24)))
+        : ListView.builder(
+            itemCount: filtered.length,
+            itemBuilder: (_, i) {
+              final f = filtered[i] as Map<String, dynamic>;
+              final p = f['properties'] as Map<String, dynamic>? ?? {};
+              final t = p['tipo'] ?? '';
+              return Container(
+                margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+                child: Material(
+                  color: Color(0x0AFFFFFF),
+                  borderRadius: BorderRadius.circular(10),
+                  child: ListTile(
+                    dense: true,
+                    leading: Icon(_typeIcon(t), color: _typeColor(t), size: 20),
+                    title: Text(p['nombre'] ?? '',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        )),
+                    subtitle: Text(
+                      '${p['departamento'] ?? ''} - ${p['descripcion'] ?? ''}',
+                      style: TextStyle(
+                        color: Color(0x4DFFFFFF),
+                        fontSize: 11,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    trailing: p['emergencia'] != null
+                        ? Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: Color(0x1FF44336),
+                              borderRadius: BorderRadius.circular(3),
+                            ),
+                            child: Text(
+                              '${p['emergencia']}',
+                              style: const TextStyle(
+                                color: Colors.redAccent,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          )
+                        : null,
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => _MapDetailPage(props: p),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          );
   }
 
   Widget _mapFilter(String label, String val) {
@@ -5503,12 +5630,225 @@ class _EmergencyMapPageState extends State<EmergencyMapPage> {
       child: FilterChip(
         label: Text(label),
         selected: _filter == val,
-        onSelected: (_) => setState(() => _filter = val),
+        onSelected: (_) => setState(() { _filter = val; _selectedIdx = null; }),
         backgroundColor: _kCardBgLight,
         selectedColor: _kChipBgActive,
         labelStyle: TextStyle(
           color: _filter == val ? Colors.white : Colors.white54,
           fontSize: 12,
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Custom painter for Colombia map ───
+class _ColombiaMapPainter extends CustomPainter {
+  final List<dynamic> features;
+  final int? selectedIdx;
+
+  _ColombiaMapPainter({required this.features, this.selectedIdx});
+
+  // Colombia bounds
+  static const minLng = -79.5, maxLng = -66.5, minLat = -4.5, maxLat = 13.5;
+
+  Offset _toOffset(double lng, double lat, Size size) {
+    final x = ((lng - minLng) / (maxLng - minLng)) * size.width;
+    final y = (1.0 - (lat - minLat) / (maxLat - minLat)) * size.height;
+    return Offset(x, y);
+  }
+
+  // Simplified Colombia outline polygon
+  static const _colombiaOutline = [
+    [-77.4, 1.2], [-77.1, 1.6], [-76.9, 2.1], [-76.8, 2.6], [-76.9, 2.9],
+    [-77.0, 3.3], [-76.6, 3.9], [-76.4, 4.2], [-76.2, 3.9], [-76.1, 3.5],
+    [-75.8, 3.0], [-75.6, 2.6], [-75.3, 2.2], [-75.0, 1.8], [-74.8, 1.5],
+    [-74.5, 1.2], [-74.2, 0.8], [-73.8, 0.5], [-73.5, 0.2], [-72.8, -0.2],
+    [-72.0, -0.5], [-71.5, -1.0], [-70.8, -1.5], [-70.3, -2.0], [-70.0, -2.5],
+    [-69.5, -3.0], [-69.0, -3.5], [-68.5, -3.8], [-67.5, -2.5], [-67.0, -1.0],
+    [-66.9, 0.5], [-67.0, 1.5], [-67.2, 2.5], [-67.5, 3.5], [-67.8, 4.5],
+    [-68.0, 5.5], [-68.5, 6.5], [-69.0, 7.5], [-69.5, 8.5], [-70.0, 9.0],
+    [-71.0, 9.5], [-72.0, 10.0], [-72.5, 10.5], [-73.0, 11.0], [-73.5, 11.5],
+    [-74.0, 12.0], [-74.5, 12.5], [-75.0, 12.0], [-75.5, 11.5], [-76.0, 11.0],
+    [-76.5, 10.5], [-77.0, 10.0], [-77.2, 9.5], [-77.0, 9.0], [-76.8, 8.5],
+    [-76.5, 8.0], [-76.2, 7.5], [-76.0, 7.0], [-75.8, 6.5], [-75.6, 6.0],
+    [-75.5, 5.5], [-75.8, 5.0], [-76.0, 4.5], [-76.3, 4.0], [-76.5, 3.5],
+    [-76.8, 3.0], [-77.0, 2.5], [-77.2, 2.0], [-77.4, 1.5], [-77.4, 1.2],
+  ];
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Draw Colombia outline
+    final outlinePaint = Paint()
+      ..color = const Color(0xFF2A2A2A)
+      ..style = PaintingStyle.fill;
+    final borderPaint = Paint()
+      ..color = const Color(0xFF444444)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+
+    final outlinePath = Path();
+    for (int i = 0; i < _colombiaOutline.length; i++) {
+      final pt = _toOffset(_colombiaOutline[i][0], _colombiaOutline[i][1], size);
+      if (i == 0) {
+        outlinePath.moveTo(pt.dx, pt.dy);
+      } else {
+        outlinePath.lineTo(pt.dx, pt.dy);
+      }
+    }
+    outlinePath.close();
+    canvas.drawPath(outlinePath, outlinePaint);
+    canvas.drawPath(outlinePath, borderPaint);
+
+    // Draw points
+    for (int i = 0; i < features.length; i++) {
+      final f = features[i] as Map<String, dynamic>;
+      final geom = f['geometry'] as Map<String, dynamic>?;
+      final coords = geom?['coordinates'] as List?;
+      if (coords == null || coords.length < 2) continue;
+
+      final lng = (coords[0] as num).toDouble();
+      final lat = (coords[1] as num).toDouble();
+      final pos = _toOffset(lng, lat, size);
+
+      final p = f['properties'] as Map<String, dynamic>? ?? {};
+      final t = p['tipo'] ?? '';
+      final isHospital = t == 'hospital_referencia' || p['hospital'] == true;
+      final isCapital = t == 'capital_nacional';
+      final isDeptCapital = t == 'capital_departamento';
+
+      Color dotColor;
+      double dotRadius;
+      if (isCapital) {
+        dotColor = Colors.white;
+        dotRadius = 6;
+      } else if (isDeptCapital) {
+        dotColor = Colors.grey;
+        dotRadius = 5;
+      } else if (isHospital) {
+        dotColor = Colors.redAccent;
+        dotRadius = 4;
+      } else {
+        dotColor = Colors.greenAccent;
+        dotRadius = 3;
+      }
+
+      // Glow for selected
+      if (i == selectedIdx) {
+        final glowPaint = Paint()..color = dotColor.withOpacity(0.3);
+        canvas.drawCircle(pos, dotRadius + 8, glowPaint);
+        dotRadius = 8;
+      }
+
+      final dotPaint = Paint()..color = dotColor;
+      canvas.drawCircle(pos, dotRadius, dotPaint);
+
+      // Dark border
+      final borderDot = Paint()
+        ..color = const Color(0xFF0A0A0A)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1;
+      canvas.drawCircle(pos, dotRadius, borderDot);
+
+      // Label for capitals
+      if (isCapital || isDeptCapital) {
+        final tp = TextPainter(
+          text: TextSpan(
+            text: p['nombre'] ?? '',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.8),
+              fontSize: 9,
+              fontWeight: isCapital ? FontWeight.w700 : FontWeight.w500,
+            ),
+          ),
+          textDirection: TextDirection.ltr,
+        );
+        tp.layout();
+        tp.paint(canvas, pos + Offset(dotRadius + 2, -6));
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ColombiaMapPainter oldDelegate) {
+    return features != oldDelegate.features || selectedIdx != oldDelegate.selectedIdx;
+  }
+}
+
+// ─── Map point info card ───
+class _MapPointCard extends StatelessWidget {
+  final Map<String, dynamic> feature;
+  final VoidCallback onTap;
+
+  const _MapPointCard({required this.feature, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = feature['properties'] as Map<String, dynamic>? ?? {};
+    final t = p['tipo'] ?? '';
+    final isHospital = t == 'hospital_referencia' || p['hospital'] == true;
+
+    return Material(
+      color: const Color(0xDD111111),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: isHospital
+                      ? const Color(0x1FF44336)
+                      : const Color(0x1AFFFFFF),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  isHospital ? Icons.local_hospital : Icons.location_city,
+                  color: isHospital ? Colors.redAccent : Colors.white,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(p['nombre'] ?? '',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                        )),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${p['departamento'] ?? ''}${p['descripcion'] != null ? ' - ${p['descripcion']}' : ''}',
+                      style: const TextStyle(
+                        color: Colors.white54,
+                        fontSize: 11,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (p['emergencia'] != null)
+                      Text(
+                        'Emergencia: ${p['emergencia']}',
+                        style: const TextStyle(
+                          color: Colors.redAccent,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right, color: Colors.white24),
+            ],
+          ),
         ),
       ),
     );
@@ -6809,6 +7149,378 @@ class _Header extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+// MORSE CODE — LINTERNA
+// ─────────────────────────────────────────────
+class MorseCodePage extends StatefulWidget {
+  const MorseCodePage({super.key});
+
+  @override
+  State<MorseCodePage> createState() => _MorseCodePageState();
+}
+
+class _MorseCodePageState extends State<MorseCodePage> {
+  static const _torchChannel = MethodChannel('com.lessnet.torch');
+  final _controller = TextEditingController();
+  String _morseOutput = '';
+  bool _isTransmitting = false;
+  bool _hasTorch = true;
+  double _progress = 0.0;
+
+  // Morse code map
+  static const _morseMap = {
+    'A': '.-', 'B': '-...', 'C': '-.-.', 'D': '-..', 'E': '.', 'F': '..-.',
+    'G': '--.', 'H': '....', 'I': '..', 'J': '.---', 'K': '-.-', 'L': '.-..',
+    'M': '--', 'N': '-.', 'O': '---', 'P': '.--.', 'Q': '--.-', 'R': '.-.',
+    'S': '...', 'T': '-', 'U': '..-', 'V': '...-', 'W': '.--', 'X': '-..-',
+    'Y': '-.--', 'Z': '--..', '0': '-----', '1': '.----', '2': '..---',
+    '3': '...--', '4': '....-', '5': '.....', '6': '-....', '7': '--...',
+    '8': '---..', '9': '----.', '.': '.-.-.-', ',': '--..--', '?': '..--..',
+    '!': '-.-.--', '/': '-..-.', '(': '-.--.', ')': '-.--.-', '&': '.-...',
+    ':': '---...', ';': '-.-.-.', '=': '-...-', '+': '.-.-.', '-': '-....-',
+    '_': '..--.-', '"': '.-..-.', '\$': '...-..-', '@': '.--.-.', "'": '.----.',
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _checkTorch();
+  }
+
+  Future<void> _checkTorch() async {
+    try {
+      final has = await _torchChannel.invokeMethod<bool>('hasTorch') ?? false;
+      if (mounted) setState(() => _hasTorch = has);
+    } catch (_) {
+      if (mounted) setState(() => _hasTorch = false);
+    }
+  }
+
+  String _textToMorse(String text) {
+    return text.toUpperCase().split('').map((c) {
+      if (c == ' ') return '/';
+      return _morseMap[c] ?? '';
+    }).where((m) => m.isNotEmpty).join(' ');
+  }
+
+  Future<void> _transmit() async {
+    if (_isTransmitting || _controller.text.isEmpty) return;
+    final text = _controller.text.trim();
+    if (text.isEmpty) return;
+
+    setState(() {
+      _isTransmitting = true;
+      _progress = 0.0;
+    });
+
+    final morse = _textToMorse(text);
+    setState(() => _morseOutput = morse);
+
+    // Timing: dot = 200ms, dash = 600ms, symbol gap = 200ms, letter gap = 600ms, word gap = 1400ms
+    const dotMs = 200;
+    const dashMs = 600;
+    const symbolGapMs = 200;
+    const letterGapMs = 600;
+    const wordGapMs = 1400;
+
+    final symbols = morse.split('');
+    final totalSymbols = symbols.length;
+    int completed = 0;
+
+    for (int i = 0; i < symbols.length; i++) {
+      if (!mounted || !_isTransmitting) break;
+
+      final s = symbols[i];
+      if (s == '.') {
+        try { await _torchChannel.invokeMethod('on'); } catch (_) {}
+        await Future.delayed(const Duration(milliseconds: dotMs));
+        try { await _torchChannel.invokeMethod('off'); } catch (_) {}
+      } else if (s == '-') {
+        try { await _torchChannel.invokeMethod('on'); } catch (_) {}
+        await Future.delayed(const Duration(milliseconds: dashMs));
+        try { await _torchChannel.invokeMethod('off'); } catch (_) {}
+      } else if (s == ' ') {
+        // Letter gap
+        await Future.delayed(const Duration(milliseconds: letterGapMs));
+      } else if (s == '/') {
+        // Word gap
+        await Future.delayed(const Duration(milliseconds: wordGapMs));
+      }
+
+      completed++;
+      if (mounted) {
+        setState(() => _progress = completed / totalSymbols);
+      }
+
+      // Symbol gap (after dot or dash)
+      if (s == '.' || s == '-') {
+        await Future.delayed(const Duration(milliseconds: symbolGapMs));
+      }
+    }
+
+    // Ensure torch is off
+    try { await _torchChannel.invokeMethod('off'); } catch (_) {}
+
+    if (mounted) {
+      setState(() {
+        _isTransmitting = false;
+        _progress = 1.0;
+      });
+    }
+  }
+
+  void _stop() {
+    setState(() => _isTransmitting = false);
+    try { _torchChannel.invokeMethod('off'); } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    try { _torchChannel.invokeMethod('off'); } catch (_) {}
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF0A0A0A),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF111111),
+        title: const Text('Codigo Morse',
+            style: TextStyle(color: Colors.white)),
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Torch status
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: _hasTorch ? const Color(0x1A4CAF50) : const Color(0x1AF44336),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    _hasTorch ? Icons.flashlight_on : Icons.flashlight_off,
+                    color: _hasTorch ? Colors.greenAccent : Colors.redAccent,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    _hasTorch
+                        ? 'Linterna disponible'
+                        : 'Este dispositivo no tiene linterna',
+                    style: TextStyle(
+                      color: _hasTorch ? Colors.greenAccent : Colors.redAccent,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            // Input
+            Text('Escribe tu mensaje:',
+                style: TextStyle(
+                  color: Color(0xB3FFFFFF),
+                  fontSize: 13,
+                )),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _controller,
+              style: const TextStyle(color: Colors.white, fontSize: 16),
+              maxLines: 3,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: InputDecoration(
+                hintText: 'Escribe algo para transmitir...',
+                hintStyle: TextStyle(color: Color(0x4DFFFFFF)),
+              ),
+              onChanged: (_) {
+                if (mounted) {
+                  setState(() {
+                    _morseOutput = _textToMorse(_controller.text);
+                  });
+                }
+              },
+            ),
+            const SizedBox(height: 16),
+            // Morse output
+            if (_morseOutput.isNotEmpty) ...[
+              Text('Codigo Morse:',
+                  style: TextStyle(
+                    color: Color(0xB3FFFFFF),
+                    fontSize: 13,
+                  )),
+              const SizedBox(height: 6),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF151515),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Color(0xFF2A2A2A)),
+                ),
+                child: Text(
+                  _morseOutput,
+                  style: TextStyle(
+                    color: Colors.amberAccent,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 2,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+            // Progress
+            if (_isTransmitting) ...[
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: _progress,
+                  backgroundColor: const Color(0xFF222222),
+                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.amberAccent),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Transmitiendo... ${(_progress * 100).toStringAsFixed(0)}%',
+                style: const TextStyle(
+                  color: Colors.amberAccent,
+                  fontSize: 12,
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+            // Buttons
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: _isTransmitting || !_hasTorch ? null : _transmit,
+                    icon: const Icon(Icons.flashlight_on, size: 18),
+                    label: Text(_isTransmitting ? 'Transmitiendo...' : 'Transmitir'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.amberAccent,
+                      foregroundColor: Colors.black,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                  ),
+                ),
+                if (_isTransmitting) ...[
+                  const SizedBox(width: 10),
+                  IconButton(
+                    onPressed: _stop,
+                    icon: const Icon(Icons.stop, color: Colors.redAccent, size: 28),
+                    style: IconButton.styleFrom(
+                      backgroundColor: const Color(0x1AF44336),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: 24),
+            // Reference table
+            Text('Referencia Morse:',
+                style: TextStyle(
+                  color: Color(0x99FFFFFF),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                )),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 4,
+              runSpacing: 4,
+              children: _morseMap.entries.take(26).map((e) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF151515),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: Color(0xFF1E1E1E)),
+                  ),
+                  child: Text(
+                    '${e.key} ${e.value}',
+                    style: const TextStyle(
+                      color: Colors.white54,
+                      fontSize: 10,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 16),
+            // Timing info
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF111111),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Tiempos:',
+                      style: TextStyle(
+                        color: Color(0x99FFFFFF),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      )),
+                  const SizedBox(height: 4),
+                  _timingRow('.', 'Punto', '200ms'),
+                  _timingRow('-', 'Raya', '600ms'),
+                  _timingRow('  ', 'Entre simbolos', '200ms'),
+                  _timingRow('   ', 'Entre letras', '600ms'),
+                  _timingRow('/', 'Entre palabras', '1400ms'),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _timingRow(String symbol, String label, String time) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 1),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 30,
+            child: Text(symbol,
+                style: TextStyle(
+                  color: Colors.amberAccent,
+                  fontSize: 12,
+                  fontFamily: 'monospace',
+                  fontWeight: FontWeight.w700,
+                )),
+          ),
+          Expanded(
+            child: Text(label,
+                style: TextStyle(
+                  color: Color(0x80FFFFFF),
+                  fontSize: 11,
+                )),
+          ),
+          Text(time,
+              style: TextStyle(
+                color: Color(0x66FFFFFF),
+                fontSize: 10,
+              )),
+        ],
+      ),
     );
   }
 }

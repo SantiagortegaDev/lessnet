@@ -5,14 +5,17 @@
     "fecha": "2026-05-16",
     "descripcion": "Ciudades principales y rutas de Colombia para navegación offline",
     "fuente": "Datos geográficos combinados - versión simplificada para acceso offline",
-    "total_ciudades": 55
+    "total_ciudades": 74
   },
   "features": [
     {
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-74.0721, 4.7110]
+        "coordinates": [
+          -74.0721,
+          4.711
+        ]
       },
       "properties": {
         "nombre": "Bogotá",
@@ -30,7 +33,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-75.5616, 6.2442]
+        "coordinates": [
+          -75.5616,
+          6.2442
+        ]
       },
       "properties": {
         "nombre": "Medellín",
@@ -48,7 +54,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-76.5225, 3.4516]
+        "coordinates": [
+          -76.5225,
+          3.4516
+        ]
       },
       "properties": {
         "nombre": "Cali",
@@ -66,7 +75,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-74.8302, 11.0041]
+        "coordinates": [
+          -74.8302,
+          11.0041
+        ]
       },
       "properties": {
         "nombre": "Barranquilla",
@@ -84,7 +96,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-73.2539, 5.5385]
+        "coordinates": [
+          -73.2539,
+          5.5385
+        ]
       },
       "properties": {
         "nombre": "Bucaramanga",
@@ -102,7 +117,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-75.6972, 4.4389]
+        "coordinates": [
+          -75.6972,
+          4.4389
+        ]
       },
       "properties": {
         "nombre": "Cartagena de Indias",
@@ -120,7 +138,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-75.2508, 4.6097]
+        "coordinates": [
+          -75.2508,
+          4.6097
+        ]
       },
       "properties": {
         "nombre": "Santa Marta",
@@ -138,7 +159,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-72.9279, 6.1774]
+        "coordinates": [
+          -72.9279,
+          6.1774
+        ]
       },
       "properties": {
         "nombre": "Cúcuta",
@@ -156,7 +180,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-75.2818, 5.0735]
+        "coordinates": [
+          -75.2818,
+          5.0735
+        ]
       },
       "properties": {
         "nombre": "Bello",
@@ -174,7 +201,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-74.1461, 5.3361]
+        "coordinates": [
+          -74.1461,
+          5.3361
+        ]
       },
       "properties": {
         "nombre": "Soacha",
@@ -192,7 +222,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-76.6138, 2.9276]
+        "coordinates": [
+          -76.6138,
+          2.9276
+        ]
       },
       "properties": {
         "nombre": "Pasto",
@@ -210,7 +243,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-75.5906, 5.0662]
+        "coordinates": [
+          -75.5906,
+          5.0662
+        ]
       },
       "properties": {
         "nombre": "Itagüí",
@@ -228,7 +264,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-75.7071, 4.8139]
+        "coordinates": [
+          -75.7071,
+          4.8139
+        ]
       },
       "properties": {
         "nombre": "Neiva",
@@ -246,7 +285,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-73.9893, 4.1543]
+        "coordinates": [
+          -73.9893,
+          4.1543
+        ]
       },
       "properties": {
         "nombre": "Ibagué",
@@ -264,7 +306,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-75.6964, 5.1985]
+        "coordinates": [
+          -75.6964,
+          5.1985
+        ]
       },
       "properties": {
         "nombre": "Envigado",
@@ -282,7 +327,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-77.2807, 1.2136]
+        "coordinates": [
+          -77.2807,
+          1.2136
+        ]
       },
       "properties": {
         "nombre": "San Andrés",
@@ -300,7 +348,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-73.6341, 4.1426]
+        "coordinates": [
+          -73.6341,
+          4.1426
+        ]
       },
       "properties": {
         "nombre": "Villavicencio",
@@ -318,7 +369,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-75.5155, 4.4374]
+        "coordinates": [
+          -75.5155,
+          4.4374
+        ]
       },
       "properties": {
         "nombre": "Armenia",
@@ -336,7 +390,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-76.6461, 4.8106]
+        "coordinates": [
+          -76.6461,
+          4.8106
+        ]
       },
       "properties": {
         "nombre": "Pereira",
@@ -354,7 +411,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-74.0774, 5.7828]
+        "coordinates": [
+          -74.0774,
+          5.7828
+        ]
       },
       "properties": {
         "nombre": "Manizales",
@@ -372,7 +432,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-74.8033, 6.3475]
+        "coordinates": [
+          -74.8033,
+          6.3475
+        ]
       },
       "properties": {
         "nombre": "Floridablanca",
@@ -390,7 +453,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-74.2190, 4.4236]
+        "coordinates": [
+          -74.219,
+          4.4236
+        ]
       },
       "properties": {
         "nombre": "Palmira",
@@ -408,7 +474,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-75.7060, 5.6881]
+        "coordinates": [
+          -75.706,
+          5.6881
+        ]
       },
       "properties": {
         "nombre": "Dosquebradas",
@@ -426,7 +495,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-73.5265, 4.3080]
+        "coordinates": [
+          -73.5265,
+          4.308
+        ]
       },
       "properties": {
         "nombre": "Barrancabermeja",
@@ -444,7 +516,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-75.5813, 4.8106]
+        "coordinates": [
+          -75.5813,
+          4.8106
+        ]
       },
       "properties": {
         "nombre": "La Tebaida",
@@ -462,7 +537,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-74.0603, 6.5544]
+        "coordinates": [
+          -74.0603,
+          6.5544
+        ]
       },
       "properties": {
         "nombre": "San José del Guaviare",
@@ -480,7 +558,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-67.4856, 2.5579]
+        "coordinates": [
+          -67.4856,
+          2.5579
+        ]
       },
       "properties": {
         "nombre": "Puerto Inírida",
@@ -498,7 +579,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-69.7187, 1.3194]
+        "coordinates": [
+          -69.7187,
+          1.3194
+        ]
       },
       "properties": {
         "nombre": "Mitú",
@@ -516,7 +600,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-70.0373, 2.5158]
+        "coordinates": [
+          -70.0373,
+          2.5158
+        ]
       },
       "properties": {
         "nombre": "Puerto Carreño",
@@ -534,7 +621,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-72.3954, 4.0856]
+        "coordinates": [
+          -72.3954,
+          4.0856
+        ]
       },
       "properties": {
         "nombre": "Yopal",
@@ -552,7 +642,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-75.2828, 6.5554]
+        "coordinates": [
+          -75.2828,
+          6.5554
+        ]
       },
       "properties": {
         "nombre": "Apartadó",
@@ -570,7 +663,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-73.0298, 7.0681]
+        "coordinates": [
+          -73.0298,
+          7.0681
+        ]
       },
       "properties": {
         "nombre": "Arauca",
@@ -588,7 +684,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-76.2310, 3.8814]
+        "coordinates": [
+          -76.231,
+          3.8814
+        ]
       },
       "properties": {
         "nombre": "Buenaventura",
@@ -606,7 +705,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-74.8511, 4.0907]
+        "coordinates": [
+          -74.8511,
+          4.0907
+        ]
       },
       "properties": {
         "nombre": "Girardot",
@@ -624,7 +726,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-75.7452, 2.6043]
+        "coordinates": [
+          -75.7452,
+          2.6043
+        ]
       },
       "properties": {
         "nombre": "Mocoa",
@@ -642,7 +747,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-75.5916, 5.8190]
+        "coordinates": [
+          -75.5916,
+          5.819
+        ]
       },
       "properties": {
         "nombre": "Turbo",
@@ -660,7 +768,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-74.6386, 8.7468]
+        "coordinates": [
+          -74.6386,
+          8.7468
+        ]
       },
       "properties": {
         "nombre": "Valledupar",
@@ -678,7 +789,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-75.8818, 5.5342]
+        "coordinates": [
+          -75.8818,
+          5.5342
+        ]
       },
       "properties": {
         "nombre": "Montería",
@@ -696,7 +810,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-75.3975, 5.6875]
+        "coordinates": [
+          -75.3975,
+          5.6875
+        ]
       },
       "properties": {
         "nombre": "Sahagún",
@@ -714,7 +831,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-74.5014, 6.1851]
+        "coordinates": [
+          -74.5014,
+          6.1851
+        ]
       },
       "properties": {
         "nombre": "Ocaña",
@@ -732,7 +852,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-75.2926, 5.0310]
+        "coordinates": [
+          -75.2926,
+          5.031
+        ]
       },
       "properties": {
         "nombre": "Rionegro",
@@ -750,7 +873,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-76.7422, 4.5383]
+        "coordinates": [
+          -76.7422,
+          4.5383
+        ]
       },
       "properties": {
         "nombre": "Popayán",
@@ -768,7 +894,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-73.3617, 5.1997]
+        "coordinates": [
+          -73.3617,
+          5.1997
+        ]
       },
       "properties": {
         "nombre": "Tunja",
@@ -786,7 +915,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-73.5508, 5.5338]
+        "coordinates": [
+          -73.5508,
+          5.5338
+        ]
       },
       "properties": {
         "nombre": "Duitama",
@@ -804,7 +936,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-73.3664, 5.6916]
+        "coordinates": [
+          -73.3664,
+          5.6916
+        ]
       },
       "properties": {
         "nombre": "Sogamoso",
@@ -822,7 +957,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-73.0292, 6.8252]
+        "coordinates": [
+          -73.0292,
+          6.8252
+        ]
       },
       "properties": {
         "nombre": "Pamplona",
@@ -840,7 +978,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-76.6097, 5.6809]
+        "coordinates": [
+          -76.6097,
+          5.6809
+        ]
       },
       "properties": {
         "nombre": "Quibdó",
@@ -858,7 +999,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-75.0326, 8.4541]
+        "coordinates": [
+          -75.0326,
+          8.4541
+        ]
       },
       "properties": {
         "nombre": "Sincelejo",
@@ -876,7 +1020,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-75.7131, 9.3160]
+        "coordinates": [
+          -75.7131,
+          9.316
+        ]
       },
       "properties": {
         "nombre": "Riohacha",
@@ -894,7 +1041,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-72.6467, 4.4263]
+        "coordinates": [
+          -72.6467,
+          4.4263
+        ]
       },
       "properties": {
         "nombre": "Sabanalarga",
@@ -912,7 +1062,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-76.5193, 2.9275]
+        "coordinates": [
+          -76.5193,
+          2.9275
+        ]
       },
       "properties": {
         "nombre": "Ipiales",
@@ -930,7 +1083,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-73.7597, 5.2574]
+        "coordinates": [
+          -73.7597,
+          5.2574
+        ]
       },
       "properties": {
         "nombre": "Chiquinquirá",
@@ -948,7 +1104,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-75.2325, 6.6379]
+        "coordinates": [
+          -75.2325,
+          6.6379
+        ]
       },
       "properties": {
         "nombre": "Sonson",
@@ -966,7 +1125,10 @@
       "type": "Feature",
       "geometry": {
         "type": "Point",
-        "coordinates": [-74.4107, 5.0682]
+        "coordinates": [
+          -74.4107,
+          5.0682
+        ]
       },
       "properties": {
         "nombre": "La Paz",
@@ -979,6 +1141,386 @@
         "hospital": true,
         "emergencia": "123"
       }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -74.0659,
+          4.6268
+        ]
+      },
+      "properties": {
+        "nombre": "Hospital Universitario San Ignacio",
+        "tipo": "hospital_referencia",
+        "departamento": "Cundinamarca",
+        "descripcion": "Hospital universitario de referencia nacional en Bogota",
+        "hospital": true,
+        "aeropuerto": false,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -74.0744,
+          4.6534
+        ]
+      },
+      "properties": {
+        "nombre": "Hospital Militar Central",
+        "tipo": "hospital_referencia",
+        "departamento": "Cundinamarca",
+        "descripcion": "Hospital militar de alta complejidad en Bogota",
+        "hospital": true,
+        "aeropuerto": false,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -74.0486,
+          4.6735
+        ]
+      },
+      "properties": {
+        "nombre": "Fundacion Santa Fe de Bogota",
+        "tipo": "hospital_referencia",
+        "departamento": "Cundinamarca",
+        "descripcion": "Centro medico de alta complejidad en Bogota",
+        "hospital": true,
+        "aeropuerto": false,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -76.531,
+          3.4516
+        ]
+      },
+      "properties": {
+        "nombre": "Hospital Universitario del Valle",
+        "tipo": "hospital_referencia",
+        "departamento": "Valle del Cauca",
+        "descripcion": "Hospital universitario de referencia en Cali",
+        "hospital": true,
+        "aeropuerto": false,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -75.575,
+          6.2442
+        ]
+      },
+      "properties": {
+        "nombre": "Hospital Pablo Tobon Uribe",
+        "tipo": "hospital_referencia",
+        "departamento": "Antioquia",
+        "descripcion": "Hospital de alta complejidad en Medellin",
+        "hospital": true,
+        "aeropuerto": false,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -75.556,
+          6.267
+        ]
+      },
+      "properties": {
+        "nombre": "Hospital Universitario San Vicente",
+        "tipo": "hospital_referencia",
+        "departamento": "Antioquia",
+        "descripcion": "Hospital universitario de referencia en Medellin",
+        "hospital": true,
+        "aeropuerto": false,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.247,
+          7.062
+        ]
+      },
+      "properties": {
+        "nombre": "Hospital Universitario de Santander",
+        "tipo": "hospital_referencia",
+        "departamento": "Santander",
+        "descripcion": "Hospital universitario en Bucaramanga",
+        "hospital": true,
+        "aeropuerto": false,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -72.89,
+          7.89
+        ]
+      },
+      "properties": {
+        "nombre": "Hospital Universitario Erasmo Meoz",
+        "tipo": "hospital_referencia",
+        "departamento": "Norte de Santander",
+        "descripcion": "Hospital de referencia en Cucuta",
+        "hospital": true,
+        "aeropuerto": false,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -74.82,
+          10.98
+        ]
+      },
+      "properties": {
+        "nombre": "Hospital Universitario de la Caridad",
+        "tipo": "hospital_referencia",
+        "departamento": "Atlantico",
+        "descripcion": "Hospital de referencia en Barranquilla",
+        "hospital": true,
+        "aeropuerto": false,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -75.55,
+          10.42
+        ]
+      },
+      "properties": {
+        "nombre": "Hospital Naval de Cartagena",
+        "tipo": "hospital_referencia",
+        "departamento": "Bolivar",
+        "descripcion": "Hospital naval de referencia en Cartagena",
+        "hospital": true,
+        "aeropuerto": false,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -75.3975,
+          9.304
+        ]
+      },
+      "properties": {
+        "nombre": "Hospital Universitario de Sincelejo",
+        "tipo": "hospital_referencia",
+        "departamento": "Sucre",
+        "descripcion": "Hospital universitario en Sincelejo",
+        "hospital": true,
+        "aeropuerto": false,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -75.8818,
+          8.75
+        ]
+      },
+      "properties": {
+        "nombre": "Hospital Universitario de Monteria",
+        "tipo": "hospital_referencia",
+        "departamento": "Cordoba",
+        "descripcion": "Hospital universitario en Monteria",
+        "hospital": true,
+        "aeropuerto": false,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -73.6341,
+          4.152
+        ]
+      },
+      "properties": {
+        "nombre": "Hospital Departitario de Villavicencio",
+        "tipo": "hospital_referencia",
+        "departamento": "Meta",
+        "descripcion": "Hospital departamental en Villavicencio",
+        "hospital": true,
+        "aeropuerto": false,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -76.607,
+          2.44
+        ]
+      },
+      "properties": {
+        "nombre": "Hospital San Jose de Popayan",
+        "tipo": "hospital_referencia",
+        "departamento": "Cauca",
+        "descripcion": "Hospital de referencia en Popayan",
+        "hospital": true,
+        "aeropuerto": false,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -75.68,
+          4.53
+        ]
+      },
+      "properties": {
+        "nombre": "Hospital Universitario del Quindio",
+        "tipo": "hospital_referencia",
+        "departamento": "Quindio",
+        "descripcion": "Hospital universitario en Armenia",
+        "hospital": true,
+        "aeropuerto": false,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -75.69,
+          4.81
+        ]
+      },
+      "properties": {
+        "nombre": "Hospital San Juan de Dios de Pereira",
+        "tipo": "hospital_referencia",
+        "departamento": "Risaralda",
+        "descripcion": "Hospital de referencia en Pereira",
+        "hospital": true,
+        "aeropuerto": false,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -75.52,
+          5.07
+        ]
+      },
+      "properties": {
+        "nombre": "Hospital Departamental de Manizales",
+        "tipo": "hospital_referencia",
+        "departamento": "Caldas",
+        "descripcion": "Hospital departamental en Manizales",
+        "hospital": true,
+        "aeropuerto": false,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -78.77,
+          1.27
+        ]
+      },
+      "properties": {
+        "nombre": "Hospital San Andres de Tumaco",
+        "tipo": "hospital_referencia",
+        "departamento": "Narino",
+        "descripcion": "Hospital de referencia en Tumaco",
+        "hospital": true,
+        "aeropuerto": false,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -75.28,
+          2.93
+        ]
+      },
+      "properties": {
+        "nombre": "Hospital Regional de Neiva",
+        "tipo": "hospital_referencia",
+        "departamento": "Huila",
+        "descripcion": "Hospital regional en Neiva",
+        "hospital": true,
+        "aeropuerto": false,
+        "emergencia": "123"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          -75.23,
+          4.44
+        ]
+      },
+      "properties": {
+        "nombre": "Hospital Universitario de Ibague",
+        "tipo": "hospital_referencia",
+        "departamento": "Tolima",
+        "descripcion": "Hospital universitario en Ibague",
+        "hospital": true,
+        "aeropuerto": false,
+        "emergencia": "123"
+      }
     }
   ],
   "rutas": [
@@ -989,8 +1531,14 @@
       "geometria": {
         "type": "LineString",
         "coordinates": [
-          [-74.0721, 4.7110],
-          [-75.5616, 6.2442]
+          [
+            -74.0721,
+            4.711
+          ],
+          [
+            -75.5616,
+            6.2442
+          ]
         ]
       }
     },
@@ -1001,8 +1549,14 @@
       "geometria": {
         "type": "LineString",
         "coordinates": [
-          [-74.0721, 4.7110],
-          [-76.5225, 3.4516]
+          [
+            -74.0721,
+            4.711
+          ],
+          [
+            -76.5225,
+            3.4516
+          ]
         ]
       }
     },
@@ -1013,8 +1567,14 @@
       "geometria": {
         "type": "LineString",
         "coordinates": [
-          [-74.0721, 4.7110],
-          [-73.2539, 5.5385]
+          [
+            -74.0721,
+            4.711
+          ],
+          [
+            -73.2539,
+            5.5385
+          ]
         ]
       }
     },
@@ -1025,8 +1585,14 @@
       "geometria": {
         "type": "LineString",
         "coordinates": [
-          [-74.0721, 4.7110],
-          [-74.8302, 11.0041]
+          [
+            -74.0721,
+            4.711
+          ],
+          [
+            -74.8302,
+            11.0041
+          ]
         ]
       }
     },
@@ -1037,8 +1603,14 @@
       "geometria": {
         "type": "LineString",
         "coordinates": [
-          [-75.5616, 6.2442],
-          [-76.5225, 3.4516]
+          [
+            -75.5616,
+            6.2442
+          ],
+          [
+            -76.5225,
+            3.4516
+          ]
         ]
       }
     },
@@ -1049,8 +1621,14 @@
       "geometria": {
         "type": "LineString",
         "coordinates": [
-          [-75.5616, 6.2442],
-          [-76.6461, 4.8106]
+          [
+            -75.5616,
+            6.2442
+          ],
+          [
+            -76.6461,
+            4.8106
+          ]
         ]
       }
     },
@@ -1061,8 +1639,14 @@
       "geometria": {
         "type": "LineString",
         "coordinates": [
-          [-76.5225, 3.4516],
-          [-76.6138, 2.9276]
+          [
+            -76.5225,
+            3.4516
+          ],
+          [
+            -76.6138,
+            2.9276
+          ]
         ]
       }
     },
@@ -1073,8 +1657,14 @@
       "geometria": {
         "type": "LineString",
         "coordinates": [
-          [-74.0721, 4.7110],
-          [-73.9893, 4.1543]
+          [
+            -74.0721,
+            4.711
+          ],
+          [
+            -73.9893,
+            4.1543
+          ]
         ]
       }
     },
@@ -1085,8 +1675,14 @@
       "geometria": {
         "type": "LineString",
         "coordinates": [
-          [-74.0721, 4.7110],
-          [-73.9893, 4.1543]
+          [
+            -74.0721,
+            4.711
+          ],
+          [
+            -73.9893,
+            4.1543
+          ]
         ]
       }
     },
@@ -1097,8 +1693,14 @@
       "geometria": {
         "type": "LineString",
         "coordinates": [
-          [-74.0721, 4.7110],
-          [-73.3617, 5.1997]
+          [
+            -74.0721,
+            4.711
+          ],
+          [
+            -73.3617,
+            5.1997
+          ]
         ]
       }
     },
@@ -1109,8 +1711,14 @@
       "geometria": {
         "type": "LineString",
         "coordinates": [
-          [-74.8302, 11.0041],
-          [-75.6972, 4.4389]
+          [
+            -74.8302,
+            11.0041
+          ],
+          [
+            -75.6972,
+            4.4389
+          ]
         ]
       }
     },
@@ -1121,8 +1729,14 @@
       "geometria": {
         "type": "LineString",
         "coordinates": [
-          [-74.8302, 11.0041],
-          [-75.2508, 4.6097]
+          [
+            -74.8302,
+            11.0041
+          ],
+          [
+            -75.2508,
+            4.6097
+          ]
         ]
       }
     },
@@ -1133,8 +1747,14 @@
       "geometria": {
         "type": "LineString",
         "coordinates": [
-          [-73.2539, 5.5385],
-          [-72.9279, 6.1774]
+          [
+            -73.2539,
+            5.5385
+          ],
+          [
+            -72.9279,
+            6.1774
+          ]
         ]
       }
     },
@@ -1145,8 +1765,14 @@
       "geometria": {
         "type": "LineString",
         "coordinates": [
-          [-76.7422, 4.5383],
-          [-76.6138, 2.9276]
+          [
+            -76.7422,
+            4.5383
+          ],
+          [
+            -76.6138,
+            2.9276
+          ]
         ]
       }
     },
@@ -1157,8 +1783,14 @@
       "geometria": {
         "type": "LineString",
         "coordinates": [
-          [-75.5616, 6.2442],
-          [-75.2828, 6.5554]
+          [
+            -75.5616,
+            6.2442
+          ],
+          [
+            -75.2828,
+            6.5554
+          ]
         ]
       }
     },
@@ -1169,8 +1801,14 @@
       "geometria": {
         "type": "LineString",
         "coordinates": [
-          [-75.7071, 4.8139],
-          [-73.9893, 4.1543]
+          [
+            -75.7071,
+            4.8139
+          ],
+          [
+            -73.9893,
+            4.1543
+          ]
         ]
       }
     },
@@ -1181,8 +1819,14 @@
       "geometria": {
         "type": "LineString",
         "coordinates": [
-          [-75.2508, 4.6097],
-          [-74.6386, 8.7468]
+          [
+            -75.2508,
+            4.6097
+          ],
+          [
+            -74.6386,
+            8.7468
+          ]
         ]
       }
     },
@@ -1193,8 +1837,14 @@
       "geometria": {
         "type": "LineString",
         "coordinates": [
-          [-75.6972, 4.4389],
-          [-75.0326, 8.4541]
+          [
+            -75.6972,
+            4.4389
+          ],
+          [
+            -75.0326,
+            8.4541
+          ]
         ]
       }
     },
@@ -1205,8 +1855,14 @@
       "geometria": {
         "type": "LineString",
         "coordinates": [
-          [-75.8818, 5.5342],
-          [-75.0326, 8.4541]
+          [
+            -75.8818,
+            5.5342
+          ],
+          [
+            -75.0326,
+            8.4541
+          ]
         ]
       }
     },
@@ -1217,8 +1873,14 @@
       "geometria": {
         "type": "LineString",
         "coordinates": [
-          [-76.6461, 4.8106],
-          [-75.5155, 4.4374]
+          [
+            -76.6461,
+            4.8106
+          ],
+          [
+            -75.5155,
+            4.4374
+          ]
         ]
       }
     }
