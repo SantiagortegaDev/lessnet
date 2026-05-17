@@ -20,6 +20,7 @@ import 'package:encrypt/encrypt.dart' as enc;
 import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 
 // ─── UUIDs del servicio BLE de LessNet ───
 const String lessnetServiceUuid = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
@@ -203,7 +204,8 @@ class LessNetNotifications {
     final lat = parts.isNotEmpty ? parts[0] : '?';
     final lng = parts.length > 1 ? parts[1] : '?';
     final userId = parts.length > 2 ? parts[2] : 'Desconocido';
-    const android = AndroidNotificationDetails(
+    final vibrationPattern = Int64List.fromList([0, 500, 200, 500, 200, 500]);
+    final android = AndroidNotificationDetails(
       'lessnet_sos',
       'SOS LessNet',
       channelDescription: 'Alertas de emergencia SOS',
@@ -214,9 +216,9 @@ class LessNetNotifications {
       ongoing: true,
       playSound: true,
       enableVibration: true,
-      vibrationPattern: Int64List.fromList([0, 500, 200, 500, 200, 500]),
+      vibrationPattern: vibrationPattern,
     );
-    const details = NotificationDetails(android: android);
+    final details = NotificationDetails(android: android);
     await _plugin.show(
       7777,
       'ALERTA SOS - $userId',
@@ -359,6 +361,7 @@ class _LessNetAppState extends State<LessNetApp> with WidgetsBindingObserver {
       // Newer version available
       final htmlUrl = data['html_url'] as String? ?? '';
       final assets = (data['assets'] as List?) ?? [];
+      final body = data['body'] as String? ?? '';
       String? apkUrl;
       for (final asset in assets) {
         final name = (asset['name'] as String? ?? '').toLowerCase();
@@ -368,7 +371,7 @@ class _LessNetAppState extends State<LessNetApp> with WidgetsBindingObserver {
         }
       }
       if (mounted) {
-        _showUpdateDialog(tagName, htmlUrl, apkUrl);
+        _showUpdateDialog(tagName, htmlUrl, apkUrl, body);
       }
     } catch (e) {
       debugPrint('Update check error: $e');
@@ -384,16 +387,61 @@ class _LessNetAppState extends State<LessNetApp> with WidgetsBindingObserver {
     return aParts.length.compareTo(bParts.length);
   }
 
-  void _showUpdateDialog(String version, String htmlUrl, String? apkUrl) {
+  void _showUpdateDialog(String version, String htmlUrl, String? apkUrl, [String? body]) {
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1A1A1A),
         title: const Text('Actualizacion disponible', style: TextStyle(color: Colors.white)),
-        content: Text(
-          'Nueva version v$version disponible (actual: v$kAppVersion).\n${apkUrl != null ? "Puedes descargar e instalar el APK directamente." : "Visita GitHub para descargar."}',
-          style: const TextStyle(color: Colors.white70),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Nueva version v$version disponible (actual: v$kAppVersion).',
+                style: const TextStyle(color: Colors.white70),
+              ),
+              if (apkUrl != null)
+                const Text(
+                  'Puedes descargar e instalar el APK directamente.',
+                  style: TextStyle(color: Colors.white54, fontSize: 13),
+                )
+              else
+                const Text(
+                  'Visita GitHub para descargar.',
+                  style: TextStyle(color: Colors.white54, fontSize: 13),
+                ),
+              if (body != null && body.trim().isNotEmpty) ...[
+                const SizedBox(height: 16),
+                const Text('Cambios en esta version:',
+                    style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF111111),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFF2A2A2A)),
+                  ),
+                  constraints: const BoxConstraints(maxHeight: 250),
+                  child: SingleChildScrollView(
+                    child: MarkdownBody(
+                      data: body,
+                      selectable: true,
+                      styleSheet: MarkdownStyleSheet(
+                        p: const TextStyle(color: Colors.white60, fontSize: 12, height: 1.5),
+                        h2: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600),
+                        listBullet: const TextStyle(color: Colors.white60, fontSize: 12),
+                        code: const TextStyle(color: Colors.greenAccent, fontSize: 11, backgroundColor: Color(0xFF1A1A1A)),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -440,6 +488,135 @@ class _LessNetAppState extends State<LessNetApp> with WidgetsBindingObserver {
       await OpenFilex.open(file.path);
     } catch (e) {
       AppLogger.log('Error instalando APK: $e');
+    }
+  }
+
+  Future<void> _showChangelog() async {
+    showDialog(
+      context: context,
+      builder: (ctx) => const AlertDialog(
+        backgroundColor: Color(0xFF1A1A1A),
+        title: Text('Changelog', style: TextStyle(color: Colors.white)),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Descargando releases...', style: TextStyle(color: Colors.white54)),
+            ],
+          ),
+        ),
+      ),
+    );
+    try {
+      final response = await http.get(
+        Uri.parse('https://api.github.com/repos/$kGitHubOwner/$kGitHubRepo/releases?per_page=10'),
+        headers: {'Accept': 'application/vnd.github+json'},
+      ).timeout(const Duration(seconds: 10));
+      if (ctx.mounted) Navigator.pop(ctx);
+      if (response.statusCode != 200) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Error al obtener changelog'), backgroundColor: Colors.redAccent),
+          );
+        }
+        return;
+      }
+      final List releases = json.decode(response.body);
+      if (releases.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No hay releases disponibles'), backgroundColor: Colors.orange),
+          );
+        }
+        return;
+      }
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (ctx2) => AlertDialog(
+            backgroundColor: const Color(0xFF1A1A1A),
+            title: const Text('Changelog', style: TextStyle(color: Colors.white)),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: releases.length,
+                itemBuilder: (context, index) {
+                  final release = releases[index];
+                  final tag = release['tag_name'] ?? '?';
+                  final name = release['name'] ?? tag;
+                  final body = release['body'] ?? '';
+                  final isCurrent = tag.replaceFirst('v', '') == kAppVersion;
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF111111),
+                      borderRadius: BorderRadius.circular(8),
+                      border: isCurrent
+                          ? Border.all(color: Colors.greenAccent.withOpacity(0.5))
+                          : Border.all(color: const Color(0xFF2A2A2A)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(name,
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14)),
+                            if (isCurrent) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.greenAccent.withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: const Text('ACTUAL',
+                                    style: TextStyle(color: Colors.greenAccent, fontSize: 10, fontWeight: FontWeight.w600)),
+                              ),
+                            ],
+                          ],
+                        ),
+                        if (body.trim().isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          MarkdownBody(
+                            data: body,
+                            selectable: true,
+                            styleSheet: MarkdownStyleSheet(
+                              p: const TextStyle(color: Colors.white54, fontSize: 12, height: 1.5),
+                              h2: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600),
+                              h3: const TextStyle(color: Colors.white60, fontSize: 12, fontWeight: FontWeight.w600),
+                              listBullet: const TextStyle(color: Colors.white54, fontSize: 12),
+                              code: const TextStyle(color: Colors.greenAccent, fontSize: 11, backgroundColor: Color(0xFF1A1A1A)),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx2),
+                child: const Text('Cerrar'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted && ModalRoute.of(context)?.isCurrent != true) {
+        Navigator.pop(context);
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.redAccent),
+        );
+      }
     }
   }
 
@@ -8469,6 +8646,18 @@ class _ProfilePageState extends State<ProfilePage> {
                     onPressed: () { _checkInternet(); _getCoordinates(); },
                     icon: const Icon(Icons.refresh, color: Colors.white38, size: 16),
                     label: const Text('Actualizar', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0x1AFFFFFF)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _showChangelog,
+                    icon: const Icon(Icons.article_outlined, color: Colors.white38, size: 16),
+                    label: const Text('Changelog', style: TextStyle(color: Colors.white54, fontSize: 12)),
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: Color(0x1AFFFFFF)),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
