@@ -7,6 +7,7 @@ plugins {
 android {
     namespace "com.lessnet.app"
     compileSdk 36
+    ndkVersion "28.0.13004108"
 
     defaultConfig {
         applicationId "com.lessnet.app"

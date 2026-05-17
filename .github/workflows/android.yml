@@ -41,6 +41,8 @@ jobs:
           # Patch build.gradle with our SDK versions and permission_handler config
           if [ -f /tmp/build_gradle_backup ]; then
             cp /tmp/build_gradle_backup "$GITHUB_WORKSPACE/android/app/build.gradle"
+            # Remove build.gradle.kts if flutter create generated one (avoids conflict)
+            rm -f "$GITHUB_WORKSPACE/android/app/build.gradle.kts"
           else
             # If no backup, patch the generated one with correct SDK versions
             GRADLE="$GITHUB_WORKSPACE/android/app/build.gradle"
