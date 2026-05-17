@@ -73,11 +73,12 @@ class LessNetNotifications {
 }
 
 // ─── Background service top-level callback ───
+@pragma('vm:entry-point')
 Future<void> onStart(ServiceInstance service) async {
   // This keeps the foreground service alive while advertising
-  service.on('stopService') {
+  service.on('stopService').listen((_) {
     service.stopSelf();
-  };
+  });
 }
 
 Future<void> startForegroundService() async {
@@ -87,10 +88,8 @@ Future<void> startForegroundService() async {
       onStart: onStart,
       autoStart: true,
       isForegroundMode: true,
-      notificationTitle: 'LessNet',
-      notificationText: 'Visible y esperando conexion',
       initialNotificationTitle: 'LessNet',
-      initialNotificationText: 'Visible y esperando conexion',
+      initialNotificationContent: 'Visible y esperando conexion',
     ),
     iosConfiguration: IosConfiguration(),
   );
@@ -1912,15 +1911,21 @@ class _ChatListPageState extends State<ChatListPage> {
                               confirmDismiss: (_) => _deleteConversation(conv.deviceId).then((_) => false),
                               child: Container(
                                 margin: const EdgeInsets.only(bottom: 6),
-                                child: Material(
-                                  color: isActive
-                                      ? Colors.white.withOpacity(0.08)
-                                      : Colors.white.withOpacity(0.03),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: isActive
-                                      ? Border.all(color: Colors.white.withOpacity(0.12))
-                                      : null,
-                                  child: InkWell(
+                                child: Container(
+                                  decoration: isActive
+                                      ? BoxDecoration(
+                                          color: Colors.white.withOpacity(0.08),
+                                          borderRadius: BorderRadius.circular(12),
+                                          border: Border.all(color: Colors.white.withOpacity(0.12)),
+                                        )
+                                      : BoxDecoration(
+                                          color: Colors.white.withOpacity(0.03),
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: InkWell(
                                     borderRadius: BorderRadius.circular(12),
                                     onTap: () {
                                       Navigator.push(
@@ -2010,7 +2015,8 @@ class _ChatListPageState extends State<ChatListPage> {
                                   ),
                                 ),
                               ),
-                            );
+                            ),
+                          );
                           },
                         ),
                       ),
