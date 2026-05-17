@@ -13,14 +13,98 @@ import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:video_player/video_player.dart';
 import 'package:open_filex/open_filex.dart';
+import 'package:flutter_background_service/flutter_background_service.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 // ─── UUIDs del servicio BLE de LessNet ───
 const String lessnetServiceUuid = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
 const String lessnetCharRxUuid = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
 const String lessnetCharTxUuid = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";
 
-void main() {
+// ─── Notification helper ───
+class LessNetNotifications {
+  static final FlutterLocalNotificationsPlugin _plugin =
+      FlutterLocalNotificationsPlugin();
+
+  static Future<void> init() async {
+    const android = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const settings = InitializationSettings(android: android);
+    await _plugin.initialize(
+      settings,
+      onDidReceiveNotificationResponse: (_) {
+        // Bring app to foreground when tapping notification
+      },
+    );
+  }
+
+  static Future<void> showMessageNotification(String deviceName, String text) async {
+    const android = AndroidNotificationDetails(
+      'lessnet_messages',
+      'Mensajes LessNet',
+      channelDescription: 'Notificaciones de mensajes recibidos',
+      importance: Importance.high,
+      priority: Priority.high,
+    );
+    const details = NotificationDetails(android: android);
+    await _plugin.show(
+      DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      'Nuevo mensaje de $deviceName',
+      text,
+      details,
+    );
+  }
+
+  static Future<void> showConnectionNotification(String deviceName) async {
+    const android = AndroidNotificationDetails(
+      'lessnet_connections',
+      'Conexiones LessNet',
+      channelDescription: 'Notificaciones de conexion de dispositivos',
+      importance: Importance.high,
+      priority: Priority.high,
+    );
+    const details = NotificationDetails(android: android);
+    await _plugin.show(
+      9999,
+      '$deviceName se ha conectado',
+      null,
+      details,
+    );
+  }
+}
+
+// ─── Background service top-level callback ───
+Future<void> onStart(ServiceInstance service) async {
+  // This keeps the foreground service alive while advertising
+  service.on('stopService') {
+    service.stopSelf();
+  };
+}
+
+Future<void> startForegroundService() async {
+  final service = FlutterBackgroundService();
+  await service.configure(
+    androidConfiguration: AndroidConfiguration(
+      onStart: onStart,
+      autoStart: true,
+      isForegroundMode: true,
+      notificationTitle: 'LessNet',
+      notificationText: 'Visible y esperando conexion',
+      initialNotificationTitle: 'LessNet',
+      initialNotificationText: 'Visible y esperando conexion',
+    ),
+    iosConfiguration: IosConfiguration(),
+  );
+  await service.startService();
+}
+
+Future<void> stopForegroundService() async {
+  final service = FlutterBackgroundService();
+  service.invoke('stopService');
+}
+
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await LessNetNotifications.init();
   runApp(const LessNetApp());
 }
 
@@ -146,6 +230,18 @@ class BtService {
     return '';
   }
 
+  String get connectedDeviceId {
+    if (connectedDevice != null) {
+      return connectedDevice!.platformName.isNotEmpty
+          ? connectedDevice!.platformName
+          : connectedDevice!.remoteId.toString();
+    }
+    if (_peripheralConnected && _peripheralDeviceName.isNotEmpty) {
+      return _peripheralDeviceName;
+    }
+    return '';
+  }
+
   // ─── CRC32 ───
   static int _crc32(List<int> data) {
     int crc = 0xFFFFFFFF;
@@ -183,6 +279,9 @@ class BtService {
           _advertisingController.add(false);
           _connectionController.add(true);
           _statusController.add('Conectado: $_peripheralDeviceName');
+          // Stop foreground service on connection, show connection notification
+          try { await stopForegroundService(); } catch (_) {}
+          try { await LessNetNotifications.showConnectionNotification(_peripheralDeviceName.isNotEmpty ? _peripheralDeviceName : 'Dispositivo'); } catch (_) {}
           break;
         case 'onDeviceDisconnected':
           _peripheralConnected = false;
@@ -211,6 +310,8 @@ class BtService {
       _isPeripheral = true;
       _isAdvertising = true;
       _advertisingController.add(true);
+      // Start foreground service while advertising
+      try { await startForegroundService(); } catch (_) {}
     } catch (e) {
       _isAdvertising = false;
       _advertisingError = e.toString().contains('ADV_ERROR')
@@ -229,6 +330,8 @@ class BtService {
     _isPeripheral = false;
     _peripheralConnected = false;
     _advertisingController.add(false);
+    // Stop foreground service when advertising stops
+    try { await stopForegroundService(); } catch (_) {}
   }
 
   Future<void> connectToDevice(BluetoothDevice device) async {
@@ -345,10 +448,13 @@ class BtService {
                 fileName: fileName,
                 filePath: savedPath,
                 fileSize: fileSize,
+                deviceId: connectedDeviceId,
               );
               messages.add(msg);
               _msgController.add(msg);
               MessageDB.insert(msg);
+              // Show notification for background message
+              try { LessNetNotifications.showMessageNotification(connectedName, fileName); } catch (_) {}
             });
             return;
           }
@@ -398,10 +504,12 @@ class BtService {
               fileName: fileName,
               filePath: savedPath,
               fileSize: fileSize,
+              deviceId: connectedDeviceId,
             );
             messages.add(msg);
             _msgController.add(msg);
             MessageDB.insert(msg);
+            try { LessNetNotifications.showMessageNotification(connectedName, fileName); } catch (_) {}
           });
           return;
         }
@@ -412,10 +520,12 @@ class BtService {
     }
 
     // ─── Plain text message ───
-    final msg = ChatMessage(id: DateTime.now().microsecondsSinceEpoch.toString(), text: text, mine: false, time: DateTime.now());
+    final msg = ChatMessage(id: DateTime.now().microsecondsSinceEpoch.toString(), text: text, mine: false, time: DateTime.now(), deviceId: connectedDeviceId);
     messages.add(msg);
     _msgController.add(msg);
     MessageDB.insert(msg);
+    // Show notification for background message
+    try { LessNetNotifications.showMessageNotification(connectedName, text); } catch (_) {}
   }
 
   Future<String> _saveReceivedFile(String type, String fileName, List<int> bytes) async {
@@ -453,7 +563,7 @@ class BtService {
 
   Future<void> sendMessage(String text) async {
     if (text.isEmpty) return;
-    final msg = ChatMessage(id: DateTime.now().microsecondsSinceEpoch.toString(), text: text, mine: true, time: DateTime.now());
+    final msg = ChatMessage(id: DateTime.now().microsecondsSinceEpoch.toString(), text: text, mine: true, time: DateTime.now(), deviceId: connectedDeviceId);
     messages.add(msg);
     _msgController.add(msg);
     MessageDB.insert(msg);
@@ -486,6 +596,7 @@ class BtService {
       fileName: fileName,
       filePath: localPath,
       fileSize: fileSize,
+      deviceId: connectedDeviceId,
     );
     messages.add(msg);
     _msgController.add(msg);
@@ -593,6 +704,7 @@ class ChatMessage {
   final String? fileName;
   final String? filePath; // local file path for received/sent files
   final int? fileSize;
+  final String deviceId; // remote device identifier
 
   ChatMessage({
     required this.id,
@@ -603,6 +715,7 @@ class ChatMessage {
     this.fileName,
     this.filePath,
     this.fileSize,
+    this.deviceId = '',
   });
 
   Map<String, dynamic> toMap() => {
@@ -614,6 +727,7 @@ class ChatMessage {
     'fileName': fileName,
     'filePath': filePath,
     'fileSize': fileSize,
+    'deviceId': deviceId,
   };
 
   factory ChatMessage.fromMap(Map<String, dynamic> m) => ChatMessage(
@@ -625,6 +739,7 @@ class ChatMessage {
     fileName: m['fileName'] as String?,
     filePath: m['filePath'] as String?,
     fileSize: m['fileSize'] as int?,
+    deviceId: m['deviceId'] as String? ?? '',
   );
 }
 
@@ -642,7 +757,7 @@ class MessageDB {
     final path = await getDatabasesPath();
     return openDatabase(
       '$path/lessnet_messages.db',
-      version: 1,
+      version: 2,
       onCreate: (db, ver) async {
         await db.execute('''
           CREATE TABLE messages (
@@ -653,9 +768,15 @@ class MessageDB {
             type TEXT,
             fileName TEXT,
             filePath TEXT,
-            fileSize INTEGER
+            fileSize INTEGER,
+            deviceId TEXT DEFAULT ''
           )
         ''');
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          await db.execute('ALTER TABLE messages ADD COLUMN deviceId TEXT DEFAULT \'\'');
+        }
       },
     );
   }
@@ -681,6 +802,91 @@ class MessageDB {
     final d = await db;
     await d.delete('messages', where: 'id = ?', whereArgs: [id]);
   }
+
+  static Future<List<ChatMessage>> getByDevice(String deviceId) async {
+    final d = await db;
+    final rows = await d.query(
+      'messages',
+      where: 'deviceId = ?',
+      whereArgs: [deviceId],
+      orderBy: 'time ASC',
+    );
+    return rows.map((m) => ChatMessage.fromMap(m)).toList();
+  }
+
+  static Future<void> deleteByDevice(String deviceId) async {
+    final d = await db;
+    await d.delete('messages', where: 'deviceId = ?', whereArgs: [deviceId]);
+  }
+
+  static Future<List<DeviceConversation>> getDeviceList() async {
+    final d = await db;
+    final rows = await d.rawQuery('''
+      SELECT deviceId,
+             MAX(time) as lastTime,
+             (SELECT text FROM messages m2 WHERE m2.deviceId = m.deviceId ORDER BY time DESC LIMIT 1) as lastMessage,
+             (SELECT COUNT(*) FROM messages m3 WHERE m3.deviceId = m.deviceId AND m3.mine = 0 AND m3.id NOT IN (
+               SELECT id FROM messages WHERE mine = 0 ORDER BY time DESC LIMIT 0
+             )) as unreadCount
+      FROM messages m
+      WHERE deviceId IS NOT NULL AND deviceId != ''
+      GROUP BY deviceId
+      ORDER BY lastTime DESC
+    ''');
+    // Also check for messages with empty deviceId ("General")
+    final generalRows = await d.rawQuery(
+      'SELECT COUNT(*) as cnt FROM messages WHERE deviceId = \'\' OR deviceId IS NULL',
+    );
+    final result = <DeviceConversation>[];
+    for (final row in rows) {
+      final did = row['deviceId'] as String? ?? '';
+      result.add(DeviceConversation(
+        deviceId: did,
+        lastMessage: row['lastMessage'] as String? ?? '',
+        lastTime: DateTime.fromMillisecondsSinceEpoch(
+          (row['lastTime'] as int?) ?? 0,
+        ),
+        unreadCount: 0, // Simplified: we'll count unread via a separate approach
+      ));
+    }
+    // Add "General" conversation if there are messages without deviceId
+    if ((generalRows.first['cnt'] as int? ?? 0) > 0) {
+      final lastGeneral = await d.query(
+        'messages',
+        where: 'deviceId = \'\' OR deviceId IS NULL',
+        orderBy: 'time DESC',
+        limit: 1,
+      );
+      if (lastGeneral.isNotEmpty) {
+        result.add(DeviceConversation(
+          deviceId: '',
+          lastMessage: (lastGeneral.first['text'] as String?) ?? '',
+          lastTime: DateTime.fromMillisecondsSinceEpoch(
+            (lastGeneral.first['time'] as int?) ?? 0,
+          ),
+          unreadCount: 0,
+        ));
+      }
+    }
+    result.sort((a, b) => b.lastTime.compareTo(a.lastTime));
+    return result;
+  }
+}
+
+class DeviceConversation {
+  final String deviceId;
+  final String lastMessage;
+  final DateTime lastTime;
+  final int unreadCount;
+
+  const DeviceConversation({
+    required this.deviceId,
+    required this.lastMessage,
+    required this.lastTime,
+    this.unreadCount = 0,
+  });
+
+  String get displayName => deviceId.isEmpty ? 'General' : deviceId;
 }
 
 // ─────────────────────────────────────────────
@@ -704,7 +910,7 @@ class _HomePageState extends State<HomePage> {
         children: const [
           PermissionsPage(),
           ScanPage(),
-          ChatPage(),
+          ChatListPage(),
           VaultHomePage(),
         ],
       ),
@@ -768,6 +974,8 @@ class _PermissionsPageState extends State<PermissionsPage> {
         Permission.videos, 'Acceder a videos'));
     items.add(_PermItem('Almacenamiento', Icons.folder,
         Permission.storage, 'Archivos (Android 12 o menor)'));
+    items.add(_PermItem('Notificaciones', Icons.notifications,
+        Permission.notification, 'Alertas de mensajes'));
     return items;
   }
 
@@ -1554,10 +1762,271 @@ class _ScanPageState extends State<ScanPage> {
 }
 
 // ─────────────────────────────────────────────
-// CHAT
+// CHAT LIST — List of device conversations
+// ─────────────────────────────────────────────
+class ChatListPage extends StatefulWidget {
+  const ChatListPage({super.key});
+
+  @override
+  State<ChatListPage> createState() => _ChatListPageState();
+}
+
+class _ChatListPageState extends State<ChatListPage> {
+  final bt = BtService();
+  List<DeviceConversation> _conversations = [];
+  bool _loading = true;
+  StreamSubscription? _msgSub;
+  StreamSubscription? _connSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadConversations();
+    _msgSub = bt.onMessage.listen((_) {
+      if (mounted) _loadConversations();
+    });
+    _connSub = bt.onConnectionChange.listen((_) {
+      if (mounted) _loadConversations();
+    });
+  }
+
+  Future<void> _loadConversations() async {
+    try {
+      final convs = await MessageDB.getDeviceList();
+      if (mounted) setState(() {
+        _conversations = convs;
+        _loading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  String _fmtTime(DateTime t) {
+    final now = DateTime.now();
+    final diff = now.difference(t);
+    if (diff.inDays == 0) {
+      return '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+    } else if (diff.inDays == 1) {
+      return 'Ayer';
+    } else if (diff.inDays < 7) {
+      const days = ['Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab', 'Dom'];
+      return days[t.weekday - 1];
+    } else {
+      return '${t.day}/${t.month}';
+    }
+  }
+
+  Future<void> _deleteConversation(String deviceId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        title: const Text('Eliminar chat', style: TextStyle(color: Colors.white)),
+        content: Text(
+          'Seguro que quieres eliminar la conversacion con ${deviceId.isEmpty ? "General" : deviceId}? Esta accion no se puede deshacer.',
+          style: const TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Eliminar', style: TextStyle(color: Colors.redAccent)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await MessageDB.deleteByDevice(deviceId);
+      bt.messages.removeWhere((m) => m.deviceId == deviceId);
+      _loadConversations();
+    }
+  }
+
+  @override
+  void dispose() {
+    _msgSub?.cancel();
+    _connSub?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final currentDeviceId = bt.connectedDeviceId;
+
+    // If connected, open the chat for that device directly
+    if (bt.isConnected && currentDeviceId.isNotEmpty) {
+      return ChatPage(deviceId: currentDeviceId);
+    }
+
+    return SafeArea(
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+            child: _Header(
+              'Chat',
+              Icons.chat_bubble,
+              _conversations.isEmpty
+                  ? 'Sin conversaciones'
+                  : '${_conversations.length} conversacion${_conversations.length > 1 ? 'es' : ''}',
+            ),
+          ),
+          Expanded(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator(color: Colors.white))
+                : _conversations.isEmpty
+                    ? Center(
+                        child: Text(
+                          'Conecta un dispositivo para chatear',
+                          style: TextStyle(color: Colors.white.withOpacity(0.15)),
+                          textAlign: TextAlign.center,
+                        ),
+                      )
+                    : RefreshIndicator(
+                        onRefresh: _loadConversations,
+                        color: Colors.white,
+                        backgroundColor: Colors.grey[800],
+                        child: ListView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          itemCount: _conversations.length,
+                          itemBuilder: (_, i) {
+                            final conv = _conversations[i];
+                            final isActive = conv.deviceId == currentDeviceId;
+                            return Dismissible(
+                              key: Key(conv.deviceId + conv.lastTime.millisecondsSinceEpoch.toString()),
+                              direction: DismissDirection.endToStart,
+                              background: Container(
+                                alignment: Alignment.centerRight,
+                                padding: const EdgeInsets.only(right: 20),
+                                margin: const EdgeInsets.only(bottom: 6),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Icon(Icons.delete, color: Colors.redAccent),
+                              ),
+                              confirmDismiss: (_) => _deleteConversation(conv.deviceId).then((_) => false),
+                              child: Container(
+                                margin: const EdgeInsets.only(bottom: 6),
+                                child: Material(
+                                  color: isActive
+                                      ? Colors.white.withOpacity(0.08)
+                                      : Colors.white.withOpacity(0.03),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: isActive
+                                      ? Border.all(color: Colors.white.withOpacity(0.12))
+                                      : null,
+                                  child: InkWell(
+                                    borderRadius: BorderRadius.circular(12),
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => ChatPage(deviceId: conv.deviceId),
+                                        ),
+                                      ).then((_) => _loadConversations());
+                                    },
+                                    onLongPress: () => _deleteConversation(conv.deviceId),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(14),
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.all(10),
+                                            decoration: BoxDecoration(
+                                              color: isActive
+                                                  ? Colors.white.withOpacity(0.1)
+                                                  : Colors.white.withOpacity(0.05),
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                            child: Icon(
+                                              isActive ? Icons.bluetooth_connected : Icons.phone_android,
+                                              color: isActive ? Colors.white : Colors.white38,
+                                              size: 20,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  conv.displayName,
+                                                  style: TextStyle(
+                                                    color: isActive ? Colors.white : Colors.white70,
+                                                    fontWeight: FontWeight.w600,
+                                                    fontSize: 14,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 2),
+                                                Text(
+                                                  conv.lastMessage,
+                                                  style: TextStyle(
+                                                    color: Colors.white.withOpacity(0.35),
+                                                    fontSize: 12,
+                                                  ),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          Column(
+                                            crossAxisAlignment: CrossAxisAlignment.end,
+                                            children: [
+                                              Text(
+                                                _fmtTime(conv.lastTime),
+                                                style: TextStyle(
+                                                  color: Colors.white.withOpacity(0.25),
+                                                  fontSize: 11,
+                                                ),
+                                              ),
+                                              if (conv.unreadCount > 0)
+                                                Container(
+                                                  margin: const EdgeInsets.only(top: 4),
+                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.white,
+                                                    borderRadius: BorderRadius.circular(10),
+                                                  ),
+                                                  child: Text(
+                                                    '${conv.unreadCount}',
+                                                    style: const TextStyle(
+                                                      color: Colors.black,
+                                                      fontSize: 10,
+                                                      fontWeight: FontWeight.w700,
+                                                    ),
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+// CHAT — Conversation with a specific device
 // ─────────────────────────────────────────────
 class ChatPage extends StatefulWidget {
-  const ChatPage({super.key});
+  final String deviceId;
+  const ChatPage({super.key, this.deviceId = ''});
 
   @override
   State<ChatPage> createState() => _ChatPageState();
@@ -1639,6 +2108,17 @@ class _ChatPageState extends State<ChatPage> {
       if (saved.isNotEmpty && bt.messages.isEmpty) {
         bt.messages.addAll(saved);
       }
+      // Also load device-specific history from DB
+      if (widget.deviceId.isNotEmpty) {
+        final deviceMsgs = await MessageDB.getByDevice(widget.deviceId);
+        // Merge any DB messages not already in memory
+        for (final m in deviceMsgs) {
+          if (!bt.messages.any((e) => e.id == m.id)) {
+            bt.messages.add(m);
+          }
+        }
+        bt.messages.sort((a, b) => a.time.compareTo(b.time));
+      }
     } catch (_) {}
     if (mounted) setState(() => _loadingHistory = false);
     _toBottom();
@@ -1717,7 +2197,7 @@ class _ChatPageState extends State<ChatPage> {
       final picker = ImagePicker();
       final xfile = await picker.pickVideo(
         source: ImageSource.gallery,
-        maxDuration: const Duration(seconds: 30),
+        maxDuration: const Duration(seconds: 120),
       );
       if (xfile == null) return;
       final size = await xfile.length();
@@ -1816,7 +2296,9 @@ class _ChatPageState extends State<ChatPage> {
 
   @override
   Widget build(BuildContext context) {
-    final msgs = bt.messages;
+    final msgs = widget.deviceId.isNotEmpty
+        ? bt.messages.where((m) => m.deviceId == widget.deviceId || (widget.deviceId.isEmpty && m.deviceId.isEmpty)).toList()
+        : bt.messages;
     return PopScope(
       canPop: !bt.isSending,
       onPopInvokedWithResult: (didPop, _) async {
@@ -1852,12 +2334,51 @@ class _ChatPageState extends State<ChatPage> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
-            child: _Header(
-              'Chat',
-              Icons.chat_bubble,
-              _connected
-                  ? 'Conectado por Bluetooth'
-                  : 'Sin conexion',
+            child: Row(
+              children: [
+                Expanded(
+                  child: _Header(
+                    'Chat',
+                    Icons.chat_bubble,
+                    _connected
+                        ? 'Conectado por Bluetooth'
+                        : 'Sin conexion',
+                  ),
+                ),
+                if (widget.deviceId.isNotEmpty)
+                  IconButton(
+                    onPressed: () async {
+                      final confirmed = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          backgroundColor: const Color(0xFF1A1A1A),
+                          title: const Text('Eliminar chat', style: TextStyle(color: Colors.white)),
+                          content: Text(
+                            'Seguro que quieres eliminar la conversacion con ${widget.deviceId.isEmpty ? "General" : widget.deviceId}? Esta accion no se puede deshacer.',
+                            style: const TextStyle(color: Colors.white70),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, false),
+                              child: const Text('Cancelar'),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, true),
+                              child: const Text('Eliminar', style: TextStyle(color: Colors.redAccent)),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirmed == true) {
+                        await MessageDB.deleteByDevice(widget.deviceId);
+                        bt.messages.removeWhere((m) => m.deviceId == widget.deviceId);
+                        if (mounted) Navigator.of(context).pop();
+                      }
+                    },
+                    icon: const Icon(Icons.delete_outline, color: Colors.white38, size: 20),
+                    tooltip: 'Eliminar chat',
+                  ),
+              ],
             ),
           ),
           if (_connected)

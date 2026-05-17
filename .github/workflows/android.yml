@@ -23,6 +23,7 @@ jobs:
           # Save our custom files before regenerating
           cp -r lib /tmp/lib_backup
           cp -r assets /tmp/assets_backup 2>/dev/null || true
+          cp -r native /tmp/native_backup 2>/dev/null || true
           cp pubspec.yaml /tmp/pubspec_backup.yaml
           cp android/app/src/main/AndroidManifest.xml /tmp/AndroidManifest_backup.xml
           cp android/app/build.gradle /tmp/build_gradle_backup 2>/dev/null || true
@@ -108,6 +109,12 @@ jobs:
           if [ -d "/tmp/assets_backup" ]; then
             rm -rf "$GITHUB_WORKSPACE/assets"
             cp -r /tmp/assets_backup "$GITHUB_WORKSPACE/assets"
+          fi
+
+          # Restore native/ directory with custom Kotlin files
+          if [ -d "/tmp/native_backup" ]; then
+            rm -rf "$GITHUB_WORKSPACE/native"
+            cp -r /tmp/native_backup "$GITHUB_WORKSPACE/native"
           fi
 
           # Use our pubspec.yaml with our dependencies
