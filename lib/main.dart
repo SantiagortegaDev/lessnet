@@ -635,6 +635,128 @@ const int _kBleWriteSize = 200; // bytes por write BLE (MTU-safe)
 const int _kMaxFileSize = 2 * 1024 * 1024; // 2 MB
 const int _kPeripheralNotifyDelayMs = 10; // ms entre notificaciones (peripheral)
 
+// ─────────────────────────────────────────────
+// TRANSPORT MANAGER — Abstracción de transporte adaptativo
+// Prioridad: BLE > LAN (misma red) > Wi-Fi Direct > offline
+// ─────────────────────────────────────────────
+enum TransportQuality { excellent, good, weak, lost }
+
+enum TransportType { ble, lan, wifiDirect, none }
+
+abstract class Transport {
+  Stream<ChatMessage> get messageStream;
+  Future<void> send(ChatMessage msg);
+  Future<void> disconnect();
+  TransportQuality get quality;
+  TransportType get type;
+  bool get isConnected;
+}
+
+class TransportManager {
+  static final TransportManager _instance = TransportManager._internal();
+  factory TransportManager() => _instance;
+  TransportManager._internal();
+
+  Transport? _activeTransport;
+  Transport? get activeTransport => _activeTransport;
+  final _transportChangeController = StreamController<TransportType>.broadcast();
+  Stream<TransportType> get onTransportChange => _transportChangeController.stream;
+
+  int _lastRssi = -100;
+  Timer? _rssiMonitor;
+  static const int _rssiCheckIntervalSec = 3;
+  static const int _rssiGoodThreshold = -70;
+  static const int _rssiWeakThreshold = -85;
+
+  TransportType _currentType = TransportType.none;
+  TransportType get currentType => _currentType;
+
+  void setActiveTransport(Transport transport) {
+    _activeTransport = transport;
+    _currentType = transport.type;
+    _transportChangeController.add(_currentType);
+    AppLogger.log('TransportManager: transporte activo = $_currentType');
+  }
+
+  void clearTransport() {
+    _activeTransport = null;
+    _currentType = TransportType.none;
+    _transportChangeController.add(_currentType);
+    AppLogger.log('TransportManager: sin transporte');
+  }
+
+  /// Update RSSI from BLE scan results. Monitors quality and suggests upgrades.
+  void updateRssi(int rssi) {
+    _lastRssi = rssi;
+    if (rssi > _rssiGoodThreshold) {
+      // BLE quality is good, no need to upgrade
+    } else if (rssi > _rssiWeakThreshold && rssi <= _rssiGoodThreshold) {
+      AppLogger.log('TransportManager: BLE señal débil (RSSI=$rssi), considere cambiar a Wi-Fi');
+    } else if (rssi <= _rssiWeakThreshold) {
+      AppLogger.log('TransportManager: BLE señal muy débil (RSSI=$rssi), debería cambiar a Wi-Fi o LAN');
+    }
+  }
+
+  /// Get quality assessment based on current RSSI
+  TransportQuality get bleQuality {
+    if (_lastRssi > _rssiGoodThreshold) return TransportQuality.excellent;
+    if (_lastRssi > _rssiWeakThreshold) return TransportQuality.good;
+    if (_lastRssi > -100) return TransportQuality.weak;
+    return TransportQuality.lost;
+  }
+
+  /// Get recommended transport based on available options and current quality
+  TransportType get recommendedTransport {
+    // BLE is preferred if quality is good
+    if (bleQuality == TransportQuality.excellent || bleQuality == TransportQuality.good) {
+      return TransportType.ble;
+    }
+    // Try to upgrade if BLE is weak
+    if (bleQuality == TransportQuality.weak) {
+      // TODO: Check if LAN is available (BUG-5 implementation)
+      // TODO: Check if Wi-Fi Direct is available (BUG-4 implementation)
+      return TransportType.ble; // Stay on BLE for now
+    }
+    // BLE is lost
+    // TODO: Try LAN, then Wi-Fi Direct
+    return TransportType.none;
+  }
+
+  /// Start monitoring RSSI periodically
+  void startRssiMonitoring(BluetoothDevice device) {
+    _rssiMonitor?.cancel();
+    _rssiMonitor = Timer.periodic(
+      const Duration(seconds: _rssiCheckIntervalSec),
+      (_) async {
+        try {
+          final rssi = await device.readRssi();
+          updateRssi(rssi);
+        } catch (e) {
+          AppLogger.log('TransportManager: Error leyendo RSSI: $e');
+        }
+      },
+    );
+  }
+
+  void stopRssiMonitoring() {
+    _rssiMonitor?.cancel();
+    _rssiMonitor = null;
+  }
+
+  void dispose() {
+    _rssiMonitor?.cancel();
+    _transportChangeController.close();
+  }
+}
+
+/// Notification type for transport changes in the UI
+class TransportNotification {
+  final TransportType from;
+  final TransportType to;
+  final TransportQuality quality;
+  const TransportNotification(this.from, this.to, this.quality);
+}
+
 // ─── Per-connection data for Central mode ───
 class _CentralConnection {
   final BluetoothDevice device;
@@ -1018,6 +1140,9 @@ class BtService {
 
       _connectionController.add(true);
       _statusController.add('Conectado: ${conn.name}');
+
+      // Start RSSI monitoring for transport quality assessment
+      TransportManager().startRssiMonitoring(device);
     } catch (e) {
       _statusController.add('Error: $e');
       rethrow;
@@ -3710,15 +3835,18 @@ class _ChatPageState extends State<ChatPage> {
   final _ctrl = TextEditingController();
   final _scroll = ScrollController();
   final bt = BtService();
+  final _transportMgr = TransportManager();
   StreamSubscription? _msgSub;
   StreamSubscription? _connSub;
   StreamSubscription? _progressSub;
   StreamSubscription? _statusSub;
+  StreamSubscription? _transportSub;
   bool _connected = false;
   double _sendProgress = 0;
   bool _sending = false;
   bool _loadingHistory = true;
   String _sendingFileName = '';
+  TransportType _currentTransport = TransportType.ble;
   Timer? _sendTimeout;
 
   @override
@@ -3736,6 +3864,10 @@ class _ChatPageState extends State<ChatPage> {
     // Also listen for status changes (peripheral connect/disconnect)
     _statusSub = bt.onStatusChange.listen((_) {
       if (mounted) setState(() => _connected = _checkConnected());
+    });
+    // Listen for transport changes
+    _transportSub = _transportMgr.onTransportChange.listen((type) {
+      if (mounted) setState(() => _currentTransport = type);
     });
     // Set active device when entering chat
     if (widget.deviceId.isNotEmpty) {
@@ -3779,6 +3911,24 @@ class _ChatPageState extends State<ChatPage> {
     if (bt.isPeripheralConnected) return true;
     // Otherwise check if the specific device is connected
     return bt.isDeviceConnected(widget.deviceId);
+  }
+
+  String _transportLabel() {
+    switch (_currentTransport) {
+      case TransportType.ble:
+        final quality = _transportMgr.bleQuality;
+        final qualityLabel = quality == TransportQuality.excellent ? ''
+            : quality == TransportQuality.good ? ' (señal buena)'
+            : quality == TransportQuality.weak ? ' (señal débil!)'
+            : ' (sin señal!)';
+        return 'BLE$qualityLabel';
+      case TransportType.lan:
+        return 'WiFi LAN';
+      case TransportType.wifiDirect:
+        return 'WiFi Direct';
+      case TransportType.none:
+        return 'Sin transporte';
+    }
   }
 
   void _startSendTimeout() {
@@ -3996,6 +4146,7 @@ class _ChatPageState extends State<ChatPage> {
     _connSub?.cancel();
     _progressSub?.cancel();
     _statusSub?.cancel();
+    _transportSub?.cancel();
     _sendTimeout?.cancel();
     _ctrl.dispose();
     _scroll.dispose();
@@ -4053,7 +4204,7 @@ class _ChatPageState extends State<ChatPage> {
                     _connected
                         ? (widget.deviceId == kGlobalChatId
                             ? '${bt.centralConnectionCount} dispositivo${bt.centralConnectionCount > 1 ? 's' : ''} conectado${bt.centralConnectionCount > 1 ? 's' : ''}'
-                            : 'Conectado por Bluetooth')
+                            : 'Conectado via ${_transportLabel()}')
                         : 'Sin conexion',
                     subtitleColor: _connected
                         ? (widget.deviceId == kGlobalChatId ? Colors.greenAccent : Colors.greenAccent)
