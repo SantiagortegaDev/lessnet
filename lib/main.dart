@@ -38,7 +38,9 @@ const String kAppVersion = '1.2.0';
 const String kHotspotChannel = 'com.lessnet.hotspot';
 const String kLocationChannel = 'com.lessnet.location';
 const String kLanChannel = 'com.lessnet.lan';
-const int kLanPort = 9876;
+const String kLanPort = 9876;
+const String kWifiDirectChannel = 'com.lessnet.wifi_direct';
+const int kP2pPort = 9877;
 
 // ─── APP LOGGER (ring buffer for debug mode) ───
 class AppLogger {
@@ -2182,6 +2184,164 @@ class LanService {
 
   void dispose() {
     _deviceController.close();
+  }
+}
+
+// ─── WI-FI DIRECT SERVICE ───
+class P2pPeer {
+  final String name;
+  final String address;
+  final bool isGroupOwner;
+  const P2pPeer({required this.name, required this.address, this.isGroupOwner = false});
+}
+
+class WifiDirectService {
+  static final WifiDirectService _instance = WifiDirectService._internal();
+  factory WifiDirectService() => _instance;
+  WifiDirectService._internal() {
+    _setupChannel();
+  }
+
+  static const _channel = MethodChannel(kWifiDirectChannel);
+  final List<P2pPeer> _peers = [];
+  final _peerController = StreamController<List<P2pPeer>>.broadcast();
+  Stream<List<P2pPeer>> get onPeersChanged => _peerController.stream;
+  List<P2pPeer> get peers => List.unmodifiable(_peers);
+
+  bool _connected = false;
+  bool _isGroupOwner = false;
+  String _groupOwnerAddress = '';
+  bool _p2pEnabled = false;
+
+  bool get connected => _connected;
+  bool get isGroupOwner => _isGroupOwner;
+  String get groupOwnerAddress => _groupOwnerAddress;
+  bool get p2pEnabled => _p2pEnabled;
+
+  void _setupChannel() {
+    _channel.setMethodCallHandler((call) async {
+      switch (call.method) {
+        case 'onP2pStateChanged':
+          _p2pEnabled = call.arguments as bool? ?? false;
+          AppLogger.log('WiFi Direct: estado ${_p2pEnabled ? "HABILITADO" : "DESHABILITADO"}');
+          break;
+        case 'onPeersChanged':
+          _peers.clear();
+          final peerList = call.arguments as List? ?? [];
+          for (final p in peerList) {
+            final map = p as Map;
+            _peers.add(P2pPeer(
+              name: map['name'] as String? ?? 'Unknown',
+              address: map['address'] as String? ?? '',
+              isGroupOwner: map['isGroupOwner'] == 'true',
+            ));
+          }
+          AppLogger.log('WiFi Direct: ${_peers.length} peers encontrados');
+          _peerController.add(List.from(_peers));
+          break;
+        case 'onConnectionChanged':
+          final info = call.arguments as Map? ?? {};
+          _connected = info['connected'] as bool? ?? false;
+          _isGroupOwner = info['isGroupOwner'] as bool? ?? false;
+          _groupOwnerAddress = info['groupOwnerAddress'] as String? ?? '';
+          AppLogger.log('WiFi Direct: conexion=$_connected, owner=$_isGroupOwner, addr=$_groupOwnerAddress');
+          break;
+        case 'onP2pMessage':
+          final message = call.arguments as String? ?? '';
+          if (message.isNotEmpty) {
+            AppLogger.log('WiFi Direct: mensaje recibido (${message.length} chars)');
+            BtService()._processReceivedText(message);
+          }
+          break;
+      }
+    });
+  }
+
+  Future<bool> initialize() async {
+    try {
+      await _channel.invokeMethod('initialize');
+      return true;
+    } catch (e) {
+      AppLogger.log('WiFi Direct: error inicializando: $e');
+      return false;
+    }
+  }
+
+  Future<bool> discoverPeers() async {
+    try {
+      await _channel.invokeMethod('discoverPeers');
+      AppLogger.log('WiFi Direct: descubrimiento iniciado');
+      return true;
+    } catch (e) {
+      AppLogger.log('WiFi Direct: error descubriendo: $e');
+      return false;
+    }
+  }
+
+  Future<void> stopDiscovery() async {
+    try {
+      await _channel.invokeMethod('stopDiscovery');
+    } catch (e) {
+      AppLogger.log('WiFi Direct: error deteniendo descubrimiento: $e');
+    }
+  }
+
+  Future<bool> connect(String address) async {
+    try {
+      await _channel.invokeMethod('connect', {'address': address});
+      AppLogger.log('WiFi Direct: conectando a $address...');
+      return true;
+    } catch (e) {
+      AppLogger.log('WiFi Direct: error conectando: $e');
+      return false;
+    }
+  }
+
+  Future<void> disconnect() async {
+    try {
+      await _channel.invokeMethod('disconnect');
+      _connected = false;
+      _isGroupOwner = false;
+      _groupOwnerAddress = '';
+    } catch (e) {
+      AppLogger.log('WiFi Direct: error desconectando: $e');
+    }
+  }
+
+  Future<bool> startP2pServer() async {
+    try {
+      await _channel.invokeMethod('startP2pServer');
+      AppLogger.log('WiFi Direct: servidor TCP P2P iniciado');
+      return true;
+    } catch (e) {
+      AppLogger.log('WiFi Direct: error iniciando servidor: $e');
+      return false;
+    }
+  }
+
+  Future<void> stopP2pServer() async {
+    try {
+      await _channel.invokeMethod('stopP2pServer');
+    } catch (e) {
+      AppLogger.log('WiFi Direct: error deteniendo servidor: $e');
+    }
+  }
+
+  Future<bool> sendMessage({String? host, required String message}) async {
+    try {
+      await _channel.invokeMethod('sendP2pMessage', {
+        'host': host ?? _groupOwnerAddress,
+        'message': message,
+      });
+      return true;
+    } catch (e) {
+      AppLogger.log('WiFi Direct: error enviando mensaje: $e');
+      return false;
+    }
+  }
+
+  void dispose() {
+    _peerController.close();
   }
 }
 

@@ -25,6 +25,13 @@ import java.io.InputStreamReader
 import java.io.PrintWriter
 import java.net.ServerSocket
 import java.net.Socket
+import android.net.wifi.p2p.WifiP2pConfig
+import android.net.wifi.p2p.WifiP2pDevice
+import android.net.wifi.p2p.WifiP2pDeviceList
+import android.net.wifi.p2p.WifiP2pInfo
+import android.net.wifi.p2p.WifiP2pManager
+import android.content.BroadcastReceiver
+import android.content.IntentFilter
 
 class MainActivity : FlutterActivity() {
     private var hotspotReservation: WifiManager.LocalOnlyHotspotReservation? = null
@@ -39,6 +46,19 @@ class MainActivity : FlutterActivity() {
     private var lanServerThread: Thread? = null
     private var lanChannel: MethodChannel? = null
     private val LAN_PORT = 9876
+
+    // ─── Wi-Fi Direct ───
+    private val TAG_P2P = "LessNetP2P"
+    private var p2pManager: WifiP2pManager? = null
+    private var p2pChannel: WifiP2pManager.Channel? = null
+    private var p2pReceiver: BroadcastReceiver? = null
+    private var p2pGroupOwner: Boolean = false
+    private var p2pConnected: Boolean = false
+    private var p2pGroupOwnerAddress: String = ""
+    private var wifiDirectChannel: MethodChannel? = null
+    private var p2pServerSocket: ServerSocket? = null
+    private var p2pServerThread: Thread? = null
+    private val P2P_PORT = 9877
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -105,6 +125,26 @@ class MainActivity : FlutterActivity() {
             }
         }
         nsdManager = getSystemService(Context.NSD_SERVICE) as NsdManager
+
+        // Wi-Fi Direct channel
+        wifiDirectChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.lessnet.wifi_direct")
+        wifiDirectChannel?.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "initialize" -> initializeWifiP2p(result)
+                "discoverPeers" -> discoverP2pPeers(result)
+                "stopDiscovery" -> stopP2pDiscovery(result)
+                "connect" -> connectP2pPeer(call, result)
+                "disconnect" -> disconnectP2p(result)
+                "isConnected" -> result.success(p2pConnected)
+                "isGroupOwner" -> result.success(p2pGroupOwner)
+                "getGroupOwnerAddress" -> result.success(p2pGroupOwnerAddress)
+                "startP2pServer" -> startP2pServer(result)
+                "stopP2pServer" -> stopP2pServer(result)
+                "sendP2pMessage" -> sendP2pMessage(call, result)
+                else -> result.notImplemented()
+            }
+        }
+        initializeWifiP2pSilent()
     }
 
     // ─── Hotspot Methods ───
@@ -513,6 +553,249 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    // ─── Wi-Fi Direct Methods ───
+
+    private fun initializeWifiP2pSilent() {
+        try {
+            p2pManager = getSystemService(Context.WIFI_P2P_SERVICE) as WifiP2pManager
+            p2pChannel = p2pManager?.initialize(this, looper, null)
+
+            // Register BroadcastReceiver for P2P events
+            val intentFilter = IntentFilter().apply {
+                addAction(WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION)
+                addAction(WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION)
+                addAction(WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION)
+                addAction(WifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION)
+            }
+
+            p2pReceiver = object : BroadcastReceiver() {
+                override fun onReceive(context: Context, intent: Intent) {
+                    when (intent.action) {
+                        WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION -> {
+                            val state = intent.getIntExtra(WifiP2pManager.EXTRA_WIFI_STATE, -1)
+                            val enabled = state == WifiP2pManager.WIFI_P2P_STATE_ENABLED
+                            Log.d(TAG_P2P, "Wi-Fi Direct state: ${if (enabled) "ENABLED" else "DISABLED"}")
+                            runOnUiThread {
+                                wifiDirectChannel?.invokeMethod("onP2pStateChanged", enabled)
+                            }
+                        }
+                        WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION -> {
+                            p2pManager?.requestPeers(p2pChannel) { peerList: WifiP2pDeviceList ->
+                                val peers = ArrayList<HashMap<String, String>>()
+                                for (device in peerList.deviceList) {
+                                    val peer = HashMap<String, String>()
+                                    peer["name"] = device.deviceName
+                                    peer["address"] = device.deviceAddress
+                                    peer["isGroupOwner"] = device.isGroupOwner.toString()
+                                    peer["status"] = device.status.toString()
+                                    peers.add(peer)
+                                }
+                                Log.d(TAG_P2P, "Peers found: ${peers.size}")
+                                runOnUiThread {
+                                    wifiDirectChannel?.invokeMethod("onPeersChanged", peers)
+                                }
+                            }
+                        }
+                        WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION -> {
+                            val info = intent.getParcelableExtra<WifiP2pInfo>(WifiP2pManager.EXTRA_WIFI_P2P_INFO)
+                            if (info != null) {
+                                p2pConnected = info.groupFormed
+                                p2pGroupOwner = info.isGroupOwner
+                                p2pGroupOwnerAddress = info.groupOwnerAddress?.hostAddress ?: ""
+                                Log.d(TAG_P2P, "P2P connection: formed=${info.groupFormed}, owner=${info.isGroupOwner}, addr=$p2pGroupOwnerAddress")
+                                runOnUiThread {
+                                    val connInfo = HashMap<String, Any>()
+                                    connInfo["connected"] = p2pConnected
+                                    connInfo["isGroupOwner"] = p2pGroupOwner
+                                    connInfo["groupOwnerAddress"] = p2pGroupOwnerAddress
+                                    wifiDirectChannel?.invokeMethod("onConnectionChanged", connInfo)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            registerReceiver(p2pReceiver, intentFilter)
+            Log.d(TAG_P2P, "Wi-Fi Direct inicializado")
+        } catch (e: Exception) {
+            Log.e(TAG_P2P, "Error inicializando Wi-Fi Direct: ${e.message}")
+        }
+    }
+
+    private fun initializeWifiP2p(result: MethodChannel.Result) {
+        try {
+            if (p2pManager == null) {
+                p2pManager = getSystemService(Context.WIFI_P2P_SERVICE) as WifiP2pManager
+                p2pChannel = p2pManager?.initialize(this, looper, null)
+            }
+            result.success(true)
+        } catch (e: Exception) {
+            result.error("P2P_ERROR", e.message, null)
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun discoverP2pPeers(result: MethodChannel.Result) {
+        try {
+            p2pManager?.discoverPeers(p2pChannel, object : WifiP2pManager.ActionListener {
+                override fun onSuccess() {
+                    Log.d(TAG_P2P, "Descubrimiento P2P iniciado")
+                    result.success(true)
+                }
+                override fun onFailure(reason: Int) {
+                    Log.e(TAG_P2P, "Descubrimiento P2P fallido: reason=$reason")
+                    result.error("P2P_ERROR", "Discovery failed: reason=$reason", null)
+                }
+            })
+        } catch (e: Exception) {
+            result.error("P2P_ERROR", e.message, null)
+        }
+    }
+
+    private fun stopP2pDiscovery(result: MethodChannel.Result) {
+        try {
+            p2pManager?.stopPeerDiscovery(p2pChannel, object : WifiP2pManager.ActionListener {
+                override fun onSuccess() { result.success(true) }
+                override fun onFailure(reason: Int) { result.error("P2P_ERROR", "Stop discovery failed: reason=$reason", null) }
+            })
+        } catch (e: Exception) {
+            result.error("P2P_ERROR", e.message, null)
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun connectP2pPeer(call: MethodCall, result: MethodChannel.Result) {
+        try {
+            val address = call.argument<String>("address") ?: ""
+            if (address.isEmpty()) {
+                result.error("P2P_ERROR", "Device address required", null)
+                return
+            }
+            val config = WifiP2pConfig.Builder()
+                .setDeviceAddress(android.net.MacAddress.fromString(address))
+                .build()
+            p2pManager?.connect(p2pChannel, config, object : WifiP2pManager.ActionListener {
+                override fun onSuccess() {
+                    Log.d(TAG_P2P, "Conectando a $address...")
+                    result.success(true)
+                }
+                override fun onFailure(reason: Int) {
+                    Log.e(TAG_P2P, "Conexion P2P fallida: reason=$reason")
+                    result.error("P2P_ERROR", "Connect failed: reason=$reason", null)
+                }
+            })
+        } catch (e: Exception) {
+            // Fallback for older APIs
+            try {
+                @Suppress("DEPRECATION")
+                val address = call.argument<String>("address") ?: ""
+                val config = WifiP2pConfig()
+                config.deviceAddress = address
+                config.groupOwnerIntent = 0 // Prefer other device as group owner
+                p2pManager?.connect(p2pChannel, config, object : WifiP2pManager.ActionListener {
+                    override fun onSuccess() { result.success(true) }
+                    override fun onFailure(reason: Int) { result.error("P2P_ERROR", "Connect failed: reason=$reason", null) }
+                })
+            } catch (e2: Exception) {
+                result.error("P2P_ERROR", e2.message, null)
+            }
+        }
+    }
+
+    private fun disconnectP2p(result: MethodChannel.Result) {
+        try {
+            p2pManager?.removeGroup(p2pChannel, object : WifiP2pManager.ActionListener {
+                override fun onSuccess() {
+                    p2pConnected = false
+                    p2pGroupOwner = false
+                    p2pGroupOwnerAddress = ""
+                    result.success(true)
+                }
+                override fun onFailure(reason: Int) { result.error("P2P_ERROR", "Disconnect failed: reason=$reason", null) }
+            })
+        } catch (e: Exception) {
+            result.error("P2P_ERROR", e.message, null)
+        }
+    }
+
+    private fun startP2pServer(result: MethodChannel.Result) {
+        try {
+            if (p2pServerSocket != null) {
+                result.success(true)
+                return
+            }
+            p2pServerThread = Thread {
+                try {
+                    p2pServerSocket = ServerSocket(P2P_PORT)
+                    Log.d(TAG_P2P, "Servidor P2P TCP iniciado en puerto $P2P_PORT")
+                    while (!Thread.currentThread().isInterrupted) {
+                        try {
+                            val client = p2pServerSocket?.accept() ?: break
+                            val reader = BufferedReader(InputStreamReader(client.getInputStream()))
+                            val message = reader.readLine()
+                            if (message != null) {
+                                Log.d(TAG_P2P, "Mensaje P2P recibido: ${message.length} chars")
+                                runOnUiThread {
+                                    wifiDirectChannel?.invokeMethod("onP2pMessage", message)
+                                }
+                            }
+                            client.close()
+                        } catch (e: Exception) {
+                            if (!Thread.currentThread().isInterrupted) {
+                                Log.e(TAG_P2P, "Error conexion P2P: ${e.message}")
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG_P2P, "Error servidor P2P: ${e.message}")
+                }
+            }
+            p2pServerThread?.start()
+            result.success(true)
+        } catch (e: Exception) {
+            result.error("P2P_ERROR", e.message, null)
+        }
+    }
+
+    private fun stopP2pServer(result: MethodChannel.Result) {
+        try {
+            p2pServerThread?.interrupt()
+            p2pServerSocket?.close()
+            p2pServerSocket = null
+            p2pServerThread = null
+            result.success(true)
+        } catch (e: Exception) {
+            result.error("P2P_ERROR", e.message, null)
+        }
+    }
+
+    private fun sendP2pMessage(call: MethodCall, result: MethodChannel.Result) {
+        try {
+            val host = call.argument<String>("host") ?: p2pGroupOwnerAddress
+            val message = call.argument<String>("message") ?: ""
+            if (host.isEmpty() || message.isEmpty()) {
+                result.error("P2P_ERROR", "Host y mensaje requeridos", null)
+                return
+            }
+            Thread {
+                try {
+                    val socket = Socket(host, P2P_PORT)
+                    val writer = PrintWriter(socket.getOutputStream(), true)
+                    writer.println(message)
+                    writer.flush()
+                    socket.close()
+                    Log.d(TAG_P2P, "Mensaje P2P enviado a $host ($P2P_PORT)")
+                    runOnUiThread { result.success(true) }
+                } catch (e: Exception) {
+                    Log.e(TAG_P2P, "Error enviando P2P: ${e.message}")
+                    runOnUiThread { result.error("P2P_ERROR", e.message, null) }
+                }
+            }.start()
+        } catch (e: Exception) {
+            result.error("P2P_ERROR", e.message, null)
+        }
+    }
+
     override fun onDestroy() {
         try {
             hotspotReservation?.close()
@@ -533,6 +816,16 @@ class MainActivity : FlutterActivity() {
         try {
             lanServerThread?.interrupt()
             lanServerSocket?.close()
+        } catch (_: Exception) {}
+        try {
+            p2pServerThread?.interrupt()
+            p2pServerSocket?.close()
+        } catch (_: Exception) {}
+        try {
+            if (p2pReceiver != null) unregisterReceiver(p2pReceiver)
+        } catch (_: Exception) {}
+        try {
+            p2pManager?.removeGroup(p2pChannel, null)
         } catch (_: Exception) {}
         super.onDestroy()
     }
