@@ -3,6 +3,7 @@ package PACKAGE_PLACEHOLDER
 import android.bluetooth.*
 import android.bluetooth.le.*
 import android.content.Context
+import android.content.pm.PackageManager
 import android.os.Handler
 import android.os.Looper
 import android.os.ParcelUuid
@@ -33,6 +34,8 @@ class BlePeripheralPlugin(private val context: Context) : MethodChannel.MethodCa
     private var connectedDevice: BluetoothDevice? = null
     private var txCharacteristic: BluetoothGattCharacteristic? = null
     private var isCurrentlyAdvertising = false
+    private var legacyAdvertiseCallback: AdvertiseCallback? = null
+    private var advertisingSetCallback: AdvertisingSetCallback? = null
 
     private var channel: MethodChannel? = null
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -74,16 +77,19 @@ class BlePeripheralPlugin(private val context: Context) : MethodChannel.MethodCa
     }
 
     private fun checkAdvertisingSupport(): Boolean {
-        try {
+        return try {
             val btManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
             val btAdapter = btManager?.adapter
             if (btAdapter == null || !btAdapter.isEnabled) return false
-
-            val adv = btAdapter.bluetoothLeAdvertiser
-            return adv != null && btAdapter.isMultipleAdvertisementSupported
-        } catch (e: Exception) {
-            return false
-        }
+            // En Android 8+ siempre intentar, ignorar isMultipleAdvertisementSupported
+            // (MediaTek y otros chipsets reportan false pero sí funcionan)
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                return btAdapter.bluetoothLeAdvertiser != null
+            }
+            // Android < 8: respetar el flag
+            btAdapter.bluetoothLeAdvertiser != null &&
+                btAdapter.isMultipleAdvertisementSupported
+        } catch (e: Exception) { false }
     }
 
     private fun startAdvertising(result: MethodChannel.Result) {
@@ -92,27 +98,114 @@ class BlePeripheralPlugin(private val context: Context) : MethodChannel.MethodCa
             bluetoothAdapter = bluetoothManager?.adapter
 
             if (bluetoothAdapter == null || !bluetoothAdapter!!.isEnabled) {
-                Log.e(TAG, "Bluetooth no activado o adaptador null")
-                result.error("BT_ERROR", "Bluetooth no esta activado", null)
+                result.error("BT_ERROR", "Bluetooth no activado", null)
                 return
             }
 
+            // Verificar permiso BLUETOOTH_ADVERTISE en Android 12+
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                if (context.checkSelfPermission(
+                        android.Manifest.permission.BLUETOOTH_ADVERTISE
+                    ) != PackageManager.PERMISSION_GRANTED) {
+                    result.error("ADV_ERROR",
+                        "Falta permiso BLUETOOTH_ADVERTISE", null)
+                    return
+                }
+            }
+
+            if (!startGattServer()) {
+                result.error("GATT_ERROR", "No se pudo crear GATT server", null)
+                return
+            }
+
+            // Intentar advertising con fallback progresivo
+            tryAdvertisingWithFallback(result)
+
+        } catch (e: Exception) {
+            isCurrentlyAdvertising = false
+            result.error("ADV_ERROR", e.message, null)
+        }
+    }
+
+    private fun tryAdvertisingWithFallback(result: MethodChannel.Result) {
+        // Intento 1: Android 8+ AdvertisingSet API (mas compatible)
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            tryAdvertisingSetApi(result)
+            return
+        }
+        // Intento 2: Legacy API sin nombre (payload minimo)
+        tryLegacyAdvertising(result)
+    }
+
+    // Intento 1: AdvertisingSet API (Android 8+) - mas compatible con
+    // chipsets MediaTek y Qualcomm que rechazan la API legacy
+    @androidx.annotation.RequiresApi(android.os.Build.VERSION_CODES.O)
+    private fun tryAdvertisingSetApi(result: MethodChannel.Result) {
+        try {
+            val setAdvertiser = bluetoothAdapter?.bluetoothLeAdvertiser
+            if (setAdvertiser == null) {
+                tryLegacyAdvertising(result)
+                return
+            }
+
+            val params = AdvertisingSetParameters.Builder()
+                .setLegacyMode(true)   // compatible con todos los scanners
+                .setConnectable(true)
+                .setInterval(AdvertisingSetParameters.INTERVAL_LOW)
+                .setTxPowerLevel(AdvertisingSetParameters.TX_POWER_HIGH)
+                .build()
+
+            // Payload minimo: SOLO el UUID (sin nombre = ahorra 12 bytes)
+            val data = AdvertiseData.Builder()
+                .setIncludeDeviceName(false)
+                .addServiceUuid(ParcelUuid(SERVICE_UUID))
+                .build()
+
+            // Scan response lleva el nombre (no cuenta para el limite principal)
+            val scanResponse = AdvertiseData.Builder()
+                .setIncludeDeviceName(true)
+                .build()
+
+            val setCallback = object : AdvertisingSetCallback() {
+                override fun onAdvertisingSetStarted(
+                    set: AdvertisingSet?,
+                    txPower: Int,
+                    status: Int
+                ) {
+                    if (status == AdvertisingSetCallback.ADVERTISE_SUCCESS) {
+                        Log.d(TAG, "AdvertisingSet API exitoso")
+                        isCurrentlyAdvertising = true
+                        mainHandler.post {
+                            channel?.invokeMethod("onAdvertiseStatus", true)
+                            result.success(true)
+                        }
+                    } else {
+                        Log.w(TAG, "AdvertisingSet fallo status=$status, intentando legacy")
+                        mainHandler.post { tryLegacyAdvertising(result) }
+                    }
+                }
+            }
+            advertisingSetCallback = setCallback
+            setAdvertiser.startAdvertisingSet(
+                params, data, scanResponse, null, null, setCallback
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "AdvertisingSet API excepcion: ${e.message}, intentando legacy")
+            tryLegacyAdvertising(result)
+        }
+    }
+
+    // Intento 2: Legacy API sin nombre del dispositivo
+    private fun tryLegacyAdvertising(result: MethodChannel.Result) {
+        try {
             advertiser = bluetoothAdapter?.bluetoothLeAdvertiser
             if (advertiser == null) {
-                Log.e(TAG, "BLE Advertiser no disponible en este dispositivo")
-                result.error("ADV_ERROR", "Este dispositivo NO soporta BLE advertising. Muchos celulares OPPO, Realme y gamas bajas no lo soportan. Usa este celular para BUSCAR.", null)
+                Log.e(TAG, "Advertiser null en ambos intentos")
+                result.error("ADV_ERROR",
+                    "Este dispositivo no soporta BLE advertising", null)
                 return
             }
 
-            Log.d(TAG, "Iniciando GATT server con UUID: $SERVICE_UUID")
-            if (!startGattServer()) {
-                Log.e(TAG, "Fallo al crear GATT server")
-                result.error("GATT_ERROR", "No se pudo crear el servidor GATT", null)
-                return
-            }
-
-            // Use LOW_LATENCY for first 30s for fast discovery, then switch is handled
-            // by the system. LOW_POWER is more battery-friendly but slower to discover.
             val settings = AdvertiseSettings.Builder()
                 .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
                 .setConnectable(true)
@@ -120,35 +213,43 @@ class BlePeripheralPlugin(private val context: Context) : MethodChannel.MethodCa
                 .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
                 .build()
 
+            // SIN nombre del dispositivo = payload pequeno = mas compatible
             val data = AdvertiseData.Builder()
-                .setIncludeDeviceName(true)
+                .setIncludeDeviceName(false)
                 .addServiceUuid(ParcelUuid(SERVICE_UUID))
                 .build()
 
-            Log.d(TAG, "Iniciando advertising con service UUID: $SERVICE_UUID")
-            advertiser?.startAdvertising(settings, data, advertiseCallback)
-            isCurrentlyAdvertising = true
-            result.success(true)
+            val scanResponse = AdvertiseData.Builder()
+                .setIncludeDeviceName(true)
+                .build()
+
+            val cb = object : AdvertiseCallback() {
+                override fun onStartSuccess(s: AdvertiseSettings) {
+                    Log.d(TAG, "Legacy advertising exitoso")
+                    isCurrentlyAdvertising = true
+                    mainHandler.post {
+                        channel?.invokeMethod("onAdvertiseStatus", true)
+                        result.success(true)
+                    }
+                }
+                override fun onStartFailure(errorCode: Int) {
+                    Log.e(TAG, "Legacy advertising fallo: errorCode=$errorCode")
+                    isCurrentlyAdvertising = false
+                    mainHandler.post {
+                        channel?.invokeMethod("onAdvertiseStatus", false)
+                        result.error("ADV_ERROR",
+                            "Advertising fallo (codigo $errorCode). " +
+                            "Este dispositivo no puede ser visible.", null)
+                    }
+                }
+            }
+            advertiser?.startAdvertising(settings, data, scanResponse, cb)
+            // Guarda referencia para poder detenerlo
+            legacyAdvertiseCallback = cb
+
         } catch (e: Exception) {
             isCurrentlyAdvertising = false
             result.error("ADV_ERROR", e.message, null)
-        }
-    }
-
-    private val advertiseCallback = object : AdvertiseCallback() {
-        override fun onStartSuccess(settingsInEffect: AdvertiseSettings) {
-            Log.d(TAG, "Advertising iniciado exitosamente (mode=${settingsInEffect.mode}, txPower=${settingsInEffect.txPowerLevel})")
-            mainHandler.post {
-                channel?.invokeMethod("onAdvertiseStatus", true)
-            }
-        }
-
-        override fun onStartFailure(errorCode: Int) {
-            Log.e(TAG, "Advertising fallo con errorCode=$errorCode (1=DATA_TOO_LARGE, 2=TOO_MANY_ADVERTISERS, 3=INTERNAL_ERROR, 4=FEATURE_UNSUPPORTED)")
-            isCurrentlyAdvertising = false
-            mainHandler.post {
-                channel?.invokeMethod("onAdvertiseStatus", false)
-            }
         }
     }
 
@@ -195,7 +296,12 @@ class BlePeripheralPlugin(private val context: Context) : MethodChannel.MethodCa
                 messageBuffer.reset()
                 isSending = false
                 try {
-                    advertiser?.stopAdvertising(advertiseCallback)
+                    if (advertisingSetCallback != null && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                        bluetoothAdapter?.bluetoothLeAdvertiser?.stopAdvertisingSet(advertisingSetCallback)
+                    }
+                } catch (e: Exception) {}
+                try {
+                    advertiser?.stopAdvertising(legacyAdvertiseCallback)
                 } catch (e: Exception) {}
                 isCurrentlyAdvertising = false
                 val deviceName = device.name ?: device.address
@@ -319,6 +425,58 @@ class BlePeripheralPlugin(private val context: Context) : MethodChannel.MethodCa
             if (bluetoothAdapter == null || !bluetoothAdapter!!.isEnabled) return
             advertiser = bluetoothAdapter?.bluetoothLeAdvertiser ?: return
 
+            // Try AdvertisingSet API on Android 8+
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                try {
+                    val params = AdvertisingSetParameters.Builder()
+                        .setLegacyMode(true)
+                        .setConnectable(true)
+                        .setInterval(AdvertisingSetParameters.INTERVAL_LOW)
+                        .setTxPowerLevel(AdvertisingSetParameters.TX_POWER_HIGH)
+                        .build()
+
+                    val data = AdvertiseData.Builder()
+                        .setIncludeDeviceName(false)
+                        .addServiceUuid(ParcelUuid(SERVICE_UUID))
+                        .build()
+
+                    val scanResponse = AdvertiseData.Builder()
+                        .setIncludeDeviceName(true)
+                        .build()
+
+                    val setCallback = object : AdvertisingSetCallback() {
+                        override fun onAdvertisingSetStarted(
+                            set: AdvertisingSet?, txPower: Int, status: Int
+                        ) {
+                            if (status == AdvertisingSetCallback.ADVERTISE_SUCCESS) {
+                                Log.d(TAG, "Restart: AdvertisingSet API exitoso")
+                                isCurrentlyAdvertising = true
+                                mainHandler.post {
+                                    channel?.invokeMethod("onAdvertiseStatus", true)
+                                }
+                            } else {
+                                Log.w(TAG, "Restart: AdvertisingSet fallo, intentando legacy")
+                                restartLegacyAdvertising()
+                            }
+                        }
+                    }
+                    advertisingSetCallback = setCallback
+                    advertiser?.startAdvertisingSet(params, data, scanResponse, null, null, setCallback)
+                    return
+                } catch (e: Exception) {
+                    Log.w(TAG, "Restart: AdvertisingSet excepcion: ${e.message}")
+                }
+            }
+
+            // Fallback: Legacy API
+            restartLegacyAdvertising()
+        } catch (e: Exception) {
+            isCurrentlyAdvertising = false
+        }
+    }
+
+    private fun restartLegacyAdvertising() {
+        try {
             val settings = AdvertiseSettings.Builder()
                 .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
                 .setConnectable(true)
@@ -327,12 +485,29 @@ class BlePeripheralPlugin(private val context: Context) : MethodChannel.MethodCa
                 .build()
 
             val data = AdvertiseData.Builder()
-                .setIncludeDeviceName(true)
+                .setIncludeDeviceName(false)
                 .addServiceUuid(ParcelUuid(SERVICE_UUID))
                 .build()
 
-            advertiser?.startAdvertising(settings, data, advertiseCallback)
-            isCurrentlyAdvertising = true
+            val scanResponse = AdvertiseData.Builder()
+                .setIncludeDeviceName(true)
+                .build()
+
+            val cb = object : AdvertiseCallback() {
+                override fun onStartSuccess(s: AdvertiseSettings) {
+                    Log.d(TAG, "Restart: Legacy advertising exitoso")
+                    isCurrentlyAdvertising = true
+                    mainHandler.post {
+                        channel?.invokeMethod("onAdvertiseStatus", true)
+                    }
+                }
+                override fun onStartFailure(errorCode: Int) {
+                    Log.e(TAG, "Restart: Legacy advertising fallo: errorCode=$errorCode")
+                    isCurrentlyAdvertising = false
+                }
+            }
+            legacyAdvertiseCallback = cb
+            advertiser?.startAdvertising(settings, data, scanResponse, cb)
         } catch (e: Exception) {
             isCurrentlyAdvertising = false
         }
@@ -528,7 +703,14 @@ class BlePeripheralPlugin(private val context: Context) : MethodChannel.MethodCa
     private fun stopAdvertising(result: MethodChannel.Result) {
         try {
             try {
-                advertiser?.stopAdvertising(advertiseCallback)
+                if (advertisingSetCallback != null && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    bluetoothAdapter?.bluetoothLeAdvertiser?.stopAdvertisingSet(advertisingSetCallback)
+                    advertisingSetCallback = null
+                }
+            } catch (e: Exception) {}
+            try {
+                advertiser?.stopAdvertising(legacyAdvertiseCallback)
+                legacyAdvertiseCallback = null
             } catch (e: Exception) {}
             try {
                 gattServer?.close()
@@ -547,7 +729,12 @@ class BlePeripheralPlugin(private val context: Context) : MethodChannel.MethodCa
 
     fun cleanup() {
         try {
-            advertiser?.stopAdvertising(advertiseCallback)
+            if (advertisingSetCallback != null && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                bluetoothAdapter?.bluetoothLeAdvertiser?.stopAdvertisingSet(advertisingSetCallback)
+            }
+        } catch (e: Exception) {}
+        try {
+            advertiser?.stopAdvertising(legacyAdvertiseCallback)
         } catch (e: Exception) {}
         try {
             gattServer?.close()
