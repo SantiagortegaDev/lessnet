@@ -1598,6 +1598,21 @@ class BtService {
         await conn!.rxChar!.write(Uint8List.fromList([0x00]), withoutResponse: false);
       }
     }
+
+    // Fallback LAN: si hay dispositivos LAN conocidos, enviar también por TCP
+    final lanDevices = LanService().devices;
+    if (lanDevices.isNotEmpty) {
+      for (final d in lanDevices) {
+        LanService().sendMessage(d.host, port: d.port, message: text)
+            .catchError((e) => AppLogger.log('LAN send error: $e'));
+      }
+    }
+
+    // Fallback P2P: si hay conexión Wi-Fi Direct activa
+    if (WifiDirectService().connected) {
+      WifiDirectService().sendMessage(message: text)
+          .catchError((e) => AppLogger.log('P2P send error: $e'));
+    }
   }
 
   Future<void> sendMessage(String text, {String? deviceId}) async {
@@ -2402,6 +2417,25 @@ class _HomePageState extends State<HomePage> {
     // Start auto-connect to nearby LessNet devices
     WidgetsBinding.instance.addPostFrameCallback((_) {
       bt.startAutoConnect();
+
+      // Iniciar LAN automáticamente (misma red WiFi)
+      LanService().startFullService().catchError((e) {
+        AppLogger.log('LAN autostart error: $e');
+      });
+
+      // Iniciar Wi-Fi Direct automáticamente
+      WifiDirectService().initialize().then((ok) {
+        if (ok) {
+          WifiDirectService().discoverPeers().catchError((e) {
+            AppLogger.log('P2P discover error: $e');
+          });
+          WifiDirectService().startP2pServer().catchError((e) {
+            AppLogger.log('P2P server error: $e');
+          });
+        }
+      }).catchError((e) {
+        AppLogger.log('P2P init error: $e');
+      });
     });
   }
 
@@ -2832,6 +2866,12 @@ class _ScanPageState extends State<ScanPage> {
   int _advSec = 0;
   Timer? _advTimer;
 
+  // ─── LAN & P2P state ───
+  StreamSubscription? _lanSub;
+  StreamSubscription? _p2pSub;
+  List<LanDevice> _lanDevices = [];
+  List<P2pPeer> _p2pPeers = [];
+
   // ─── Hotspot state ───
   static const _hotspotChannel = MethodChannel(kHotspotChannel);
   bool _hotspotEnabled = false;
@@ -2871,6 +2911,16 @@ class _ScanPageState extends State<ScanPage> {
           ),
         );
       }
+    });
+
+    // LAN device discovery
+    _lanSub = LanService().onDevicesChanged.listen((devices) {
+      if (mounted) setState(() => _lanDevices = devices);
+    });
+
+    // Wi-Fi Direct peer discovery
+    _p2pSub = WifiDirectService().onPeersChanged.listen((peers) {
+      if (mounted) setState(() => _p2pPeers = peers);
     });
   }
 
@@ -3205,6 +3255,8 @@ class _ScanPageState extends State<ScanPage> {
     _connSub?.cancel();
     _advSub?.cancel();
     _statusSub?.cancel();
+    _lanSub?.cancel();
+    _p2pSub?.cancel();
     _advTimer?.cancel();
     _scanTimer?.cancel();
     FlutterBluePlus.stopScan();
@@ -3486,6 +3538,31 @@ class _ScanPageState extends State<ScanPage> {
                     style: const TextStyle(color: Colors.redAccent, fontSize: 11)),
               ),
 
+            // Buscar por Wi-Fi Direct button
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.wifi_tethering, color: Colors.white38, size: 18),
+                label: const Text('Buscar por Wi-Fi Direct',
+                    style: TextStyle(color: Colors.white54, fontSize: 13)),
+                onPressed: () async {
+                  final ok = await WifiDirectService().discoverPeers();
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text(ok ? 'Buscando por Wi-Fi Direct...' : 'Wi-Fi Direct no disponible'),
+                      backgroundColor: Colors.grey[800],
+                    ));
+                  }
+                },
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  side: const BorderSide(color: Color(0x1AFFFFFF)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ),
+
             const SizedBox(height: 16),
 
             // Scan results
@@ -3613,7 +3690,90 @@ class _ScanPageState extends State<ScanPage> {
                   ),
                 );
               }),
-            ] else if (!_scanning &&
+            // Dispositivos LAN (misma red WiFi)
+            if (_lanDevices.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Row(children: [
+                const Icon(Icons.wifi, color: Colors.white38, size: 16),
+                const SizedBox(width: 8),
+                Text('Misma red WiFi (${_lanDevices.length})',
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14)),
+              ]),
+              const SizedBox(height: 8),
+              ..._lanDevices.map((d) => Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: _kCardBgLight,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: _kBorder),
+                ),
+                child: Row(children: [
+                  const Icon(Icons.wifi, color: Colors.white, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(d.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13)),
+                      Text('${d.host}:${d.port}', style: const TextStyle(color: Colors.white38, fontSize: 10)),
+                    ],
+                  )),
+                  TextButton(
+                    onPressed: () {
+                      bt.setActiveDevice(d.name);
+                      Navigator.of(context).push(MaterialPageRoute(
+                        builder: (_) => ChatPage(deviceId: d.name),
+                      ));
+                    },
+                    child: const Text('Chat', style: TextStyle(fontSize: 11)),
+                  ),
+                ]),
+              )),
+            ],
+
+            // Dispositivos Wi-Fi Direct
+            if (_p2pPeers.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Row(children: [
+                const Icon(Icons.wifi_tethering, color: Colors.white38, size: 16),
+                const SizedBox(width: 8),
+                Text('Wi-Fi Direct (${_p2pPeers.length})',
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14)),
+              ]),
+              const SizedBox(height: 8),
+              ..._p2pPeers.map((p) => Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: _kCardBgLight,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: _kBorder),
+                ),
+                child: Row(children: [
+                  const Icon(Icons.wifi_tethering, color: Colors.white, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(p.name, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13)),
+                      Text(p.address, style: const TextStyle(color: Colors.white38, fontSize: 10)),
+                    ],
+                  )),
+                  TextButton(
+                    onPressed: () async {
+                      final ok = await WifiDirectService().connect(p.address);
+                      if (ok && mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Conectando a ${p.name}...'), backgroundColor: Colors.grey[800]),
+                        );
+                      }
+                    },
+                    child: const Text('Conectar', style: TextStyle(fontSize: 11)),
+                  ),
+                ]),
+              )),
+            ],
+          ] else if (!_scanning &&
                 !bt.isAdvertising &&
                 !bt.isConnected)
               Center(
