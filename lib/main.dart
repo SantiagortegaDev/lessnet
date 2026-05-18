@@ -37,6 +37,8 @@ const String kGitHubRepo = "lessnet";
 const String kAppVersion = '1.2.0';
 const String kHotspotChannel = 'com.lessnet.hotspot';
 const String kLocationChannel = 'com.lessnet.location';
+const String kLanChannel = 'com.lessnet.lan';
+const int kLanPort = 9876;
 
 // ─── APP LOGGER (ring buffer for debug mode) ───
 class AppLogger {
@@ -1992,6 +1994,194 @@ class DeviceConversation {
     if (deviceId == kGlobalChatId) return 'Chat Global';
     if (deviceId.isEmpty) return 'General';
     return deviceId;
+  }
+}
+
+// ─── LAN SERVICE — NSD discovery + TCP chat ───
+class LanDevice {
+  final String name;
+  final String host;
+  final int port;
+  const LanDevice({required this.name, required this.host, required this.port});
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is LanDevice && runtimeType == other.runtimeType && host == other.host && port == other.port;
+
+  @override
+  int get hashCode => host.hashCode ^ port.hashCode;
+}
+
+class LanService {
+  static final LanService _instance = LanService._internal();
+  factory LanService() => _instance;
+  LanService._internal() {
+    _setupChannel();
+  }
+
+  static const _channel = MethodChannel(kLanChannel);
+  final List<LanDevice> _discoveredDevices = [];
+  final _deviceController = StreamController<List<LanDevice>>.broadcast();
+  Stream<List<LanDevice>> get onDevicesChanged => _deviceController.stream;
+  List<LanDevice> get devices => List.unmodifiable(_discoveredDevices);
+
+  bool _isRegistered = false;
+  bool _isDiscovering = false;
+  bool _tcpServerRunning = false;
+  String _localIp = '';
+
+  bool get isRegistered => _isRegistered;
+  bool get isDiscovering => _isDiscovering;
+  bool get tcpServerRunning => _tcpServerRunning;
+  String get localIp => _localIp;
+
+  void _setupChannel() {
+    _channel.setMethodCallHandler((call) async {
+      switch (call.method) {
+        case 'onServiceFound':
+          final info = call.arguments as Map;
+          final device = LanDevice(
+            name: info['name'] as String? ?? 'Unknown',
+            host: info['host'] as String? ?? '',
+            port: info['port'] as int? ?? kLanPort,
+          );
+          if (device.host.isNotEmpty && !_discoveredDevices.any((d) => d.host == device.host)) {
+            _discoveredDevices.add(device);
+            AppLogger.log('LAN: dispositivo encontrado: ${device.name} @ ${device.host}:${device.port}');
+            _deviceController.add(List.from(_discoveredDevices));
+          }
+          break;
+        case 'onServiceLost':
+          final name = call.arguments as String? ?? '';
+          _discoveredDevices.removeWhere((d) => d.name == name);
+          AppLogger.log('LAN: dispositivo perdido: $name');
+          _deviceController.add(List.from(_discoveredDevices));
+          break;
+        case 'onServiceRegistered':
+          AppLogger.log('LAN: servicio NSD registrado: ${call.arguments}');
+          break;
+        case 'onRegistrationFailed':
+          AppLogger.log('LAN: registro NSD fallido: errorCode=${call.arguments}');
+          break;
+        case 'onTcpMessage':
+          final message = call.arguments as String? ?? '';
+          if (message.isNotEmpty) {
+            AppLogger.log('LAN: mensaje TCP recibido (${message.length} chars)');
+            // Feed into BtService's message processing
+            BtService()._processReceivedText(message);
+          }
+          break;
+      }
+    });
+  }
+
+  Future<void> registerService({String serviceName = 'LessNet'}) async {
+    try {
+      await _channel.invokeMethod('registerService', {
+        'port': kLanPort,
+        'serviceName': serviceName,
+      });
+      _isRegistered = true;
+      AppLogger.log('LAN: servicio registrado en puerto $kLanPort');
+    } catch (e) {
+      AppLogger.log('LAN: error registrando servicio: $e');
+    }
+  }
+
+  Future<void> unregisterService() async {
+    try {
+      await _channel.invokeMethod('unregisterService');
+      _isRegistered = false;
+    } catch (e) {
+      AppLogger.log('LAN: error desregistrando servicio: $e');
+    }
+  }
+
+  Future<void> discoverServices() async {
+    if (_isDiscovering) return;
+    try {
+      _discoveredDevices.clear();
+      await _channel.invokeMethod('discoverServices');
+      _isDiscovering = true;
+      AppLogger.log('LAN: descubrimiento NSD iniciado');
+    } catch (e) {
+      AppLogger.log('LAN: error iniciando descubrimiento: $e');
+    }
+  }
+
+  Future<void> stopDiscovery() async {
+    try {
+      await _channel.invokeMethod('stopDiscovery');
+      _isDiscovering = false;
+    } catch (e) {
+      AppLogger.log('LAN: error deteniendo descubrimiento: $e');
+    }
+  }
+
+  Future<void> startTcpServer() async {
+    try {
+      await _channel.invokeMethod('startTcpServer');
+      _tcpServerRunning = true;
+      AppLogger.log('LAN: servidor TCP iniciado');
+    } catch (e) {
+      AppLogger.log('LAN: error iniciando servidor TCP: $e');
+    }
+  }
+
+  Future<void> stopTcpServer() async {
+    try {
+      await _channel.invokeMethod('stopTcpServer');
+      _tcpServerRunning = false;
+    } catch (e) {
+      AppLogger.log('LAN: error deteniendo servidor TCP: $e');
+    }
+  }
+
+  Future<void> sendMessage(String host, {int port = kLanPort, required String message}) async {
+    try {
+      await _channel.invokeMethod('sendTcpMessage', {
+        'host': host,
+        'port': port,
+        'message': message,
+      });
+      AppLogger.log('LAN: mensaje enviado a $host:$port');
+    } catch (e) {
+      AppLogger.log('LAN: error enviando mensaje: $e');
+      rethrow;
+    }
+  }
+
+  Future<String> getLocalIp() async {
+    try {
+      _localIp = await _channel.invokeMethod('getLocalIp') ?? '';
+      return _localIp;
+    } catch (e) {
+      AppLogger.log('LAN: error obteniendo IP local: $e');
+      return '';
+    }
+  }
+
+  /// Start full LAN service: register NSD + start TCP server
+  Future<void> startFullService() async {
+    await getLocalIp();
+    await registerService();
+    await startTcpServer();
+    await discoverServices();
+    AppLogger.log('LAN: servicio completo iniciado (IP=$_localIp)');
+  }
+
+  /// Stop full LAN service
+  Future<void> stopFullService() async {
+    await stopDiscovery();
+    await stopTcpServer();
+    await unregisterService();
+    _discoveredDevices.clear();
+    AppLogger.log('LAN: servicio completo detenido');
+  }
+
+  void dispose() {
+    _deviceController.close();
   }
 }
 
