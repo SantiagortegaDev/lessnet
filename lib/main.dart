@@ -1247,7 +1247,7 @@ class BtService {
             final prevActive = _activeDeviceId;
             _activeDeviceId = deviceId;
             _processReceivedText(text);
-            _activeDeviceId = prevActive;
+            _activeDeviceId = prevActive.isNotEmpty ? prevActive : _activeDeviceId;
           }
         }
         start = i + 1;
@@ -1513,7 +1513,8 @@ class BtService {
     }
 
     // ─── Plain text message ───
-    final msg = ChatMessage(id: DateTime.now().microsecondsSinceEpoch.toString(), text: text, mine: false, time: DateTime.now(), deviceId: connectedDeviceId);
+    final senderDeviceId = _activeDeviceId.isNotEmpty ? _activeDeviceId : connectedDeviceId;
+    final msg = ChatMessage(id: DateTime.now().microsecondsSinceEpoch.toString(), text: text, mine: false, time: DateTime.now(), deviceId: senderDeviceId);
     messages.add(msg);
     _msgController.add(msg);
     MessageDB.insert(msg);
