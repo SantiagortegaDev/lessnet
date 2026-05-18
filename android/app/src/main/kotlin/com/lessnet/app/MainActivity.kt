@@ -14,6 +14,7 @@ import android.net.nsd.NsdServiceInfo
 import android.net.wifi.WifiConfiguration
 import android.net.wifi.WifiManager
 import android.os.Build
+import android.os.Looper
 import android.provider.Settings
 import android.util.Log
 import io.flutter.embedding.android.FlutterActivity
@@ -371,7 +372,7 @@ class MainActivity : FlutterActivity() {
     private fun registerLanService(call: MethodCall, result: MethodChannel.Result) {
         try {
             val port = call.argument<Int>("port") ?: LAN_PORT
-            val serviceName = call.argument<String>("serviceName") ?: "LessNet"
+            var serviceName = call.argument<String>("serviceName") ?: "LessNet"
 
             val serviceInfo = NsdServiceInfo().apply {
                 serviceName = serviceName
@@ -603,7 +604,7 @@ class MainActivity : FlutterActivity() {
     private fun initializeWifiP2pSilent() {
         try {
             p2pManager = getSystemService(Context.WIFI_P2P_SERVICE) as WifiP2pManager
-            p2pChannel = p2pManager?.initialize(this, looper, null)
+            p2pChannel = p2pManager?.initialize(this, Looper.getMainLooper(), null)
 
             // Register BroadcastReceiver for P2P events
             val intentFilter = IntentFilter().apply {
@@ -671,7 +672,7 @@ class MainActivity : FlutterActivity() {
         try {
             if (p2pManager == null) {
                 p2pManager = getSystemService(Context.WIFI_P2P_SERVICE) as WifiP2pManager
-                p2pChannel = p2pManager?.initialize(this, looper, null)
+                p2pChannel = p2pManager?.initialize(this, Looper.getMainLooper(), null)
             }
             result.success(true)
         } catch (e: Exception) {
