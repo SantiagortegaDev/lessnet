@@ -2426,23 +2426,27 @@ class _HomePageState extends State<HomePage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       bt.startAutoConnect();
 
-      // Iniciar LAN automáticamente (misma red WiFi)
-      LanService().startFullService().catchError((e) {
-        AppLogger.log('LAN autostart error: $e');
-      });
-
-      // Iniciar Wi-Fi Direct automáticamente
-      WifiDirectService().initialize().then((ok) {
-        if (ok) {
-          WifiDirectService().discoverPeers().catchError((e) {
-            AppLogger.log('P2P discover error: $e');
-          });
-          WifiDirectService().startP2pServer().catchError((e) {
-            AppLogger.log('P2P server error: $e');
+      // Iniciar LAN automáticamente (misma red WiFi) — solo si está activo en prefs
+      SharedPreferences.getInstance().then((prefs) {
+        if (prefs.getBool('lan_enabled') ?? false) {
+          LanService().startFullService().catchError((e) {
+            AppLogger.log('LAN autostart error: $e');
           });
         }
-      }).catchError((e) {
-        AppLogger.log('P2P init error: $e');
+        if (prefs.getBool('wifi_direct_enabled') ?? false) {
+          WifiDirectService().initialize().then((ok) {
+            if (ok) {
+              WifiDirectService().discoverPeers().catchError((e) {
+                AppLogger.log('P2P discover error: $e');
+              });
+              WifiDirectService().startP2pServer().catchError((e) {
+                AppLogger.log('P2P server error: $e');
+              });
+            }
+          }).catchError((e) {
+            AppLogger.log('P2P init error: $e');
+          });
+        }
       });
     });
   }
@@ -2886,10 +2890,13 @@ class _ScanPageState extends State<ScanPage> {
   int _hotspotClients = 0;
   String _hotspotSsid = 'LessNet';
   String _hotspotError = '';
+  bool _lanEnabled = false;
+  bool _wifiDirectEnabled = false;
 
   @override
   void initState() {
     super.initState();
+    _loadPrefs();
     _connSub = bt.onConnectionChange.listen((_) {
       if (mounted) setState(() {});
     });
@@ -2947,6 +2954,14 @@ class _ScanPageState extends State<ScanPage> {
     // Wi-Fi Direct peer discovery
     _p2pSub = WifiDirectService().onPeersChanged.listen((peers) {
       if (mounted) setState(() => _p2pPeers = peers);
+    });
+  }
+
+  Future<void> _loadPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) setState(() {
+      _lanEnabled = prefs.getBool('lan_enabled') ?? false;
+      _wifiDirectEnabled = prefs.getBool('wifi_direct_enabled') ?? false;
     });
   }
 
@@ -3590,7 +3605,8 @@ class _ScanPageState extends State<ScanPage> {
               ],
             ),
 
-            // Hotspot toggle
+            // Hotspot toggle (solo si WiFi Direct está activo)
+            if (_wifiDirectEnabled) ...[
             const SizedBox(height: 10),
             SizedBox(
               width: double.infinity,
@@ -3657,6 +3673,7 @@ class _ScanPageState extends State<ScanPage> {
                 ),
               ),
             ),
+            ], // end if (_wifiDirectEnabled)
 
             const SizedBox(height: 16),
 
@@ -3785,8 +3802,8 @@ class _ScanPageState extends State<ScanPage> {
                   ),
                 );
               }),
-            // Dispositivos LAN (misma red WiFi)
-            if (_lanDevices.isNotEmpty) ...[
+            // Dispositivos LAN (misma red WiFi) — solo si LAN está activo
+            if (_lanEnabled && _lanDevices.isNotEmpty) ...[
               const SizedBox(height: 16),
               Row(children: [
                 const Icon(Icons.wifi, color: Colors.white38, size: 16),
@@ -3826,8 +3843,8 @@ class _ScanPageState extends State<ScanPage> {
               )),
             ],
 
-            // Dispositivos Wi-Fi Direct
-            if (_p2pPeers.isNotEmpty) ...[
+            // Dispositivos Wi-Fi Direct — solo si WiFi Direct está activo
+            if (_wifiDirectEnabled && _p2pPeers.isNotEmpty) ...[
               const SizedBox(height: 16),
               Row(children: [
                 const Icon(Icons.wifi_tethering, color: Colors.white38, size: 16),
@@ -9353,6 +9370,8 @@ class _ProfilePageState extends State<ProfilePage> {
   String _coordinates = 'No disponible';
   String _hotspotStatus = 'Desconocido';
   bool _bleEnabled = true;
+  bool _lanEnabled = false;
+  bool _wifiDirectEnabled = false;
   StreamSubscription? _connSub;
   StreamSubscription? _bleStateSub;
 
@@ -9394,6 +9413,8 @@ class _ProfilePageState extends State<ProfilePage> {
     if (mounted) setState(() {
       _userName = prefs.getString('user_name') ?? '';
       _debugMode = prefs.getBool('debug_mode') ?? false;
+      _lanEnabled = prefs.getBool('lan_enabled') ?? false;
+      _wifiDirectEnabled = prefs.getBool('wifi_direct_enabled') ?? false;
     });
   }
 
@@ -9542,6 +9563,48 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
             const SizedBox(height: 20),
 
+            // LAN toggle
+            _settingsToggle(
+              icon: Icons.wifi,
+              title: 'LAN (misma red WiFi)',
+              subtitle: 'Descubrir dispositivos en la red local',
+              value: _lanEnabled,
+              onChanged: (v) async {
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setBool('lan_enabled', v);
+                setState(() => _lanEnabled = v);
+                if (v) {
+                  LanService().startFullService();
+                } else {
+                  LanService().stopFullService();
+                }
+              },
+            ),
+            const SizedBox(height: 8),
+
+            // Wi-Fi Direct toggle
+            _settingsToggle(
+              icon: Icons.wifi_tethering,
+              title: 'Wi-Fi Direct / Hotspot',
+              subtitle: 'Funciones experimentales de red',
+              value: _wifiDirectEnabled,
+              onChanged: (v) async {
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setBool('wifi_direct_enabled', v);
+                setState(() => _wifiDirectEnabled = v);
+                if (v) {
+                  WifiDirectService().initialize().then((_) {
+                    WifiDirectService().discoverPeers();
+                    WifiDirectService().startP2pServer();
+                  });
+                } else {
+                  WifiDirectService().stopDiscovery();
+                  WifiDirectService().stopP2pServer();
+                }
+              },
+            ),
+            const SizedBox(height: 20),
+
             // Status panel
             const Text('Estado',
                 style: TextStyle(color: Colors.white38, fontSize: 12, fontWeight: FontWeight.w600)),
@@ -9587,6 +9650,31 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _settingsToggle({required IconData icon, required String title, required String subtitle, required bool value, required ValueChanged<bool> onChanged}) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _kCardBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _kBorder),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: Colors.white38, size: 20),
+          const SizedBox(width: 12),
+          Expanded(child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14)),
+              Text(subtitle, style: const TextStyle(color: Colors.white38, fontSize: 11)),
+            ],
+          )),
+          Switch(value: value, onChanged: onChanged, activeColor: Colors.white, activeTrackColor: Colors.white38),
+        ],
       ),
     );
   }
