@@ -799,6 +799,9 @@ class BtService {
   static const int _kMeshMaxHops = 5;
   static const Duration _kMeshSeenExpiry = Duration(minutes: 5);
 
+  // ─── Deduplication for sends ───
+  final Set<String> _pendingSendIds = {};
+
   // ─── Data tracking ───
   int _bytesSent = 0;
   int _bytesReceived = 0;
@@ -1625,6 +1628,12 @@ class BtService {
     if (text.isEmpty) return;
     final targetId = deviceId ?? _activeDeviceId;
 
+    // Guard: evitar duplicados si se llama dos veces rápido
+    final msgId = DateTime.now().microsecondsSinceEpoch.toString();
+    if (_pendingSendIds.contains(msgId)) return;
+    _pendingSendIds.add(msgId);
+
+    try {
     // Check if we are actually connected before sending
     if (targetId == kGlobalChatId) {
       // Global chat: need at least one connection
@@ -1658,6 +1667,9 @@ class BtService {
       AppLogger.log('Chat Global: broadcast completado');
     } else {
       await _sendRawMessage(payload, deviceId: deviceId);
+    }
+    } finally {
+      _pendingSendIds.remove(msgId);
     }
   }
 
@@ -4453,6 +4465,7 @@ class _ChatPageState extends State<ChatPage> {
   bool _connected = false;
   double _sendProgress = 0;
   bool _sending = false;
+  bool _isSendingText = false;
   bool _loadingHistory = true;
   String _sendingFileName = '';
   TransportType _currentTransport = TransportType.ble;
@@ -4594,6 +4607,7 @@ class _ChatPageState extends State<ChatPage> {
   Future<void> _send() async {
     final t = _ctrl.text.trim();
     if (t.isEmpty) return;
+    if (_isSendingText) return;
 
     // Check connection before sending
     if (widget.deviceId == kGlobalChatId) {
@@ -4603,9 +4617,12 @@ class _ChatPageState extends State<ChatPage> {
     }
 
     _ctrl.clear();
+    setState(() => _isSendingText = true);
     try {
       await bt.sendMessage(t, deviceId: widget.deviceId);
-    } catch (_) {}
+    } finally {
+      if (mounted) setState(() => _isSendingText = false);
+    }
     if (mounted) setState(() {});
     _toBottom();
   }
@@ -5045,13 +5062,13 @@ class _ChatPageState extends State<ChatPage> {
                           ),
                         ),
                         onSubmitted: (_) {
-                          if (_connected) _send();
+                          if (_connected && !_isSendingText) _send();
                         },
                       ),
                     ),
                     const SizedBox(width: 6),
                     FilledButton(
-                      onPressed: _connected ? _send : null,
+                      onPressed: (_connected && !_isSendingText) ? _send : null,
                       style: FilledButton.styleFrom(
                         padding: const EdgeInsets.all(10),
                         shape: RoundedRectangleBorder(
