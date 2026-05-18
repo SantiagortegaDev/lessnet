@@ -97,33 +97,14 @@ class LessNetCrypto {
   }
 
   static String encrypt(String plaintext, {String? deviceId}) {
-    try {
-      final key = deviceId != null ? _deviceKey(deviceId) : _globalKey;
-      final iv = deviceId != null ? _deviceIv(deviceId) : _globalIv;
-      final encrypter = enc.Encrypter(enc.AES(key, mode: enc.AESMode.cbc, padding: 'PKCS7'));
-      final encrypted = encrypter.encrypt(plaintext, iv: iv);
-      return '[ENC]${encrypted.base64}';
-    } catch (e) {
-      debugPrint('Encryption error: $e');
-      return plaintext;
-    }
+    return plaintext; // Encriptación desactivada — texto plano
   }
 
   static String decrypt(String ciphertext, {String? deviceId}) {
-    try {
-      if (!ciphertext.startsWith('[ENC]')) return ciphertext;
-      final data = ciphertext.substring(5);
-      final key = deviceId != null ? _deviceKey(deviceId) : _globalKey;
-      final iv = deviceId != null ? _deviceIv(deviceId) : _globalIv;
-      final encrypter = enc.Encrypter(enc.AES(key, mode: enc.AESMode.cbc, padding: 'PKCS7'));
-      return encrypter.decrypt64(data, iv: iv);
-    } catch (e) {
-      debugPrint('Decryption error: $e');
-      return ciphertext;
-    }
+    return ciphertext; // Encriptación desactivada — texto plano
   }
 
-  static bool isEncrypted(String text) => text.startsWith('[ENC]');
+  static bool isEncrypted(String text) => false; // Encriptación desactivada
 }
 
 // ─── DEVICE NAMING HELPER ───
@@ -1377,7 +1358,7 @@ class BtService {
     // [GLOBAL][ENC]<base64> — encrypted global message
     if (text.startsWith('[GLOBAL]')) {
       final encryptedPayload = text.substring(8); // skip '[GLOBAL]'
-      final decrypted = LessNetCrypto.decrypt(encryptedPayload);
+      final decrypted = encryptedPayload; // Sin encriptación
       if (decrypted.isNotEmpty && !decrypted.startsWith('[FILE:') && !decrypted.startsWith('[XFR:')) {
         final msg = ChatMessage(
           id: DateTime.now().microsecondsSinceEpoch.toString(),
@@ -1399,11 +1380,14 @@ class BtService {
       return;
     }
 
-    // ─── ENCRYPTED PERSONAL MESSAGE ───
+    // ─── ENCRYPTED PERSONAL MESSAGE (legacy — ya no se genera) ───
+    // Los mensajes [ENC] legacy se procesan como texto plano
     if (text.startsWith('[ENC]')) {
+      // Si llega un mensaje [ENC] de una versión antigua, intentamos decrypt
+      // pero como la encriptación está desactivada, lo pasamos tal cual
+      final payload = text.substring(5); // quitar '[ENC]'
       final senderId = _activeDeviceId.isNotEmpty ? _activeDeviceId : connectedDeviceId;
-      final decrypted = LessNetCrypto.decrypt(text, deviceId: senderId);
-      // Process the decrypted text normally (could be plain text or file protocol)
+      final decrypted = LessNetCrypto.decrypt(payload, deviceId: senderId);
       if (decrypted.startsWith('[FILE:') || decrypted.startsWith('[IMG:') || decrypted.startsWith('[VID:')) {
         _processReceivedText(decrypted);
       } else {
@@ -1633,14 +1617,9 @@ class BtService {
     _msgController.add(msg);
     MessageDB.insert(msg);
 
-    // Encrypt the message
+    // Sin encriptación — texto plano
     final isGlobal = targetId == kGlobalChatId;
-    final encryptedText = isGlobal
-        ? LessNetCrypto.encrypt(text)
-        : LessNetCrypto.encrypt(text, deviceId: targetId);
-
-    // Add protocol prefix for global chat
-    final payload = isGlobal ? '[GLOBAL]$encryptedText' : encryptedText;
+    final payload = isGlobal ? '[GLOBAL]$text' : text;
 
     if (isGlobal) {
       // Broadcast to ALL connected devices simultaneously
@@ -1700,14 +1679,9 @@ class BtService {
       // Build the full payload: [FILE:TYPE:FILENAME:SIZE:CRC32]base64data
       final filePayload = '[FILE:$typeCode:$fileName:$fileSize:$fileCrc]$b64';
 
-      // Encrypt the file payload
+      // Sin encriptación — file payload en texto plano
       final isGlobal = targetId == kGlobalChatId;
-      final encryptedPayload = isGlobal
-          ? LessNetCrypto.encrypt(filePayload)
-          : LessNetCrypto.encrypt(filePayload, deviceId: targetId);
-
-      // Add protocol prefix for global chat
-      final payload = isGlobal ? '[GLOBAL]$encryptedPayload' : encryptedPayload;
+      final payload = isGlobal ? '[GLOBAL]$filePayload' : filePayload;
       final payloadBytes = utf8.encode(payload);
 
       if (_isPeripheral && _peripheralConnected) {
