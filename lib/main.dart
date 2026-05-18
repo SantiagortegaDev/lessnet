@@ -4983,6 +4983,7 @@ class _ChatPageState extends State<ChatPage> {
       alignment: m.mine ? Alignment.centerRight : Alignment.centerLeft,
       child: Material(
         color: Colors.transparent,
+        textStyle: const TextStyle(decoration: TextDecoration.none),
         child: Container(
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -5015,17 +5016,15 @@ class _ChatPageState extends State<ChatPage> {
                     decoration: TextDecoration.none, // Kill yellow underline
                   )),
             const SizedBox(height: 4),
-            // Time + size + encryption indicator + read receipt
+            // Time + size indicator
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Lock icon for encrypted chats
-                Icon(Icons.lock, size: 9, color: m.mine ? Colors.black38 : const Color(0xFF404040)),
-                const SizedBox(width: 3),
                 Text(_fmt(m.time),
                     style: TextStyle(
                       color: m.mine ? Colors.black38 : const Color(0xFF404040),
                       fontSize: 10,
+                      decoration: TextDecoration.none,
                     )),
                 if (m.fileSize != null) ...[
                   const SizedBox(width: 6),
@@ -5033,16 +5032,8 @@ class _ChatPageState extends State<ChatPage> {
                       style: TextStyle(
                         color: m.mine ? Colors.black38 : const Color(0xFF404040),
                         fontSize: 10,
+                        decoration: TextDecoration.none,
                       )),
-                ],
-                // Read receipt checkmarks (for own messages)
-                if (m.mine) ...[
-                  const SizedBox(width: 4),
-                  Icon(
-                    m.read ? Icons.done_all : Icons.done,
-                    size: 14,
-                    color: m.read ? Colors.blueAccent : (m.mine ? Colors.black38 : const Color(0xFF404040)),
-                  ),
                 ],
               ],
             ),
