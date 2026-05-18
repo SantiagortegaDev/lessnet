@@ -6952,6 +6952,7 @@ class _EmergencyMapPageState extends State<EmergencyMapPage> {
     super.initState();
     _mapController = MapController();
     _load();
+    _maybeDownloadTiles();
   }
 
   Future<void> _load() async {
@@ -7014,6 +7015,70 @@ class _EmergencyMapPageState extends State<EmergencyMapPage> {
           }
           return true;
         }).toList();
+
+  Future<void> _maybeDownloadTiles() async {
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final tilesDir = Directory('${dir.path}/map_tiles');
+      if (await tilesDir.exists()) {
+        int count = 0;
+        await for (final _ in tilesDir.list(recursive: true)) { count++; }
+        if (count > 50) return; // Ya tenemos suficientes tiles
+      }
+      await _prefetchMapTiles();
+    } catch (_) {}
+  }
+
+  Future<void> _prefetchMapTiles() async {
+    // Bounding box Colombia
+    const double minLat = -4.2;
+    const double maxLat = 12.5;
+    const double minLng = -81.7;
+    const double maxLng = -66.9;
+    const List<int> zoomLevels = [5, 6, 7];
+
+    final client = http.Client();
+    int downloaded = 0;
+    int failed = 0;
+
+    for (final zoom in zoomLevels) {
+      final minTileX = _lngToTileX(minLng, zoom);
+      final maxTileX = _lngToTileX(maxLng, zoom);
+      final minTileY = _latToTileY(maxLat, zoom);
+      final maxTileY = _latToTileY(minLat, zoom);
+
+      for (int x = minTileX; x <= maxTileX; x++) {
+        for (int y = minTileY; y <= maxTileY; y++) {
+          final url = 'https://tile.openstreetmap.org/$zoom/$x/$y.png';
+          try {
+            final response = await client.get(Uri.parse(url),
+                headers: {'User-Agent': 'LessNet/1.0'});
+            if (response.statusCode == 200) {
+              final dir = await getApplicationDocumentsDirectory();
+              final file = File('${dir.path}/map_tiles/$zoom/$x/$y.png');
+              await file.parent.create(recursive: true);
+              await file.writeAsBytes(response.bodyBytes);
+              downloaded++;
+            }
+          } catch (_) {
+            failed++;
+          }
+          await Future.delayed(const Duration(milliseconds: 50));
+        }
+      }
+    }
+    client.close();
+    AppLogger.log('Tiles descargados: $downloaded, fallidos: $failed');
+  }
+
+  int _lngToTileX(double lng, int zoom) {
+    return ((lng + 180.0) / 360.0 * (1 << zoom)).floor();
+  }
+
+  int _latToTileY(double lat, int zoom) {
+    final latRad = lat * pi / 180.0;
+    return ((1.0 - log(tan(latRad) + 1.0 / cos(latRad)) / pi) / 2.0 * (1 << zoom)).floor();
+  }
 
   @override
   Widget build(BuildContext context) {
