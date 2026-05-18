@@ -5,6 +5,8 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.hardware.camera2.CameraCharacteristics
+import android.hardware.camera2.CameraManager
 import android.location.Location
 import android.location.LocationManager
 import android.net.wifi.WifiConfiguration
@@ -44,6 +46,16 @@ class MainActivity : FlutterActivity() {
                 "getLocation" -> getLocation(result)
                 "hasLocationPermission" -> result.success(hasLocationPermission())
                 "requestLocationPermission" -> requestLocationPermission(result)
+                else -> result.notImplemented()
+            }
+        }
+
+        // Flashlight channel
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.lessnet.flashlight").setMethodCallHandler { call, result ->
+            when (call.method) {
+                "turnOn" -> turnFlashlight(true, result)
+                "turnOff" -> turnFlashlight(false, result)
+                "isAvailable" -> result.success(isFlashlightAvailable())
                 else -> result.notImplemented()
             }
         }
@@ -188,6 +200,31 @@ class MainActivity : FlutterActivity() {
             }
         } catch (e: Exception) {
             result.error("LOCATION_ERROR", e.message, null)
+        }
+    }
+
+    // ─── Flashlight Methods ───
+
+    private fun isFlashlightAvailable(): Boolean {
+        val pm = packageManager
+        return pm.hasSystemFeature(PackageManager.FEATURE_CAMERA_FLASH)
+    }
+
+    private fun turnFlashlight(on: Boolean, result: MethodChannel.Result) {
+        try {
+            val cameraManager = getSystemService(Context.CAMERA_SERVICE) as CameraManager
+            val cameraId = cameraManager.cameraIdList.firstOrNull { id ->
+                cameraManager.getCameraCharacteristics(id)
+                    .get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true
+            }
+            if (cameraId != null) {
+                cameraManager.setTorchMode(cameraId, on)
+                result.success(true)
+            } else {
+                result.error("FLASHLIGHT_ERROR", "No flashlight available", null)
+            }
+        } catch (e: Exception) {
+            result.error("FLASHLIGHT_ERROR", e.message, null)
         }
     }
 }

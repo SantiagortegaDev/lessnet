@@ -21,6 +21,11 @@ import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:vibration/vibration.dart';
+import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import 'dart:math';
 
 // ─── UUIDs del servicio BLE de LessNet ───
 const String lessnetServiceUuid = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
@@ -867,9 +872,11 @@ class BtService {
 
   Future<void> startAdvertising() async {
     _advertisingError = '';
+    _isAdvertising = false; // Don't set true until confirmed
     try {
       await _peripheralChannel.invokeMethod('startAdvertising');
       _isPeripheral = true;
+      // Only set true after native confirms success (no exception thrown)
       _isAdvertising = true;
       _advertisingController.add(true);
       // Start foreground service while advertising
@@ -1600,6 +1607,7 @@ class ChatMessage {
   final String? filePath; // local file path for received/sent files
   final int? fileSize;
   final String deviceId; // remote device identifier
+  final bool read; // read receipt
 
   ChatMessage({
     required this.id,
@@ -1611,6 +1619,7 @@ class ChatMessage {
     this.filePath,
     this.fileSize,
     this.deviceId = '',
+    this.read = false,
   });
 
   Map<String, dynamic> toMap() => {
@@ -1623,6 +1632,7 @@ class ChatMessage {
     'filePath': filePath,
     'fileSize': fileSize,
     'deviceId': deviceId,
+    'read': read ? 1 : 0,
   };
 
   factory ChatMessage.fromMap(Map<String, dynamic> m) => ChatMessage(
@@ -1635,6 +1645,7 @@ class ChatMessage {
     filePath: m['filePath'] as String?,
     fileSize: m['fileSize'] as int?,
     deviceId: m['deviceId'] as String? ?? '',
+    read: (m['read'] as int?) == 1,
   );
 }
 
@@ -1652,7 +1663,7 @@ class MessageDB {
     final path = await getDatabasesPath();
     return openDatabase(
       '$path/lessnet_messages.db',
-      version: 2,
+      version: 3,
       onCreate: (db, ver) async {
         await db.execute('''
           CREATE TABLE messages (
@@ -1671,6 +1682,9 @@ class MessageDB {
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
           await db.execute('ALTER TABLE messages ADD COLUMN deviceId TEXT DEFAULT \'\'');
+        }
+        if (oldVersion < 3) {
+          await db.execute('ALTER TABLE messages ADD COLUMN read INTEGER DEFAULT 0');
         }
       },
     );
@@ -2450,6 +2464,22 @@ class _ScanPageState extends State<ScanPage> {
       }
     } else {
       try {
+        // Request NEARBY_WIFI_DEVICES permission (required on Android 13+ for hotspot)
+        final nearbyStatus = await Permission.nearbyWifiDevices.request();
+        if (!nearbyStatus.isGranted) {
+          // Fall back to location permission on older Android
+          final locStatus = await Permission.locationWhenInUse.request();
+          if (!locStatus.isGranted) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                content: Text('Se requiere permiso de WiFi cercano o ubicacion para el hotspot'),
+                backgroundColor: Colors.redAccent,
+              ));
+            }
+            return;
+          }
+        }
+
         final ssidCtrl = TextEditingController(text: _hotspotSsid);
         final ssid = await showDialog<String>(
           context: context,
@@ -2485,7 +2515,7 @@ class _ScanPageState extends State<ScanPage> {
         if (mounted) setState(() { _hotspotEnabled = true; _hotspotError = ''; });
         AppLogger.log('Hotspot iniciado: $ssid');
       } catch (e) {
-        if (mounted) setState(() { _hotspotEnabled = false; _hotspotError = 'Hotspot no disponible en este dispositivo'; });
+        if (mounted) setState(() { _hotspotEnabled = false; _hotspotError = 'Hotspot no disponible: $e'; });
         AppLogger.log('Error hotspot: $e');
       }
     }
@@ -2538,8 +2568,10 @@ class _ScanPageState extends State<ScanPage> {
               bt.centralConnectionCount > 0
                   ? '${bt.centralConnectionCount} conectado${bt.centralConnectionCount > 1 ? 's' : ''}'
                   : bt.isAdvertising
-                      ? 'Visible'
-                      : 'Sin conexion',
+                      ? 'Visible y esperando'
+                      : bt.advertisingError.isNotEmpty
+                          ? 'Sin conexion'
+                          : 'Sin conexion',
               subtitleColor: bt.isConnected ? Colors.greenAccent : (bt.isAdvertising ? Colors.blueAccent : Colors.white38),
             ),
             const SizedBox(height: 16),
@@ -3052,6 +3084,12 @@ class _ChatListPageState extends State<ChatListPage> {
         }
         return;
       }
+
+      // Stop any existing scan first (auto-connect or other) to avoid conflicts
+      try {
+        await FlutterBluePlus.stopScan();
+        await Future.delayed(const Duration(milliseconds: 500));
+      } catch (_) {}
 
       await FlutterBluePlus.startScan(
         timeout: const Duration(seconds: 15),
@@ -4092,7 +4130,9 @@ class _ChatPageState extends State<ChatPage> {
   Widget _buildMessage(ChatMessage m) {
     return Align(
       alignment: m.mine ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
+      child: Material(
+        color: Colors.transparent,
+        child: Container(
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         constraints: const BoxConstraints(maxWidth: 280),
@@ -4121,9 +4161,10 @@ class _ChatPageState extends State<ChatPage> {
                   style: TextStyle(
                     color: m.mine ? Colors.black : Colors.white,
                     fontSize: 14,
+                    decoration: TextDecoration.none, // Kill yellow underline
                   )),
             const SizedBox(height: 4),
-            // Time + size + encryption indicator
+            // Time + size + encryption indicator + read receipt
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -4143,9 +4184,19 @@ class _ChatPageState extends State<ChatPage> {
                         fontSize: 10,
                       )),
                 ],
+                // Read receipt checkmarks (for own messages)
+                if (m.mine) ...[
+                  const SizedBox(width: 4),
+                  Icon(
+                    m.read ? Icons.done_all : Icons.done,
+                    size: 14,
+                    color: m.read ? Colors.blueAccent : (m.mine ? Colors.black38 : const Color(0xFF404040)),
+                  ),
+                ],
               ],
             ),
           ],
+        ),
         ),
       ),
     );
@@ -4645,6 +4696,19 @@ class _VaultHomePageState extends State<VaultHomePage> {
     if (mounted) setState(() => _bookmarks = b);
   }
 
+  void _openBookmark(String title, String type) {
+    // Navigate to the appropriate section and find the item
+    if (type == 'first_aid') {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const FirstAidPage()));
+    } else if (type == 'guide') {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const GuidesPage()));
+    } else if (type == 'dict') {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const DictionaryPage()));
+    } else if (type == 'wiki') {
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const WikipediaPage()));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final sections = [
@@ -4765,7 +4829,9 @@ class _VaultHomePageState extends State<VaultHomePage> {
                     final parts = b.split('||');
                     final title = parts.isNotEmpty ? parts[0] : b;
                     final type = parts.length > 1 ? parts[1] : '';
-                    return Container(
+                    return GestureDetector(
+                      onTap: () => _openBookmark(title, type),
+                      child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                       decoration: BoxDecoration(
                         color: _kCardBgLight,
@@ -4793,6 +4859,7 @@ class _VaultHomePageState extends State<VaultHomePage> {
                             ),
                           ),
                         ],
+                      ),
                       ),
                     );
                   }).toList(),
@@ -5891,13 +5958,13 @@ class _EmergencyMapPageState extends State<EmergencyMapPage> {
   bool _loading = true;
   String _filter = 'all';
   bool _showMap = true;
-  Offset _offset = Offset.zero;
-  double _scale = 1.0;
   int? _selectedIdx;
+  MapController? _mapController;
 
   @override
   void initState() {
     super.initState();
+    _mapController = MapController();
     _load();
   }
 
@@ -5962,15 +6029,6 @@ class _EmergencyMapPageState extends State<EmergencyMapPage> {
           return true;
         }).toList();
 
-  // Convert lat/lng to screen coordinates within a bounding box
-  // Colombia bounds: lat ~-4.5 to ~13.5, lng ~-79.5 to ~-66.5
-  Offset _latLngToOffset(double lng, double lat, Size size) {
-    const minLng = -79.5, maxLng = -66.5, minLat = -4.5, maxLat = 13.5;
-    final x = ((lng - minLng) / (maxLng - minLng)) * size.width;
-    final y = (1.0 - (lat - minLat) / (maxLat - minLat)) * size.height;
-    return Offset(x, y);
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -6018,107 +6076,141 @@ class _EmergencyMapPageState extends State<EmergencyMapPage> {
 
   Widget _buildMapView() {
     final filtered = _filtered;
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final mapSize = Size(constraints.maxWidth, constraints.maxHeight);
-        return GestureDetector(
-          onScaleStart: (_) {},
-          onScaleUpdate: (details) {
-            setState(() {
-              _scale = (_scale * details.scale).clamp(0.5, 5.0);
-              _offset += details.focalPointDelta;
-            });
-          },
-          onTapUp: (details) {
-            final tapPos = (details.localPosition - _offset) / _scale;
-            // Find closest point
-            int? closest;
-            double minDist = 20; // min tap distance in pixels
-            for (int i = 0; i < filtered.length; i++) {
-              final f = filtered[i] as Map<String, dynamic>;
-              final geom = f['geometry'] as Map<String, dynamic>?;
-              final coords = geom?['coordinates'] as List?;
-              if (coords == null || coords.length < 2) continue;
-              final lng = (coords[0] as num).toDouble();
-              final lat = (coords[1] as num).toDouble();
-              final pos = _latLngToOffset(lng, lat, mapSize);
-              final dist = (pos - tapPos).distance;
-              if (dist < minDist) {
-                minDist = dist;
-                closest = i;
+    return Stack(
+      children: [
+        FlutterMap(
+          mapController: _mapController,
+          options: MapOptions(
+            initialCenter: LatLng(4.5, -74.0),
+            initialZoom: 5.0,
+            minZoom: 3.0,
+            maxZoom: 18.0,
+            interactionOptions: const InteractionOptions(
+              flags: InteractiveFlag.all,
+            ),
+            onTap: (tapPosition, point) {
+              // Find closest feature
+              int? closest;
+              double minDist = 0.05; // ~5km
+              for (int i = 0; i < filtered.length; i++) {
+                final f = filtered[i] as Map<String, dynamic>;
+                final geom = f['geometry'] as Map<String, dynamic>?;
+                final coords = geom?['coordinates'] as List?;
+                if (coords == null || coords.length < 2) continue;
+                final lng = (coords[0] as num).toDouble();
+                final lat = (coords[1] as num).toDouble();
+                final dist = _haversine(point.latitude, point.longitude, lat, lng);
+                if (dist < minDist) {
+                  minDist = dist;
+                  closest = i;
+                }
               }
-            }
-            setState(() => _selectedIdx = closest);
-          },
-          child: ClipRect(
-            child: Stack(
-              children: [
-                Transform.translate(
-                  offset: _offset,
-                  child: Transform.scale(
-                    scale: _scale,
-                    alignment: Alignment.topLeft,
-                    child: CustomPaint(
-                      size: mapSize,
-                      painter: _ColombiaMapPainter(
-                        features: filtered,
-                        selectedIdx: _selectedIdx,
+              setState(() => _selectedIdx = closest);
+            },
+          ),
+          children: [
+            TileLayer(
+              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              userAgentPackageName: 'com.lessnet.app',
+              maxNativeZoom: 19,
+            ),
+            MarkerLayer(
+              markers: filtered.asMap().entries.map((entry) {
+                final i = entry.key;
+                final f = entry.value as Map<String, dynamic>;
+                final geom = f['geometry'] as Map<String, dynamic>?;
+                final coords = geom?['coordinates'] as List?;
+                if (coords == null || coords.length < 2) return null;
+                final lng = (coords[0] as num).toDouble();
+                final lat = (coords[1] as num).toDouble();
+                final p = f['properties'] as Map<String, dynamic>? ?? {};
+                final t = p['tipo'] ?? '';
+                final isSelected = _selectedIdx == i;
+                return Marker(
+                  point: LatLng(lat, lng),
+                  width: isSelected ? 40 : 28,
+                  height: isSelected ? 40 : 28,
+                  child: GestureDetector(
+                    onTap: () => setState(() => _selectedIdx = i),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: _typeColor(t).withOpacity(0.9),
+                        shape: BoxShape.circle,
+                        border: isSelected
+                            ? Border.all(color: Colors.white, width: 3)
+                            : null,
+                        boxShadow: isSelected
+                            ? [BoxShadow(color: _typeColor(t), blurRadius: 8)]
+                            : null,
                       ),
+                      child: Icon(_typeIcon(t), color: Colors.black, size: isSelected ? 20 : 14),
                     ),
                   ),
-                ),
-                // Selected point info
-                if (_selectedIdx != null && _selectedIdx! < filtered.length)
-                  Positioned(
-                    left: 12,
-                    bottom: 12,
-                    right: 12,
-                    child: _MapPointCard(
-                      feature: filtered[_selectedIdx!] as Map<String, dynamic>,
-                      onTap: () {
-                        final f = filtered[_selectedIdx!] as Map<String, dynamic>;
-                        final p = f['properties'] as Map<String, dynamic>? ?? {};
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => _MapDetailPage(props: p),
-                          ),
-                        );
-                      },
-                    ),
+                );
+              }).whereType<Marker>().toList(),
+            ),
+          ],
+        ),
+        // Selected point info
+        if (_selectedIdx != null && _selectedIdx! < filtered.length)
+          Positioned(
+            left: 12,
+            bottom: 12,
+            right: 12,
+            child: _MapPointCard(
+              feature: filtered[_selectedIdx!] as Map<String, dynamic>,
+              onTap: () {
+                final f = filtered[_selectedIdx!] as Map<String, dynamic>;
+                final p = f['properties'] as Map<String, dynamic>? ?? {};
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => _MapDetailPage(props: p),
                   ),
-                // Legend
-                Positioned(
-                  right: 8,
-                  top: 8,
-                  child: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Color(0xDD000000),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _legendDot(Colors.white, 'Capital'),
-                        const SizedBox(height: 4),
-                        _legendDot(Colors.grey, 'Cap. Depto'),
-                        const SizedBox(height: 4),
-                        _legendDot(Colors.redAccent, 'Hospital'),
-                        const SizedBox(height: 4),
-                        _legendDot(Colors.greenAccent, 'Ciudad'),
-                      ],
-                    ),
-                  ),
-                ),
+                );
+              },
+            ),
+          ),
+        // Legend
+        Positioned(
+          right: 8,
+          top: 8,
+          child: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Color(0xDD000000),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _legendDot(Colors.white, 'Capital'),
+                const SizedBox(height: 4),
+                _legendDot(Colors.grey, 'Cap. Depto'),
+                const SizedBox(height: 4),
+                _legendDot(Colors.redAccent, 'Hospital'),
+                const SizedBox(height: 4),
+                _legendDot(Colors.greenAccent, 'Ciudad'),
               ],
             ),
           ),
-        );
-      },
+        ),
+      ],
     );
   }
+
+  double _haversine(double lat1, double lon1, double lat2, double lon2) {
+    const R = 6371;
+    final dLat = _toRad(lat2 - lat1);
+    final dLon = _toRad(lon2 - lon1);
+    final a = (dLat / 2) * (dLat / 2) +
+        _toRad(lat1) * _toRad(lat2) * (dLon / 2) * (dLon / 2);
+    final c = 2 * atan2(sqrt(a), sqrt(1 - a));
+    return R * c;
+  }
+
+  double _toRad(double deg) => deg * pi / 180;
 
   Widget _legendDot(Color color, String label) {
     return Row(
@@ -6215,137 +6307,7 @@ class _EmergencyMapPageState extends State<EmergencyMapPage> {
 }
 
 // ─── Custom painter for Colombia map ───
-class _ColombiaMapPainter extends CustomPainter {
-  final List<dynamic> features;
-  final int? selectedIdx;
-
-  _ColombiaMapPainter({required this.features, this.selectedIdx});
-
-  // Colombia bounds
-  static const minLng = -79.5, maxLng = -66.5, minLat = -4.5, maxLat = 13.5;
-
-  Offset _toOffset(double lng, double lat, Size size) {
-    final x = ((lng - minLng) / (maxLng - minLng)) * size.width;
-    final y = (1.0 - (lat - minLat) / (maxLat - minLat)) * size.height;
-    return Offset(x, y);
-  }
-
-  // Simplified Colombia outline polygon
-  static const _colombiaOutline = [
-    [-77.4, 1.2], [-77.1, 1.6], [-76.9, 2.1], [-76.8, 2.6], [-76.9, 2.9],
-    [-77.0, 3.3], [-76.6, 3.9], [-76.4, 4.2], [-76.2, 3.9], [-76.1, 3.5],
-    [-75.8, 3.0], [-75.6, 2.6], [-75.3, 2.2], [-75.0, 1.8], [-74.8, 1.5],
-    [-74.5, 1.2], [-74.2, 0.8], [-73.8, 0.5], [-73.5, 0.2], [-72.8, -0.2],
-    [-72.0, -0.5], [-71.5, -1.0], [-70.8, -1.5], [-70.3, -2.0], [-70.0, -2.5],
-    [-69.5, -3.0], [-69.0, -3.5], [-68.5, -3.8], [-67.5, -2.5], [-67.0, -1.0],
-    [-66.9, 0.5], [-67.0, 1.5], [-67.2, 2.5], [-67.5, 3.5], [-67.8, 4.5],
-    [-68.0, 5.5], [-68.5, 6.5], [-69.0, 7.5], [-69.5, 8.5], [-70.0, 9.0],
-    [-71.0, 9.5], [-72.0, 10.0], [-72.5, 10.5], [-73.0, 11.0], [-73.5, 11.5],
-    [-74.0, 12.0], [-74.5, 12.5], [-75.0, 12.0], [-75.5, 11.5], [-76.0, 11.0],
-    [-76.5, 10.5], [-77.0, 10.0], [-77.2, 9.5], [-77.0, 9.0], [-76.8, 8.5],
-    [-76.5, 8.0], [-76.2, 7.5], [-76.0, 7.0], [-75.8, 6.5], [-75.6, 6.0],
-    [-75.5, 5.5], [-75.8, 5.0], [-76.0, 4.5], [-76.3, 4.0], [-76.5, 3.5],
-    [-76.8, 3.0], [-77.0, 2.5], [-77.2, 2.0], [-77.4, 1.5], [-77.4, 1.2],
-  ];
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    // Draw Colombia outline
-    final outlinePaint = Paint()
-      ..color = const Color(0xFF2A2A2A)
-      ..style = PaintingStyle.fill;
-    final borderPaint = Paint()
-      ..color = const Color(0xFF444444)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5;
-
-    final outlinePath = Path();
-    for (int i = 0; i < _colombiaOutline.length; i++) {
-      final pt = _toOffset(_colombiaOutline[i][0], _colombiaOutline[i][1], size);
-      if (i == 0) {
-        outlinePath.moveTo(pt.dx, pt.dy);
-      } else {
-        outlinePath.lineTo(pt.dx, pt.dy);
-      }
-    }
-    outlinePath.close();
-    canvas.drawPath(outlinePath, outlinePaint);
-    canvas.drawPath(outlinePath, borderPaint);
-
-    // Draw points
-    for (int i = 0; i < features.length; i++) {
-      final f = features[i] as Map<String, dynamic>;
-      final geom = f['geometry'] as Map<String, dynamic>?;
-      final coords = geom?['coordinates'] as List?;
-      if (coords == null || coords.length < 2) continue;
-
-      final lng = (coords[0] as num).toDouble();
-      final lat = (coords[1] as num).toDouble();
-      final pos = _toOffset(lng, lat, size);
-
-      final p = f['properties'] as Map<String, dynamic>? ?? {};
-      final t = p['tipo'] ?? '';
-      final isHospital = t == 'hospital_referencia' || p['hospital'] == true;
-      final isCapital = t == 'capital_nacional';
-      final isDeptCapital = t == 'capital_departamento';
-
-      Color dotColor;
-      double dotRadius;
-      if (isCapital) {
-        dotColor = Colors.white;
-        dotRadius = 6;
-      } else if (isDeptCapital) {
-        dotColor = Colors.grey;
-        dotRadius = 5;
-      } else if (isHospital) {
-        dotColor = Colors.redAccent;
-        dotRadius = 4;
-      } else {
-        dotColor = Colors.greenAccent;
-        dotRadius = 3;
-      }
-
-      // Glow for selected
-      if (i == selectedIdx) {
-        final glowPaint = Paint()..color = dotColor.withOpacity(0.3);
-        canvas.drawCircle(pos, dotRadius + 8, glowPaint);
-        dotRadius = 8;
-      }
-
-      final dotPaint = Paint()..color = dotColor;
-      canvas.drawCircle(pos, dotRadius, dotPaint);
-
-      // Dark border
-      final borderDot = Paint()
-        ..color = const Color(0xFF0A0A0A)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1;
-      canvas.drawCircle(pos, dotRadius, borderDot);
-
-      // Label for capitals
-      if (isCapital || isDeptCapital) {
-        final tp = TextPainter(
-          text: TextSpan(
-            text: p['nombre'] ?? '',
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.8),
-              fontSize: 9,
-              fontWeight: isCapital ? FontWeight.w700 : FontWeight.w500,
-            ),
-          ),
-          textDirection: TextDirection.ltr,
-        );
-        tp.layout();
-        tp.paint(canvas, pos + Offset(dotRadius + 2, -6));
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _ColombiaMapPainter oldDelegate) {
-    return features != oldDelegate.features || selectedIdx != oldDelegate.selectedIdx;
-  }
-}
+// ColombiaMapPainter removed — replaced by flutter_map + OpenStreetMap
 
 // ─── Map point info card ───
 class _MapPointCard extends StatelessWidget {
@@ -7567,41 +7529,83 @@ class _DetailPageState extends State<_DetailPage> {
                     fontSize: 15,
                   )),
               const SizedBox(height: 8),
-              ...steps.asMap().entries.map((e) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Row(
-                      crossAxisAlignment:
-                          CrossAxisAlignment.start,
+              ...steps.asMap().entries.map((e) {
+                    final step = e.value;
+                    final stepNum = step is Map ? (step['numero'] ?? e.key + 1) : e.key + 1;
+                    final stepTitle = step is Map ? (step['titulo'] ?? '') : '';
+                    final stepDesc = step is Map ? (step['descripcion'] ?? step.toString()) : step.toString();
+                    final stepWarning = step is Map ? (step['advertencia'] ?? '') : '';
+                    return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          width: 24,
-                          height: 24,
-                          margin: const EdgeInsets.only(right: 10),
-                          decoration: BoxDecoration(
-                            color: _kCardBg,
-                            borderRadius:
-                                BorderRadius.circular(12),
-                          ),
-                          child: Center(
-                            child: Text('${e.key + 1}',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                )),
-                          ),
-                        ),
-                        Expanded(
-                          child: Text(e.value.toString(),
-                              style: TextStyle(
-                                color:
-                                    Color(0xB3FFFFFF),
-                                fontSize: 13,
-                              )),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: 24,
+                              height: 24,
+                              margin: const EdgeInsets.only(right: 10),
+                              decoration: BoxDecoration(
+                                color: _kCardBg,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Center(
+                                child: Text('$stepNum',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                    )),
+                              ),
+                            ),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  if (stepTitle.isNotEmpty)
+                                    Text(stepTitle,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                        )),
+                                  const SizedBox(height: 2),
+                                  Text(stepDesc,
+                                      style: TextStyle(
+                                        color: Color(0xB3FFFFFF),
+                                        fontSize: 13,
+                                      )),
+                                  if (stepWarning.isNotEmpty) ...[
+                                    const SizedBox(height: 4),
+                                    Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0x1AFF9800),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          const Icon(Icons.warning, color: Colors.orange, size: 14),
+                                          const SizedBox(width: 6),
+                                          Expanded(
+                                            child: Text(stepWarning,
+                                                style: const TextStyle(color: Colors.orange, fontSize: 11)),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                  )),
+                  );
+                  }),
             ],
             if (warnings.isNotEmpty) ...[
               const SizedBox(height: 16),
@@ -8113,20 +8117,57 @@ class _SOSOverlayState extends State<SOSOverlay> {
   int _countdown = 5;
   Timer? _timer;
   String _location = '0.0:0.0';
+  final AudioPlayer _audioPlayer = AudioPlayer();
+  bool _flashlightOn = false;
+  static const _kFlashlightChannel = MethodChannel('com.lessnet.flashlight');
 
   @override
   void initState() {
     super.initState();
     _getLocation();
+    _startAlerts();
     _timer = Timer.periodic(const Duration(seconds: 1), (t) {
       if (mounted) {
         setState(() => _countdown--);
+        // Vibrate on each countdown tick
+        _vibratePulse();
         if (_countdown <= 0) {
           t.cancel();
           _sendSOS();
         }
       }
     });
+  }
+
+  Future<void> _startAlerts() async {
+    // Start continuous vibration pattern
+    try {
+      final hasVibrator = await Vibration.hasVibrator() ?? false;
+      if (hasVibrator) {
+        // Long repeating vibration: wait 0ms, vibrate 500ms, pause 200ms, repeat
+        Vibration.repeatPattern(amplitude: 255, pattern: [0, 500, 200, 500, 200, 500]);
+      }
+    } catch (_) {}
+
+    // Play alarm sound (loop)
+    try {
+      await _audioPlayer.setReleaseMode(ReleaseMode.loop);
+      await _audioPlayer.setVolume(1.0);
+      // Use a reliable alarm sound URL
+      await _audioPlayer.play(UrlSource('https://cdn.freesound.org/previews/331/331912_3248244-lq.mp3'));
+    } catch (_) {}
+
+    // Turn on flashlight
+    try {
+      await _kFlashlightChannel.invokeMethod('turnOn');
+      _flashlightOn = true;
+    } catch (_) {}
+  }
+
+  Future<void> _vibratePulse() async {
+    try {
+      await Vibration.vibrate(duration: 200, amplitude: 255);
+    } catch (_) {}
   }
 
   Future<void> _getLocation() async {
@@ -8153,6 +8194,13 @@ class _SOSOverlayState extends State<SOSOverlay> {
   @override
   void dispose() {
     _timer?.cancel();
+    _audioPlayer.stop();
+    _audioPlayer.dispose();
+    Vibration.cancel();
+    // Turn off flashlight
+    if (_flashlightOn) {
+      try { _kFlashlightChannel.invokeMethod('turnOff'); } catch (_) {}
+    }
     super.dispose();
   }
 
@@ -8187,6 +8235,12 @@ class _SOSOverlayState extends State<SOSOverlay> {
                 child: FilledButton(
                   onPressed: () {
                     _timer?.cancel();
+                    _audioPlayer.stop();
+                    Vibration.cancel();
+                    if (_flashlightOn) {
+                      try { _kFlashlightChannel.invokeMethod('turnOff'); } catch (_) {}
+                      _flashlightOn = false;
+                    }
                     widget.onCancel();
                   },
                   style: FilledButton.styleFrom(
@@ -8323,22 +8377,39 @@ class _ProfilePageState extends State<ProfilePage> {
   bool _internetConnected = false;
   String _coordinates = 'No disponible';
   String _hotspotStatus = 'Desconocido';
+  bool _bleEnabled = true;
   StreamSubscription? _connSub;
+  StreamSubscription? _bleStateSub;
 
   @override
   void initState() {
     super.initState();
     _loadSettings();
     _checkInternet();
+    _checkBleState();
     _connSub = bt.onConnectionChange.listen((_) {
       if (mounted) setState(() {});
+    });
+    _bleStateSub = FlutterBluePlus.adapterState.listen((state) {
+      if (mounted) setState(() => _bleEnabled = state == BluetoothAdapterState.on);
     });
   }
 
   @override
   void dispose() {
     _connSub?.cancel();
+    _bleStateSub?.cancel();
     super.dispose();
+  }
+
+  Future<void> _checkBleState() async {
+    try {
+      final state = await FlutterBluePlus.adapterState.first
+          .timeout(const Duration(seconds: 3));
+      if (mounted) setState(() => _bleEnabled = state == BluetoothAdapterState.on);
+    } catch (_) {
+      if (mounted) setState(() => _bleEnabled = false);
+    }
   }
 
   Future<void> _loadSettings() async {
@@ -8505,8 +8576,8 @@ class _ProfilePageState extends State<ProfilePage> {
             _statusRow(Icons.location_on, 'Coordenadas', _coordinates, Colors.white38),
             _statusRow(Icons.upload, 'Datos enviados', _fmtBytes(bt.bytesSent), Colors.white38),
             _statusRow(Icons.download, 'Datos recibidos', _fmtBytes(bt.bytesReceived), Colors.white38),
-            _statusRow(Icons.bluetooth_connected, 'BLE', bt.isConnected ? 'Conectado' : 'Desconectado',
-                bt.isConnected ? Colors.greenAccent : Colors.white38),
+            _statusRow(Icons.bluetooth_connected, 'BLE', _bleEnabled ? 'Activado' : 'Desactivado',
+                _bleEnabled ? Colors.greenAccent : Colors.redAccent),
             _statusRow(Icons.info, 'Version', 'v$kAppVersion', Colors.white38),
             _statusRow(Icons.wifi_tethering, 'Hotspot', _hotspotStatus, Colors.white38),
             const SizedBox(height: 12),
@@ -8937,15 +9008,22 @@ class _VaultUrlPageState extends State<VaultUrlPage> {
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: _kBorder),
                 ),
-                constraints: const BoxConstraints(maxHeight: 400),
+                constraints: const BoxConstraints(maxHeight: 500),
                 child: SingleChildScrollView(
-                  child: Text(_content,
-                      style: const TextStyle(
-                        color: Colors.white70,
+                  child: MarkdownBody(
+                    data: '```json\n$_content\n```',
+                    selectable: true,
+                    styleSheet: MarkdownStyleSheet(
+                      code: const TextStyle(
+                        color: Colors.greenAccent,
                         fontSize: 11,
                         fontFamily: 'monospace',
                         height: 1.4,
-                      )),
+                        backgroundColor: Color(0xFF111111),
+                      ),
+                      p: const TextStyle(color: Colors.white70, fontSize: 12, height: 1.4),
+                    ),
+                  ),
                 ),
               ),
             ],
