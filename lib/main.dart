@@ -4024,6 +4024,14 @@ class _ChatListPageState extends State<ChatListPage> {
         return;
       }
 
+      // Detener cualquier scan previo
+      try {
+        if (FlutterBluePlus.isScanningNow) {
+          await FlutterBluePlus.stopScan();
+          await Future.delayed(const Duration(milliseconds: 300));
+        }
+      } catch (_) {}
+
       // Stop any existing scan first (auto-connect or other) to avoid conflicts
       try {
         await FlutterBluePlus.stopScan();
@@ -4038,11 +4046,11 @@ class _ChatListPageState extends State<ChatListPage> {
       _scanSub = FlutterBluePlus.scanResults.listen((results) {
         if (mounted) {
           setState(() {
-            _searchResults = results.where((r) {
-              return r.advertisementData.serviceUuids.any(
+            _searchResults = results.where((r) =>
+              r.advertisementData.serviceUuids.any(
                 (u) => u.str128.toLowerCase() == lessnetServiceUuid.toLowerCase(),
-              );
-            }).toList();
+              ) || r.device.platformName.isNotEmpty // incluir dispositivos con nombre
+            ).toList();
           });
         }
       });
