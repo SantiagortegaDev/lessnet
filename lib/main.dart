@@ -1223,11 +1223,9 @@ class BtService {
           if (connectedIds.contains(deviceId)) continue;
           if (_centralConnections.containsKey(deviceId)) continue;
 
-          // Auto-connect!
-          AppLogger.log('AutoScan: conectando a LessNet device: $deviceId (RSSI=${r.rssi})');
-          connectToDevice(r.device).catchError((e) {
-            AppLogger.log('AutoScan: fallo conexion a $deviceId: $e');
-          });
+          // Emit event for user confirmation instead of auto-connecting
+          AppLogger.log('AutoScan: dispositivo LessNet encontrado: $deviceId (RSSI=${r.rssi})');
+          _statusController.add('AUTO_CONNECT_REQUEST:$deviceId');
         }
       });
 
@@ -2898,15 +2896,33 @@ class _ScanPageState extends State<ScanPage> {
       }
     });
     _statusSub = bt.onStatusChange.listen((m) {
-      if (mounted) {
+      if (!mounted) return;
+      // Detect auto-connect request
+      if (m.startsWith('AUTO_CONNECT_REQUEST:')) {
+        final devId = m.substring('AUTO_CONNECT_REQUEST:'.length);
+        _showAutoConnectDialog(devId);
+        return;
+      }
+      // Detect SOS received
+      if (m.startsWith('SOS_RECEIVED:')) {
+        final sosData = m.substring('SOS_RECEIVED:'.length);
         ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(m),
-            backgroundColor: Colors.grey[800],
+            content: Text('🆘 ALERTA SOS: $sosData'),
+            backgroundColor: Colors.red[900],
+            duration: const Duration(seconds: 10),
           ),
         );
+        return;
       }
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(m),
+          backgroundColor: Colors.grey[800],
+        ),
+      );
     });
 
     // LAN device discovery
@@ -3137,6 +3153,53 @@ class _ScanPageState extends State<ScanPage> {
           content: Text('Error: $e'),
           backgroundColor: Colors.red,
         ));
+      }
+    }
+  }
+
+  Future<void> _showAutoConnectDialog(String deviceId) async {
+    if (!mounted) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        title: const Text('Dispositivo encontrado',
+            style: TextStyle(color: Colors.white)),
+        content: Text(
+          'Se encontró "$deviceId" cerca. ¿Conectar?',
+          style: const TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Ignorar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(
+                backgroundColor: Colors.white, foregroundColor: Colors.black),
+            child: const Text('Conectar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) {
+      // Search for the device in current scan results
+      try {
+        final scanResult = _results.firstWhere(
+          (r) => (r.device.platformName.isNotEmpty
+              ? r.device.platformName
+              : r.device.remoteId.toString()) == deviceId,
+          orElse: () => _results.isNotEmpty ? _results.first : throw StateError('no results'),
+        );
+        await _connect(scanResult.device);
+      } catch (_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('No se pudo encontrar el dispositivo para conectar'),
+            backgroundColor: Colors.orange,
+          ));
+        }
       }
     }
   }
