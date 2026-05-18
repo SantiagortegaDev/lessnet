@@ -160,25 +160,59 @@ class MainActivity : FlutterActivity() {
                 // Check NEARBY_WIFI_DEVICES permission on Android 13+
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     if (checkSelfPermission(Manifest.permission.NEARBY_WIFI_DEVICES) != PackageManager.PERMISSION_GRANTED) {
-                        result.error("PERMISSION", "Se requiere permiso NEARBY_WIFI_DEVICES para iniciar el hotspot. Concedelo en la configuracion de la app.", null)
+                        result.error("PERMISSION", "Se requiere permiso NEARBY_WIFI_DEVICES para iniciar el hotspot.", null)
                         return
                     }
                 }
-
-                val ssid = call.argument<String>("ssid") ?: "LessNet"
-                val password = call.argument<String>("password") ?: "lessnet123"
 
                 val manager = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
                 manager.startLocalOnlyHotspot(object : WifiManager.LocalOnlyHotspotCallback() {
                     override fun onStarted(reservation: WifiManager.LocalOnlyHotspotReservation?) {
                         hotspotReservation = reservation
-                        result.success(true)
+                        // Extract actual SSID and password from the hotspot configuration
+                        val wifiConfig = reservation?.wifiConfiguration
+                        val hotspotInfo = HashMap<String, Any>()
+                        hotspotInfo["success"] = true
+                        if (wifiConfig != null) {
+                            hotspotInfo["ssid"] = wifiConfig.SSID?.removeSurrounding("\"") ?: "LessNet"
+                            hotspotInfo["password"] = wifiConfig.preSharedKey?.removeSurrounding("\"") ?: ""
+                            @Suppress("DEPRECATION")
+                            hotspotInfo["securityType"] = wifiConfig.allowedKeyManagement.toString()
+                            Log.d("LessNet", "Hotspot iniciado - SSID: ${wifiConfig.SSID}, seguridad: ${wifiConfig.allowedKeyManagement}")
+                        } else {
+                            // On Android 13+ wifiConfiguration may be null
+                            hotspotInfo["ssid"] = "LessNet-Local"
+                            hotspotInfo["password"] = ""
+                            hotspotInfo["note"] = "LocalOnlyHotspot: Android genera SSID/password aleatorios. Verifica en Ajustes > Hotspot."
+                            Log.d("LessNet", "Hotspot iniciado (config null en Android 13+)")
+                        }
+                        // Notify Dart with hotspot info
+                        runOnUiThread {
+                            val hotspotChannel = MethodChannel(flutterEngine?.dartExecutor?.binaryMessenger!!, "com.lessnet.hotspot")
+                            hotspotChannel.invokeMethod("onHotspotStarted", hotspotInfo)
+                        }
+                        result.success(hotspotInfo)
                     }
                     override fun onFailed(reason: Int) {
-                        result.error("HOTSPOT_ERROR", "Failed to start hotspot: reason=$reason", null)
+                        val reasonStr = when (reason) {
+                            WifiManager.LocalOnlyHotspotCallback.ERROR_NO_CHANNEL -> "NO_CHANNEL"
+                            WifiManager.LocalOnlyHotspotCallback.ERROR_GENERIC -> "GENERIC"
+                            WifiManager.LocalOnlyHotspotCallback.ERROR_INCOMPATIBLE_MODE -> "INCOMPATIBLE_MODE"
+                            WifiManager.LocalOnlyHotspotCallback.ERROR_TETHERING_DISALLOWED -> "TETHERING_DISALLOWED"
+                            else -> "UNKNOWN($reason)"
+                        }
+                        Log.e("LessNet", "Hotspot fallido: reason=$reasonStr")
+                        result.error("HOTSPOT_ERROR", "Failed to start hotspot: $reasonStr", null)
                     }
                     override fun onStopped() {
                         hotspotReservation = null
+                        Log.d("LessNet", "Hotspot detenido")
+                        runOnUiThread {
+                            try {
+                                val hotspotChannel = MethodChannel(flutterEngine?.dartExecutor?.binaryMessenger!!, "com.lessnet.hotspot")
+                                hotspotChannel.invokeMethod("onHotspotStopped", true)
+                            } catch (_: Exception) {}
+                        }
                     }
                 }, null)
             } catch (e: Exception) {
@@ -191,11 +225,16 @@ class MainActivity : FlutterActivity() {
                 config.SSID = "\"${call.argument<String>("ssid") ?: "LessNet"}\""
                 config.preSharedKey = "\"${call.argument<String>("password") ?: "lessnet123"}\""
                 config.allowedKeyManagement.set(WifiConfiguration.KeyMgmt.WPA_PSK)
+                @Suppress("DEPRECATION")
                 val netId = wifiManager.addNetwork(config)
                 wifiManager.disconnect()
                 wifiManager.enableNetwork(netId, true)
                 wifiManager.reconnect()
-                result.success(true)
+                val hotspotInfo = HashMap<String, Any>()
+                hotspotInfo["success"] = true
+                hotspotInfo["ssid"] = call.argument<String>("ssid") ?: "LessNet"
+                hotspotInfo["password"] = call.argument<String>("password") ?: "lessnet123"
+                result.success(hotspotInfo)
             } catch (e: Exception) {
                 result.error("HOTSPOT_ERROR", "Hotspot no soportado en Android < 8: ${e.message}", null)
             }
@@ -311,11 +350,17 @@ class MainActivity : FlutterActivity() {
             }
             if (cameraId != null) {
                 cameraManager.setTorchMode(cameraId, on)
+                Log.d("LessNet", "Linterna ${if (on) "ENCENDIDA" else "APAGADA"}")
                 result.success(true)
             } else {
                 result.error("FLASHLIGHT_ERROR", "No flashlight available", null)
             }
+        } catch (e: SecurityException) {
+            // Camera in use by another app
+            Log.e("LessNet", "Linterna: cámara en uso por otra app: ${e.message}")
+            result.error("FLASHLIGHT_ERROR", "Cámara en uso por otra aplicación", null)
         } catch (e: Exception) {
+            Log.e("LessNet", "Linterna error: ${e.message}")
             result.error("FLASHLIGHT_ERROR", e.message, null)
         }
     }
