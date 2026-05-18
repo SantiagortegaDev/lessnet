@@ -1413,11 +1413,18 @@ class BtService {
     // Wrap in mesh protocol if not already wrapped
     final meshPayload = payload.startsWith('[MESH:') ? payload
         : '[MESH:$_kMeshMaxHops:${connectedDeviceId.isNotEmpty ? connectedDeviceId : "self"}]$payload';
+    AppLogger.log('Mesh relay: retransmitiendo a ${_centralConnections.length} centrales (excluyendo $excludeDeviceId)');
+    final futures = <Future>[];
     for (final devId in _centralConnections.keys.toList()) {
       if (devId != excludeDeviceId) {
-        await _sendRawMessage(meshPayload, deviceId: devId);
+        futures.add(_sendRawMessage(meshPayload, deviceId: devId));
       }
     }
+    // Also relay to peripheral if connected and not the sender
+    if (_isPeripheral && _peripheralConnected && _peripheralDeviceName != excludeDeviceId) {
+      futures.add(_sendRawMessage(meshPayload));
+    }
+    await Future.wait(futures);
   }
 
   void _cleanMeshSeen() {
@@ -1492,14 +1499,18 @@ class BtService {
     final payload = isGlobal ? '[GLOBAL]$encryptedText' : encryptedText;
 
     if (isGlobal) {
-      // Broadcast to ALL connected devices
+      // Broadcast to ALL connected devices simultaneously
+      AppLogger.log('Chat Global: enviando a ${_centralConnections.length} centrales + peripheral=$_peripheralConnected');
+      final futures = <Future>[];
       for (final devId in _centralConnections.keys.toList()) {
-        await _sendRawMessage(payload, deviceId: devId);
+        futures.add(_sendRawMessage(payload, deviceId: devId));
       }
       // Also send via peripheral if connected
       if (_isPeripheral && _peripheralConnected) {
-        await _sendRawMessage(payload);
+        futures.add(_sendRawMessage(payload));
       }
+      await Future.wait(futures);
+      AppLogger.log('Chat Global: broadcast completado');
     } else {
       await _sendRawMessage(payload, deviceId: deviceId);
     }
