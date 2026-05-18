@@ -1052,6 +1052,19 @@ class BtService {
       AppLogger.log('Descubriendo servicios en $deviceId...');
       final services = await device.discoverServices();
       AppLogger.log('Descubiertos ${services.length} servicios en $deviceId');
+
+      // Re-read device name after discoverServices — it may be available now
+      final resolvedName = device.platformName.isNotEmpty
+          ? device.platformName
+          : (await _tryGetDeviceName(device));
+      final resolvedId = resolvedName != device.remoteId.toString()
+          ? resolvedName
+          : deviceId;
+
+      if (resolvedId != deviceId) {
+        AppLogger.log('Nombre resuelto: $deviceId → $resolvedId');
+        // Update the connection map key if name resolved
+      }
       BluetoothCharacteristic? foundRx;
       BluetoothCharacteristic? foundTx;
       for (final service in services) {
@@ -1077,14 +1090,14 @@ class BtService {
         AppLogger.log('ADVERTENCIA: RX o TX no encontrados. RX=${foundRx != null}, TX=${foundTx != null}');
       }
 
-      // Store in multi-connection map
+      // Store in multi-connection map (use resolved name as key)
       final conn = _CentralConnection(device);
       conn.rxChar = foundRx;
       conn.txChar = foundTx;
-      _centralConnections[deviceId] = conn;
+      _centralConnections[resolvedId] = conn;
 
       // Set as active device
-      _activeDeviceId = deviceId;
+      _activeDeviceId = resolvedId;
       connectedDevice = device;
       rxChar = foundRx;
       txChar = foundTx;
@@ -1257,6 +1270,14 @@ class BtService {
     if (start < value.length) {
       conn.receiveBuffer.addAll(value.sublist(start));
     }
+  }
+
+  Future<String> _tryGetDeviceName(BluetoothDevice device) async {
+    // El nombre puede llegar con delay — esperar brevemente
+    await Future.delayed(const Duration(milliseconds: 500));
+    return device.platformName.isNotEmpty
+        ? device.platformName
+        : device.remoteId.toString();
   }
 
   Future<void> _cleanupSingleConnection(String deviceId) async {
