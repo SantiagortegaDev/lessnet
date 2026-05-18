@@ -3004,17 +3004,39 @@ class _ScanPageState extends State<ScanPage> {
           }
         }
       });
+      // After 10 seconds, if no LessNet devices found with UUID filter,
+      // automatically fall back to unfiltered scan (some devices with
+      // advertising legacy without name don't appear in UUID-filtered scan)
+      Timer(const Duration(seconds: 10), () {
+        if (!mounted || !_scanning) return;
+        final lessNetResults = _results.where((r) {
+          return r.advertisementData.serviceUuids.any(
+            (u) => u.str128.toLowerCase() == lessnetServiceUuid.toLowerCase(),
+          );
+        }).toList();
+        if (lessNetResults.isEmpty && _scanning) {
+          AppLogger.log('Sin resultados con filtro UUID despues de 10s, '
+              'reintentando sin filtro...');
+          _startUnfilteredScan();
+        }
+      });
       _scanningSub = FlutterBluePlus.isScanning.listen((s) {
         if (!s && mounted) {
+          // Check if we found any LessNet devices with the UUID filter
+          final lessNetResults = _results.where((r) {
+            return r.advertisementData.serviceUuids.any(
+              (u) => u.str128.toLowerCase() == lessnetServiceUuid.toLowerCase(),
+            );
+          }).toList();
           // If no LessNet devices found with filter, retry without filter
-          if (_results.isEmpty) {
-            AppLogger.log('Scan con filtro UUID no encontro nada, reintentando sin filtro...');
+          if (_results.isEmpty || lessNetResults.isEmpty) {
+            AppLogger.log('Sin resultados con filtro UUID, '
+                'reintentando sin filtro...');
             _startUnfilteredScan();
           } else {
             setState(() => _scanning = false);
+            _scanTimer?.cancel();
           }
-          _scanTimer?.cancel();
-          _scanTimer = null;
         }
       });
     } catch (e) {
