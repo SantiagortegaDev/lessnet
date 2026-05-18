@@ -313,6 +313,7 @@ class _LessNetAppState extends State<LessNetApp> with WidgetsBindingObserver {
     Permission.bluetoothScan,
     Permission.bluetoothConnect,
     Permission.bluetoothAdvertise,
+    Permission.nearbyWifiDevices,
   ];
 
   Future<void> _checkPermissionsNeeded() async {
@@ -1976,6 +1977,8 @@ class _PermissionsGatePageState extends State<PermissionsGatePage> {
         Permission.bluetoothConnect, 'Conectarse a dispositivos'),
     _PermItem('Bluetooth Advertise', Icons.broadcast_on_personal,
         Permission.bluetoothAdvertise, 'Hacerse visible'),
+    _PermItem('WiFi Cercano', Icons.wifi_tethering,
+        Permission.nearbyWifiDevices, 'Hotspot y WiFi Direct'),
     _PermItem('Fotos y Videos', Icons.photo_camera,
         _mediaPermission, 'Enviar imagenes y videos'),
     _PermItem('Notificaciones', Icons.notifications,
@@ -2203,6 +2206,50 @@ class _PermissionsGatePageState extends State<PermissionsGatePage> {
                 ),
               ),
               const SizedBox(height: 8),
+              // ─── Continue without permissions button ───
+              TextButton(
+                onPressed: () {
+                  showDialog(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      backgroundColor: const Color(0xFF1A1A1A),
+                      title: const Text('Continuar sin permisos?',
+                          style: TextStyle(color: Colors.white)),
+                      content: const Text(
+                        'Algunas funciones de la app pueden no funcionar correctamente sin los permisos necesarios. '
+                        'Por ejemplo, no podras buscar dispositivos Bluetooth, enviar mensajes o usar el GPS.\n\n'
+                        'Puedes otorgar los permisos mas tarde desde la configuracion del sistema.',
+                        style: TextStyle(color: Colors.white70, fontSize: 14),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text('Cancelar'),
+                        ),
+                        FilledButton(
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            widget.onAccepted();
+                          },
+                          style: FilledButton.styleFrom(
+                            backgroundColor: Colors.redAccent,
+                            foregroundColor: Colors.white,
+                          ),
+                          child: const Text('Continuar sin permisos'),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+                child: const Text(
+                  'Continuar sin permisos',
+                  style: TextStyle(
+                    color: Color(0xFF666666),
+                    fontSize: 13,
+                    decoration: TextDecoration.underline,
+                  ),
+                ),
+              ),
             ],
           ),
         ),
@@ -2286,6 +2333,9 @@ class _ScanPageState extends State<ScanPage> {
   }
 
   Future<void> _startScan() async {
+    // Don't restart if already scanning
+    if (_scanning) return;
+
     if (bt.isAdvertising) await bt.stopAdvertising();
 
     final st = await [
@@ -2371,6 +2421,25 @@ class _ScanPageState extends State<ScanPage> {
 
   Future<void> _startAdv() async {
     if (_scanning) await _stopScan();
+
+    // Request BLUETOOTH_ADVERTISE permission on Android 12+
+    try {
+      final advStatus = await Permission.bluetoothAdvertise.status;
+      if (!advStatus.isGranted) {
+        final result = await Permission.bluetoothAdvertise.request();
+        if (!result.isGranted) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('Se requiere permiso de Bluetooth Advertise para ser visible'),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 4),
+            ));
+          }
+          return;
+        }
+      }
+    } catch (_) {}
+
     try {
       await bt.startAdvertising();
       if (mounted) {
@@ -8129,8 +8198,6 @@ class _SOSOverlayState extends State<SOSOverlay> {
     _timer = Timer.periodic(const Duration(seconds: 1), (t) {
       if (mounted) {
         setState(() => _countdown--);
-        // Vibrate on each countdown tick
-        _vibratePulse();
         if (_countdown <= 0) {
           t.cancel();
           _sendSOS();
@@ -8140,33 +8207,41 @@ class _SOSOverlayState extends State<SOSOverlay> {
   }
 
   Future<void> _startAlerts() async {
-    // Start continuous vibration pattern
+    // Start continuous vibration pattern (repeat indefinitely)
     try {
       final hasVibrator = await Vibration.hasVibrator() ?? false;
       if (hasVibrator) {
-        // Long repeating vibration: wait 0ms, vibrate 500ms, pause 200ms, repeat
-        Vibration.repeatPattern(amplitude: 255, pattern: [0, 500, 200, 500, 200, 500]);
+        // Pattern: wait 0ms, vibrate 500ms, pause 200ms, vibrate 500ms, pause 200ms...
+        // repeat: -1 means repeat indefinitely until Vibration.cancel()
+        await Vibration.vibrate(
+          pattern: [0, 500, 200, 500, 200, 500],
+          repeat: -1,
+        );
       }
     } catch (_) {}
 
-    // Play alarm sound (loop)
+    // Play alarm sound (loop) — try system alarm first, fallback to URL
     try {
       await _audioPlayer.setReleaseMode(ReleaseMode.loop);
       await _audioPlayer.setVolume(1.0);
-      // Use a reliable alarm sound URL
-      await _audioPlayer.play(UrlSource('https://cdn.freesound.org/previews/331/331912_3248244-lq.mp3'));
+      // Try system alarm sound first (works offline)
+      try {
+        await _audioPlayer.play(DeviceFileSource('/system/media/audio/alarms/Alarm_Beep_03.ogg'));
+      } catch (_) {
+        // Fallback to another common system alarm
+        try {
+          await _audioPlayer.play(DeviceFileSource('/system/media/audio/ringtones/Ring_Synth_04.ogg'));
+        } catch (_) {
+          // Last resort: remote URL (requires internet)
+          await _audioPlayer.play(UrlSource('https://cdn.freesound.org/previews/331/331912_3248244-lq.mp3'));
+        }
+      }
     } catch (_) {}
 
     // Turn on flashlight
     try {
       await _kFlashlightChannel.invokeMethod('turnOn');
       _flashlightOn = true;
-    } catch (_) {}
-  }
-
-  Future<void> _vibratePulse() async {
-    try {
-      await Vibration.vibrate(duration: 200, amplitude: 255);
     } catch (_) {}
   }
 
@@ -8405,10 +8480,12 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<void> _checkBleState() async {
     try {
       final state = await FlutterBluePlus.adapterState.first
-          .timeout(const Duration(seconds: 3));
+          .timeout(const Duration(seconds: 5));
       if (mounted) setState(() => _bleEnabled = state == BluetoothAdapterState.on);
     } catch (_) {
-      if (mounted) setState(() => _bleEnabled = false);
+      // If we can't determine the state, assume BLE is available
+      // (most devices have BLE). Don't show "Desactivado" unless confirmed.
+      if (mounted) setState(() => _bleEnabled = true);
     }
   }
 
@@ -8576,8 +8653,8 @@ class _ProfilePageState extends State<ProfilePage> {
             _statusRow(Icons.location_on, 'Coordenadas', _coordinates, Colors.white38),
             _statusRow(Icons.upload, 'Datos enviados', _fmtBytes(bt.bytesSent), Colors.white38),
             _statusRow(Icons.download, 'Datos recibidos', _fmtBytes(bt.bytesReceived), Colors.white38),
-            _statusRow(Icons.bluetooth_connected, 'BLE', _bleEnabled ? 'Activado' : 'Desactivado',
-                _bleEnabled ? Colors.greenAccent : Colors.redAccent),
+            _statusRow(Icons.bluetooth_connected, 'BLE', _bleEnabled ? 'Activado' : 'Verificando...',
+                _bleEnabled ? Colors.greenAccent : Colors.orangeAccent),
             _statusRow(Icons.info, 'Version', 'v$kAppVersion', Colors.white38),
             _statusRow(Icons.wifi_tethering, 'Hotspot', _hotspotStatus, Colors.white38),
             const SizedBox(height: 12),
