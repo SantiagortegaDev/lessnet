@@ -1323,6 +1323,8 @@ class BtService {
     if (text.startsWith('[SOS:')) {
       AppLogger.log('SOS recibido: $text');
       try { LessNetNotifications.showSOSNotification(text); } catch (_) {}
+      // Emitir por el canal de status para que la UI lo muestre
+      _statusController.add('SOS_RECEIVED:$text');
       final msg = ChatMessage(
         id: DateTime.now().microsecondsSinceEpoch.toString(),
         text: '🆘 ALERTA SOS recibida: ${text.replaceAll('[SOS:', '').replaceAll(']', '').replaceAll(':', ' ')}',
@@ -3893,6 +3895,7 @@ class _ChatListPageState extends State<ChatListPage> {
   StreamSubscription? _connSub;
   StreamSubscription? _scanSub;
   StreamSubscription? _scanningSub;
+  StreamSubscription? _statusSub;
   List<ScanResult> _searchResults = [];
   bool _searching = false;
 
@@ -3905,6 +3908,20 @@ class _ChatListPageState extends State<ChatListPage> {
     });
     _connSub = bt.onConnectionChange.listen((_) {
       if (mounted) _loadConversations();
+    });
+    _statusSub = bt.onStatusChange.listen((m) {
+      if (!mounted) return;
+      if (m.startsWith('SOS_RECEIVED:')) {
+        final sosData = m.substring('SOS_RECEIVED:'.length);
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('🆘 ALERTA SOS: $sosData'),
+            backgroundColor: Colors.red[900],
+            duration: const Duration(seconds: 10),
+          ),
+        );
+      }
     });
   }
 
@@ -3970,6 +3987,7 @@ class _ChatListPageState extends State<ChatListPage> {
     _connSub?.cancel();
     _scanSub?.cancel();
     _scanningSub?.cancel();
+    _statusSub?.cancel();
     super.dispose();
   }
 
