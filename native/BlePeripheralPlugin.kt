@@ -9,6 +9,7 @@ import android.os.ParcelUuid
 import android.util.Log
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import java.io.ByteArrayOutputStream
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -37,7 +38,8 @@ class BlePeripheralPlugin(private val context: Context) : MethodChannel.MethodCa
     private val mainHandler = Handler(Looper.getMainLooper())
 
     // Buffer for incoming messages (until null terminator)
-    private val messageBuffer = mutableListOf<Byte>()
+    // Using ByteArrayOutputStream for O(1) append instead of O(n) mutableListOf<Byte>
+    private val messageBuffer = ByteArrayOutputStream()
 
     // Track if notifications are enabled by the client
     private var notificationsEnabled = false
@@ -190,7 +192,7 @@ class BlePeripheralPlugin(private val context: Context) : MethodChannel.MethodCa
             Log.d(TAG, "onConnectionStateChange: ${device.address} status=$status newState=$newState")
             if (newState == BluetoothProfile.STATE_CONNECTED) {
                 connectedDevice = device
-                messageBuffer.clear()
+                messageBuffer.reset()
                 isSending = false
                 try {
                     advertiser?.stopAdvertising(advertiseCallback)
@@ -206,7 +208,7 @@ class BlePeripheralPlugin(private val context: Context) : MethodChannel.MethodCa
                 connectedDevice = null
                 notificationsEnabled = false
                 isSending = false
-                messageBuffer.clear()
+                messageBuffer.reset()
                 mainHandler.post {
                     channel?.invokeMethod("onDeviceDisconnected", true)
                 }
@@ -226,31 +228,30 @@ class BlePeripheralPlugin(private val context: Context) : MethodChannel.MethodCa
             Log.d(TAG, "onCharacteristicWriteRequest: char=${characteristic.uuid} offset=$offset len=${value.size} prepared=$preparedWrite")
             if (characteristic.uuid == CHAR_RX_UUID) {
                 if (value.size == 1 && value[0] == 0x00.toByte()) {
-                    if (messageBuffer.isNotEmpty()) {
-                        val completeMessage = String(messageBuffer.toByteArray(), Charsets.UTF_8)
-                        messageBuffer.clear()
+                    // Null terminator: message complete
+                    if (messageBuffer.size() > 0) {
+                        val completeMessage = messageBuffer.toString(Charsets.UTF_8.name())
+                        messageBuffer.reset()
+                        Log.d(TAG, "Mensaje completo recibido: ${completeMessage.length} chars")
                         mainHandler.post {
                             channel?.invokeMethod("onDataReceived", completeMessage)
                         }
                     }
                 } else {
+                    // Append data to buffer
                     if (preparedWrite && offset > 0) {
-                        while (messageBuffer.size < offset) {
-                            messageBuffer.add(0)
+                        // Handle prepared write with offset
+                        val currentSize = messageBuffer.size()
+                        if (currentSize < offset) {
+                            // Pad with zeros to reach offset
+                            val padding = ByteArray(offset - currentSize)
+                            messageBuffer.write(padding)
                         }
-                        for (i in value.indices) {
-                            val pos = offset + i
-                            if (pos < messageBuffer.size) {
-                                messageBuffer[pos] = value[i]
-                            } else {
-                                messageBuffer.add(value[i])
-                            }
-                        }
+                        messageBuffer.write(value, offset.coerceAtMost(currentSize), value.size - offset.coerceAtMost(currentSize))
                     } else {
-                        for (b in value) {
-                            messageBuffer.add(b)
-                        }
+                        messageBuffer.write(value)
                     }
+                    Log.d(TAG, "Buffer: ${messageBuffer.size()} bytes acumulados")
                 }
             }
             if (responseNeeded) {
@@ -286,6 +287,7 @@ class BlePeripheralPlugin(private val context: Context) : MethodChannel.MethodCa
         ) {
             if (descriptor.uuid == CCCD_UUID) {
                 notificationsEnabled = value.contentEquals(BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE)
+                Log.d(TAG, "Notificaciones ${if (notificationsEnabled) "ACTIVADAS" else "DESACTIVADAS"} por ${device.address}")
             }
             if (responseNeeded) {
                 gattServer?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, null)
@@ -536,7 +538,7 @@ class BlePeripheralPlugin(private val context: Context) : MethodChannel.MethodCa
             isSending = false
             connectedDevice = null
             notificationsEnabled = false
-            messageBuffer.clear()
+            messageBuffer.reset()
             result.success(true)
         } catch (e: Exception) {
             result.error("STOP_ERROR", e.message, null)

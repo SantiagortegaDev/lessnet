@@ -1119,12 +1119,20 @@ class BtService {
   void _handleReceivedDataForDevice(List<int> value, String deviceId) {
     final conn = _centralConnections[deviceId];
     if (conn == null) return;
+    // Efficient parsing: find null terminators and batch process
+    int start = 0;
     for (int i = 0; i < value.length; i++) {
       if (value[i] == 0x00) {
+        // Add all bytes before the null terminator to buffer
+        if (i > start) {
+          conn.receiveBuffer.addAll(value.sublist(start, i));
+        }
+        // Process complete message
         if (conn.receiveBuffer.isNotEmpty) {
           final text = utf8.decode(conn.receiveBuffer, allowMalformed: true);
           conn.receiveBuffer.clear();
           if (text.isNotEmpty) {
+            _bytesReceived += text.length;
             // Temporarily set active device for _processReceivedText
             final prevActive = _activeDeviceId;
             _activeDeviceId = deviceId;
@@ -1132,9 +1140,12 @@ class BtService {
             _activeDeviceId = prevActive;
           }
         }
-      } else {
-        conn.receiveBuffer.add(value[i]);
+        start = i + 1;
       }
+    }
+    // Add remaining bytes (no null terminator found yet)
+    if (start < value.length) {
+      conn.receiveBuffer.addAll(value.sublist(start));
     }
   }
 
@@ -1179,6 +1190,7 @@ class BtService {
 
   void _processReceivedText(String text) {
     // ─── SOS PROTOCOL ───
+    AppLogger.log('Mensaje recibido de $_activeDeviceId (${text.length} chars): ${text.length > 80 ? "${text.substring(0, 80)}..." : text}');
     if (text.startsWith('[SOS:')) {
       AppLogger.log('SOS recibido: $text');
       try { LessNetNotifications.showSOSNotification(text); } catch (_) {}
@@ -1431,7 +1443,8 @@ class BtService {
   Future<void> _sendRawMessage(String text, {String? deviceId}) async {
     final bytes = utf8.encode(text);
     _bytesSent += bytes.length;
-    AppLogger.log('Enviando ${bytes.length} bytes a ${deviceId ?? "peripheral"}');
+    final targetId = deviceId ?? _activeDeviceId;
+    AppLogger.log('Enviando ${bytes.length} bytes a $targetId (peripheral=$_isPeripheral, peripheralConn=$_peripheralConnected)');
     if (_isPeripheral && _peripheralConnected) {
       // Peripheral: send via Kotlin (handles notifications internally)
       await _peripheralChannel.invokeMethod('sendData', {'data': text});
