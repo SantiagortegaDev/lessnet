@@ -874,12 +874,14 @@ class BtService {
   Future<void> startAdvertising() async {
     _advertisingError = '';
     _isAdvertising = false; // Don't set true until confirmed
+    AppLogger.log('Iniciando BLE advertising (UUID: $lessnetServiceUuid)...');
     try {
       await _peripheralChannel.invokeMethod('startAdvertising');
       _isPeripheral = true;
       // Only set true after native confirms success (no exception thrown)
       _isAdvertising = true;
       _advertisingController.add(true);
+      AppLogger.log('BLE advertising activo exitosamente');
       // Start foreground service while advertising
       try { await startForegroundService(); } catch (_) {}
     } catch (e) {
@@ -887,6 +889,7 @@ class BtService {
       _advertisingError = e.toString().contains('ADV_ERROR')
           ? 'Este dispositivo NO soporta BLE advertising.'
           : 'Error: $e';
+      AppLogger.log('BLE advertising FALLÓ: $_advertisingError');
       _advertisingController.add(false);
       rethrow;
     }
@@ -914,9 +917,12 @@ class BtService {
           ? device.platformName
           : device.remoteId.toString();
 
+      AppLogger.log('Conectando a dispositivo: $deviceId');
+
       // Check if already connected to this device
       if (_centralConnections.containsKey(deviceId)) {
         _statusController.add('Ya conectado a ${_centralConnections[deviceId]!.name}');
+        AppLogger.log('Ya conectado a $deviceId, saltando');
         return;
       }
 
@@ -926,28 +932,42 @@ class BtService {
         await _cleanupSingleConnection(deviceId);
       }
 
+      AppLogger.log('Llamando device.connect() para $deviceId...');
       await device.connect(timeout: const Duration(seconds: 20));
+      AppLogger.log('Conectado a $deviceId, negociando MTU...');
 
       try {
         await device.requestMtu(512);
-      } catch (_) {}
+      } catch (e) {
+        AppLogger.log('MTU request falló (no crítico): $e');
+      }
 
+      AppLogger.log('Descubriendo servicios en $deviceId...');
       final services = await device.discoverServices();
+      AppLogger.log('Descubiertos ${services.length} servicios en $deviceId');
       BluetoothCharacteristic? foundRx;
       BluetoothCharacteristic? foundTx;
       for (final service in services) {
-        if (service.uuid.str128.toLowerCase() ==
-            lessnetServiceUuid.toLowerCase()) {
+        final serviceUuidStr = service.uuid.str128.toLowerCase();
+        AppLogger.log('  Servicio: $serviceUuidStr (${service.characteristics.length} chars)');
+        if (serviceUuidStr == lessnetServiceUuid.toLowerCase()) {
+          AppLogger.log('  *** LessNet service encontrado! ***');
           for (final char in service.characteristics) {
-            if (char.uuid.str128.toLowerCase() ==
-                lessnetCharRxUuid.toLowerCase()) {
+            final charUuid = char.uuid.str128.toLowerCase();
+            AppLogger.log('    Característica: $charUuid props=${char.properties}');
+            if (charUuid == lessnetCharRxUuid.toLowerCase()) {
               foundRx = char;
-            } else if (char.uuid.str128.toLowerCase() ==
-                lessnetCharTxUuid.toLowerCase()) {
+              AppLogger.log('    *** RX characteristic encontrada ***');
+            } else if (charUuid == lessnetCharTxUuid.toLowerCase()) {
               foundTx = char;
+              AppLogger.log('    *** TX characteristic encontrada ***');
             }
           }
         }
+      }
+
+      if (foundRx == null || foundTx == null) {
+        AppLogger.log('ADVERTENCIA: RX o TX no encontrados. RX=${foundRx != null}, TX=${foundTx != null}');
       }
 
       // Store in multi-connection map
@@ -1024,22 +1044,45 @@ class BtService {
 
   Future<void> _autoScanAndConnect() async {
     try {
+      // Verify permissions before scanning
+      final scanStatus = await Permission.bluetoothScan.status;
+      final connectStatus = await Permission.bluetoothConnect.status;
+      if (!scanStatus.isGranted || !connectStatus.isGranted) {
+        AppLogger.log('AutoScan: permisos BLE no concedidos (scan=$scanStatus, connect=$connectStatus)');
+        return;
+      }
+
       // Check BT is ON
       final a = await FlutterBluePlus.adapterState.first.timeout(
         const Duration(seconds: 3),
         onTimeout: () => BluetoothAdapterState.unknown,
       );
-      if (a != BluetoothAdapterState.on) return;
+      if (a != BluetoothAdapterState.on) {
+        AppLogger.log('AutoScan: Bluetooth no activado (state=$a)');
+        return;
+      }
 
       // Don't scan if already scanning or if we're advertising
       if (FlutterBluePlus.isScanningNow) return;
+      if (_isAdvertising) return;
 
       final connectedIds = _centralConnections.keys.toSet();
+      AppLogger.log('AutoScan: iniciando escaneo (${connectedIds.length} conectados)');
 
-      await FlutterBluePlus.startScan(
-        timeout: const Duration(seconds: 10),
-        androidUsesFineLocation: true,
-      );
+      // Try with UUID filter first for efficiency
+      try {
+        await FlutterBluePlus.startScan(
+          timeout: const Duration(seconds: 10),
+          withServices: [Guid(lessnetServiceUuid)],
+          androidUsesFineLocation: false,
+        );
+      } catch (e) {
+        AppLogger.log('AutoScan: filtro UUID falló, reintentando sin filtro: $e');
+        await FlutterBluePlus.startScan(
+          timeout: const Duration(seconds: 10),
+          androidUsesFineLocation: true,
+        );
+      }
 
       final sub = FlutterBluePlus.scanResults.listen((results) {
         for (final r in results) {
@@ -1058,9 +1101,9 @@ class BtService {
           if (_centralConnections.containsKey(deviceId)) continue;
 
           // Auto-connect!
-          debugPrint('Auto-connecting to LessNet device: $deviceId');
+          AppLogger.log('AutoScan: conectando a LessNet device: $deviceId (RSSI=${r.rssi})');
           connectToDevice(r.device).catchError((e) {
-            debugPrint('Auto-connect failed for $deviceId: $e');
+            AppLogger.log('AutoScan: fallo conexion a $deviceId: $e');
           });
         }
       });
@@ -1069,7 +1112,7 @@ class BtService {
       await Future.delayed(const Duration(seconds: 11));
       await sub.cancel();
     } catch (e) {
-      debugPrint('Auto-scan error: $e');
+      AppLogger.log('AutoScan error: $e');
     }
   }
 
@@ -2338,17 +2381,24 @@ class _ScanPageState extends State<ScanPage> {
 
     if (bt.isAdvertising) await bt.stopAdvertising();
 
+    // Request permissions — BLUETOOTH_SCAN with neverForLocation on Android 12+
+    // means we don't strictly need location, but we request it anyway for
+    // Android < 12 compatibility and for location features (SOS, map).
     final st = await [
-      Permission.locationWhenInUse,
       Permission.bluetoothScan,
       Permission.bluetoothConnect,
+      Permission.locationWhenInUse,
     ].request();
+
+    AppLogger.log('Permisos: scan=${st[Permission.bluetoothScan]?.isGranted}, '
+        'connect=${st[Permission.bluetoothConnect]?.isGranted}, '
+        'location=${st[Permission.locationWhenInUse]?.isGranted}');
 
     if (!(st[Permission.bluetoothScan]?.isGranted ?? false) ||
         !(st[Permission.bluetoothConnect]?.isGranted ?? false)) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Concede permisos primero'),
+          content: Text('Concede permisos de Bluetooth primero'),
           backgroundColor: Colors.red,
         ));
       }
@@ -2361,17 +2411,20 @@ class _ScanPageState extends State<ScanPage> {
         const Duration(seconds: 3),
         onTimeout: () => BluetoothAdapterState.unknown,
       );
+      AppLogger.log('Bluetooth adapter state: $a');
       if (a != BluetoothAdapterState.on) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Bluetooth APAGADO!'),
+            content: Text('Bluetooth APAGADO! Enciende Bluetooth primero.'),
             backgroundColor: Colors.red,
             duration: Duration(seconds: 5),
           ));
         }
         return;
       }
-    } catch (_) {}
+    } catch (e) {
+      AppLogger.log('Error checking BT adapter: $e');
+    }
 
     _results.clear();
     setState(() => _scanning = true);
@@ -2382,10 +2435,14 @@ class _ScanPageState extends State<ScanPage> {
     });
 
     try {
-      // NO withServices filter — OPPO can't handle 128-bit UUID filters
+      // Try scan with UUID filter first for efficient discovery.
+      // Some devices (OPPO/Realme) may not support 128-bit UUID scan filters,
+      // so we fall back to unfiltered scan if no results appear.
+      AppLogger.log('Iniciando escaneo BLE con filtro UUID...');
       await FlutterBluePlus.startScan(
         timeout: const Duration(seconds: 60),
-        androidUsesFineLocation: true,
+        withServices: [Guid(lessnetServiceUuid)],
+        androidUsesFineLocation: false,
       );
       _scanSub = FlutterBluePlus.scanResults.listen((r) {
         if (mounted) {
@@ -2393,21 +2450,64 @@ class _ScanPageState extends State<ScanPage> {
             _results.clear();
             _results.addAll(r);
           });
+          if (r.isNotEmpty) {
+            AppLogger.log('Scan: ${r.length} resultados LessNet encontrados');
+          }
         }
       });
       _scanningSub = FlutterBluePlus.isScanning.listen((s) {
         if (!s && mounted) {
-          setState(() => _scanning = false);
+          // If no LessNet devices found with filter, retry without filter
+          if (_results.isEmpty) {
+            AppLogger.log('Scan con filtro UUID no encontro nada, reintentando sin filtro...');
+            _startUnfilteredScan();
+          } else {
+            setState(() => _scanning = false);
+          }
           _scanTimer?.cancel();
           _scanTimer = null;
         }
       });
-    } catch (_) {
-      if (mounted) {
-        setState(() => _scanning = false);
-        _scanTimer?.cancel();
+    } catch (e) {
+      AppLogger.log('Error en escaneo con filtro: $e, intentando sin filtro...');
+      // Fallback: scan without UUID filter
+      try {
+        await _startUnfilteredScan();
+      } catch (e2) {
+        AppLogger.log('Error en escaneo sin filtro: $e2');
+        if (mounted) {
+          setState(() => _scanning = false);
+          _scanTimer?.cancel();
+        }
       }
     }
+  }
+
+  /// Fallback scan without UUID filter for devices that don't support 128-bit UUID filters.
+  Future<void> _startUnfilteredScan() async {
+    await FlutterBluePlus.stopScan();
+    await FlutterBluePlus.startScan(
+      timeout: const Duration(seconds: 60),
+      androidUsesFineLocation: true,
+    );
+    _scanSub?.cancel();
+    _scanSub = FlutterBluePlus.scanResults.listen((r) {
+      if (mounted) {
+        setState(() {
+          _results.clear();
+          _results.addAll(r);
+        });
+      }
+    });
+    _scanningSub?.cancel();
+    _scanningSub = FlutterBluePlus.isScanning.listen((s) {
+      if (!s && mounted) {
+        setState(() => _scanning = false);
+        _scanTimer?.cancel();
+        _scanTimer = null;
+        AppLogger.log('Scan sin filtro completo: ${_results.length} resultados totales');
+      }
+    });
   }
 
   Future<void> _stopScan() async {

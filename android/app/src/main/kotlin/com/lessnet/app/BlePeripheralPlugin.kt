@@ -90,21 +90,27 @@ class BlePeripheralPlugin(private val context: Context) : MethodChannel.MethodCa
             bluetoothAdapter = bluetoothManager?.adapter
 
             if (bluetoothAdapter == null || !bluetoothAdapter!!.isEnabled) {
+                Log.e(TAG, "Bluetooth no activado o adaptador null")
                 result.error("BT_ERROR", "Bluetooth no esta activado", null)
                 return
             }
 
             advertiser = bluetoothAdapter?.bluetoothLeAdvertiser
             if (advertiser == null) {
+                Log.e(TAG, "BLE Advertiser no disponible en este dispositivo")
                 result.error("ADV_ERROR", "Este dispositivo NO soporta BLE advertising. Muchos celulares OPPO, Realme y gamas bajas no lo soportan. Usa este celular para BUSCAR.", null)
                 return
             }
 
+            Log.d(TAG, "Iniciando GATT server con UUID: $SERVICE_UUID")
             if (!startGattServer()) {
+                Log.e(TAG, "Fallo al crear GATT server")
                 result.error("GATT_ERROR", "No se pudo crear el servidor GATT", null)
                 return
             }
 
+            // Use LOW_LATENCY for first 30s for fast discovery, then switch is handled
+            // by the system. LOW_POWER is more battery-friendly but slower to discover.
             val settings = AdvertiseSettings.Builder()
                 .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
                 .setConnectable(true)
@@ -117,6 +123,7 @@ class BlePeripheralPlugin(private val context: Context) : MethodChannel.MethodCa
                 .addServiceUuid(ParcelUuid(SERVICE_UUID))
                 .build()
 
+            Log.d(TAG, "Iniciando advertising con service UUID: $SERVICE_UUID")
             advertiser?.startAdvertising(settings, data, advertiseCallback)
             isCurrentlyAdvertising = true
             result.success(true)
@@ -128,12 +135,14 @@ class BlePeripheralPlugin(private val context: Context) : MethodChannel.MethodCa
 
     private val advertiseCallback = object : AdvertiseCallback() {
         override fun onStartSuccess(settingsInEffect: AdvertiseSettings) {
+            Log.d(TAG, "Advertising iniciado exitosamente (mode=${settingsInEffect.mode}, txPower=${settingsInEffect.txPowerLevel})")
             mainHandler.post {
                 channel?.invokeMethod("onAdvertiseStatus", true)
             }
         }
 
         override fun onStartFailure(errorCode: Int) {
+            Log.e(TAG, "Advertising fallo con errorCode=$errorCode (1=DATA_TOO_LARGE, 2=TOO_MANY_ADVERTISERS, 3=INTERNAL_ERROR, 4=FEATURE_UNSUPPORTED)")
             isCurrentlyAdvertising = false
             mainHandler.post {
                 channel?.invokeMethod("onAdvertiseStatus", false)
@@ -178,6 +187,7 @@ class BlePeripheralPlugin(private val context: Context) : MethodChannel.MethodCa
     private val gattServerCallback = object : BluetoothGattServerCallback() {
 
         override fun onConnectionStateChange(device: BluetoothDevice, status: Int, newState: Int) {
+            Log.d(TAG, "onConnectionStateChange: ${device.address} status=$status newState=$newState")
             if (newState == BluetoothProfile.STATE_CONNECTED) {
                 connectedDevice = device
                 messageBuffer.clear()
@@ -187,10 +197,12 @@ class BlePeripheralPlugin(private val context: Context) : MethodChannel.MethodCa
                 } catch (e: Exception) {}
                 isCurrentlyAdvertising = false
                 val deviceName = device.name ?: device.address
+                Log.d(TAG, "Dispositivo CONECTADO: $deviceName")
                 mainHandler.post {
                     channel?.invokeMethod("onDeviceConnected", deviceName)
                 }
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                Log.d(TAG, "Dispositivo DESCONECTADO: ${device.address}")
                 connectedDevice = null
                 notificationsEnabled = false
                 isSending = false
@@ -211,6 +223,7 @@ class BlePeripheralPlugin(private val context: Context) : MethodChannel.MethodCa
             offset: Int,
             value: ByteArray
         ) {
+            Log.d(TAG, "onCharacteristicWriteRequest: char=${characteristic.uuid} offset=$offset len=${value.size} prepared=$preparedWrite")
             if (characteristic.uuid == CHAR_RX_UUID) {
                 if (value.size == 1 && value[0] == 0x00.toByte()) {
                     if (messageBuffer.isNotEmpty()) {

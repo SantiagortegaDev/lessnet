@@ -17,10 +17,10 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
 
 class MainActivity : FlutterActivity() {
+    private var hotspotReservation: WifiManager.LocalOnlyHotspotReservation? = null
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
@@ -50,12 +50,22 @@ class MainActivity : FlutterActivity() {
             }
         }
 
-        // Flashlight channel
+        // Flashlight channel (used by SOS overlay) — turnOn / turnOff / isAvailable
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.lessnet.flashlight").setMethodCallHandler { call, result ->
             when (call.method) {
                 "turnOn" -> turnFlashlight(true, result)
                 "turnOff" -> turnFlashlight(false, result)
                 "isAvailable" -> result.success(isFlashlightAvailable())
+                else -> result.notImplemented()
+            }
+        }
+
+        // Torch channel (used by Morse code page) — on / off / hasTorch
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.lessnet.torch").setMethodCallHandler { call, result ->
+            when (call.method) {
+                "on" -> turnFlashlight(true, result)
+                "off" -> turnFlashlight(false, result)
+                "hasTorch" -> result.success(isFlashlightAvailable())
                 else -> result.notImplemented()
             }
         }
@@ -71,29 +81,34 @@ class MainActivity : FlutterActivity() {
     private fun startHotspot(call: MethodCall, result: MethodChannel.Result) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             try {
+                // Check NEARBY_WIFI_DEVICES permission on Android 13+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    if (checkSelfPermission(Manifest.permission.NEARBY_WIFI_DEVICES) != PackageManager.PERMISSION_GRANTED) {
+                        result.error("PERMISSION", "Se requiere permiso NEARBY_WIFI_DEVICES para iniciar el hotspot. Concedelo en la configuracion de la app.", null)
+                        return
+                    }
+                }
+
                 val ssid = call.argument<String>("ssid") ?: "LessNet"
                 val password = call.argument<String>("password") ?: "lessnet123"
 
-                val manager = getSystemService(Context.WIFI_SERVICE) as WifiManager
-                // Use LocalOnlyHotspot for no-internet local network
+                val manager = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
                 manager.startLocalOnlyHotspot(object : WifiManager.LocalOnlyHotspotCallback() {
                     override fun onStarted(reservation: WifiManager.LocalOnlyHotspotReservation?) {
+                        hotspotReservation = reservation
                         result.success(true)
                     }
-
                     override fun onFailed(reason: Int) {
                         result.error("HOTSPOT_ERROR", "Failed to start hotspot: reason=$reason", null)
                     }
-
                     override fun onStopped() {
-                        // Hotspot stopped
+                        hotspotReservation = null
                     }
                 }, null)
             } catch (e: Exception) {
                 result.error("HOTSPOT_ERROR", e.message, null)
             }
         } else {
-            // Pre-Oreo: try WifiConfiguration (deprecated but may work)
             try {
                 val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
                 val config = WifiConfiguration()
@@ -114,8 +129,8 @@ class MainActivity : FlutterActivity() {
     @SuppressLint("MissingPermission")
     private fun stopHotspot(result: MethodChannel.Result) {
         try {
-            // LocalOnlyHotspot doesn't have a direct stop API from here
-            // It stops when the reservation is closed
+            hotspotReservation?.close()
+            hotspotReservation = null
             result.success(true)
         } catch (e: Exception) {
             result.error("HOTSPOT_ERROR", e.message, null)
@@ -129,7 +144,8 @@ class MainActivity : FlutterActivity() {
             val password = call.argument<String>("password") ?: "lessnet123"
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                // Android 10+: Use WifiNetworkSuggestion
+                // Android 10+ cannot programmatically connect to WiFi
+                // Open WiFi settings instead
                 val intent = Intent(Settings.ACTION_WIFI_SETTINGS)
                 intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
                 startActivity(intent)
@@ -155,12 +171,12 @@ class MainActivity : FlutterActivity() {
     // ─── Location Methods ───
 
     private fun hasLocationPermission(): Boolean {
-        return ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        return androidx.core.content.ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
     }
 
     private fun requestLocationPermission(result: MethodChannel.Result) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), 1001)
+            androidx.core.app.ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION), 1001)
             result.success(true)
         } else {
             result.success(true)
@@ -203,7 +219,7 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    // ─── Flashlight Methods ───
+    // ─── Flashlight / Torch Methods ───
 
     private fun isFlashlightAvailable(): Boolean {
         val pm = packageManager
@@ -226,5 +242,13 @@ class MainActivity : FlutterActivity() {
         } catch (e: Exception) {
             result.error("FLASHLIGHT_ERROR", e.message, null)
         }
+    }
+
+    override fun onDestroy() {
+        try {
+            hotspotReservation?.close()
+            hotspotReservation = null
+        } catch (_: Exception) {}
+        super.onDestroy()
     }
 }
