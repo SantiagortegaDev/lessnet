@@ -38,7 +38,7 @@ const String kAppVersion = '1.2.0';
 const String kHotspotChannel = 'com.lessnet.hotspot';
 const String kLocationChannel = 'com.lessnet.location';
 const String kLanChannel = 'com.lessnet.lan';
-const String kLanPort = 9876;
+const int kLanPort = 9876;
 const String kWifiDirectChannel = 'com.lessnet.wifi_direct';
 const int kP2pPort = 9877;
 
