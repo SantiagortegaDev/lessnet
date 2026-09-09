@@ -2,7 +2,7 @@ name: lessnet
 description: Comunicacion local sin internet via Bluetooth
 
 publish_to: 'none'
-version: 1.2.0+3
+version: 1.3.0+4
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -31,7 +31,9 @@ dependencies:
   audioplayers: ^6.1.0
   flutter_map: ^7.0.2
   latlong2: ^0.9.1
-
+  qr_flutter: ^4.1.0
+  mobile_scanner: ^7.4.0
+  package_info_plus: ^9.0.1
 dev_dependencies:
   flutter_test:
     sdk: flutter

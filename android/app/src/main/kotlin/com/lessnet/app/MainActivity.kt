@@ -372,10 +372,10 @@ class MainActivity : FlutterActivity() {
     private fun registerLanService(call: MethodCall, result: MethodChannel.Result) {
         try {
             val port = call.argument<Int>("port") ?: LAN_PORT
-            var serviceName = call.argument<String>("serviceName") ?: "LessNet"
+            val localServiceName = call.argument<String>("serviceName") ?: "LessNet"
 
             val serviceInfo = NsdServiceInfo().apply {
-                serviceName = serviceName
+                serviceName = localServiceName
                 serviceType = SERVICE_TYPE
                 setPort(port)
             }

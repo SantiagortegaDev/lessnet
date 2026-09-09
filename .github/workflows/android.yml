@@ -1,8 +1,10 @@
 name: Build Android APK
+
 on:
   push:
     branches:
       - main
+  pull_request:
   workflow_dispatch:
 
 jobs:
@@ -10,152 +12,53 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
 
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
-
-      - name: Regenerate Android project and restore configs
-        run: |
-          # Save our custom files before regenerating
-          cp -r lib /tmp/lib_backup
-          cp -r assets /tmp/assets_backup 2>/dev/null || true
-          cp -r native /tmp/native_backup 2>/dev/null || true
-          cp pubspec.yaml /tmp/pubspec_backup.yaml
-          cp android/app/src/main/AndroidManifest.xml /tmp/AndroidManifest_backup.xml
-          cp android/app/build.gradle /tmp/build_gradle_backup 2>/dev/null || true
-
-          # Backup custom app icon and splash resources
-          cp -r android/app/src/main/res/mipmap-mdpi /tmp/mipmap_mdpi 2>/dev/null || true
-          cp -r android/app/src/main/res/mipmap-hdpi /tmp/mipmap_hdpi 2>/dev/null || true
-          cp -r android/app/src/main/res/mipmap-xhdpi /tmp/mipmap_xhdpi 2>/dev/null || true
-          cp -r android/app/src/main/res/mipmap-xxhdpi /tmp/mipmap_xxhdpi 2>/dev/null || true
-          cp -r android/app/src/main/res/mipmap-xxxhdpi /tmp/mipmap_xxxhdpi 2>/dev/null || true
-          cp -r android/app/src/main/res/drawable /tmp/drawable_backup 2>/dev/null || true
-          cp android/app/src/main/res/values/styles.xml /tmp/styles_backup.xml 2>/dev/null || true
-          cp -r android/app/src/main/res/xml /tmp/xml_backup 2>/dev/null || true
-
-          # Create a fresh Flutter project with correct name and org
-          cd /tmp
-          flutter create --org com.lessnet --project-name app lessnet_fresh
-
-          # Replace the Android directory with fresh one
-          rm -rf "$GITHUB_WORKSPACE/android"
-          cp -r /tmp/lessnet_fresh/android "$GITHUB_WORKSPACE/android"
-
-          # Restore our AndroidManifest with BT + storage permissions
-          cp /tmp/AndroidManifest_backup.xml "$GITHUB_WORKSPACE/android/app/src/main/AndroidManifest.xml"
-
-          # Restore custom app icon (mipmap) and splash screen (drawable + styles)
-          RES_DIR="$GITHUB_WORKSPACE/android/app/src/main/res"
-          for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
-            if [ -d "/tmp/mipmap_${density}" ]; then
-              rm -rf "$RES_DIR/mipmap-${density}"
-              cp -r "/tmp/mipmap_${density}" "$RES_DIR/mipmap-${density}"
-            fi
-          done
-          if [ -d "/tmp/drawable_backup" ]; then
-            rm -rf "$RES_DIR/drawable"
-            cp -r /tmp/drawable_backup "$RES_DIR/drawable"
-          fi
-          if [ -f "/tmp/styles_backup.xml" ]; then
-            cp /tmp/styles_backup.xml "$RES_DIR/values/styles.xml"
-          fi
-          if [ -d "/tmp/xml_backup" ]; then
-            mkdir -p "$RES_DIR/xml"
-            cp -r /tmp/xml_backup/* "$RES_DIR/xml/" 2>/dev/null || true
-          fi
-
-          # Patch build.gradle with our SDK versions and permission_handler config
-          if [ -f /tmp/build_gradle_backup ]; then
-            cp /tmp/build_gradle_backup "$GITHUB_WORKSPACE/android/app/build.gradle"
-            # Remove build.gradle.kts if flutter create generated one (avoids conflict)
-            rm -f "$GITHUB_WORKSPACE/android/app/build.gradle.kts"
-          else
-            # If no backup, patch the generated one with correct SDK versions
-            GRADLE="$GITHUB_WORKSPACE/android/app/build.gradle"
-            sed -i 's/compileSdk flutter.compileSdkVersion/compileSdk 36/' "$GRADLE"
-            sed -i 's/targetSdk flutter.targetSdkVersion/targetSdk 34/' "$GRADLE"
-          fi
-
-          # ── Install our custom native BLE peripheral Kotlin files ──
-          # Extract package from the generated build.gradle
-          GRADLE_FILE=""
-          if [ -f "$GITHUB_WORKSPACE/android/app/build.gradle.kts" ]; then
-            GRADLE_FILE="$GITHUB_WORKSPACE/android/app/build.gradle.kts"
-          elif [ -f "$GITHUB_WORKSPACE/android/app/build.gradle" ]; then
-            GRADLE_FILE="$GITHUB_WORKSPACE/android/app/build.gradle"
-          fi
-
-          PACKAGE=""
-          if [ -n "$GRADLE_FILE" ]; then
-            # Try namespace first, then applicationId
-            PACKAGE=$(grep -E "^\s*namespace" "$GRADLE_FILE" | head -1 | sed -E 's/[^"]*"([^"]+)".*/\1/' | tr -d ' ')
-            if [ -z "$PACKAGE" ]; then
-              PACKAGE=$(grep -E "^\s*applicationId" "$GRADLE_FILE" | head -1 | sed -E 's/[^"]*"([^"]+)".*/\1/' | tr -d ' ')
-            fi
-          fi
-
-          # Fallback: find it from the generated MainActivity.kt
-          if [ -z "$PACKAGE" ]; then
-            GENERATED_MAIN=$(find "$GITHUB_WORKSPACE/android/app/src/main/kotlin" -name "MainActivity.kt" | head -1)
-            if [ -n "$GENERATED_MAIN" ]; then
-              PACKAGE=$(head -1 "$GENERATED_MAIN" | sed 's/package //' | tr -d ' ')
-            fi
-          fi
-
-          # Hard fallback
-          if [ -z "$PACKAGE" ]; then
-            PACKAGE="com.lessnet.lessnet"
-          fi
-
-          echo "Detected package: $PACKAGE"
-
-          # NUKE the entire kotlin directory to remove any stale files from flutter create
-          rm -rf "$GITHUB_WORKSPACE/android/app/src/main/kotlin"
-
-          # Recreate only the correct package directory
-          KOTLIN_DIR="$GITHUB_WORKSPACE/android/app/src/main/kotlin/$(echo $PACKAGE | tr '.' '/')"
-          mkdir -p "$KOTLIN_DIR"
-
-          # Replace package placeholder and copy our custom Kotlin files
-          sed "s/PACKAGE_PLACEHOLDER/$PACKAGE/g" "$GITHUB_WORKSPACE/native/BlePeripheralPlugin.kt" > "$KOTLIN_DIR/BlePeripheralPlugin.kt"
-          sed "s/PACKAGE_PLACEHOLDER/$PACKAGE/g" "$GITHUB_WORKSPACE/native/MainActivity.kt" > "$KOTLIN_DIR/MainActivity.kt"
-
-          echo "Installed custom Kotlin files at: $KOTLIN_DIR"
-          ls -la "$KOTLIN_DIR/"
-          echo "--- MainActivity.kt head ---"
-          head -3 "$KOTLIN_DIR/MainActivity.kt"
-          echo "--- BlePeripheralPlugin.kt head ---"
-          head -3 "$KOTLIN_DIR/BlePeripheralPlugin.kt"
-
-          # Restore our source code
-          rm -rf "$GITHUB_WORKSPACE/lib"
-          cp -r /tmp/lib_backup "$GITHUB_WORKSPACE/lib"
-
-          if [ -d "/tmp/assets_backup" ]; then
-            rm -rf "$GITHUB_WORKSPACE/assets"
-            cp -r /tmp/assets_backup "$GITHUB_WORKSPACE/assets"
-          fi
-
-          # Restore native/ directory with custom Kotlin files
-          if [ -d "/tmp/native_backup" ]; then
-            rm -rf "$GITHUB_WORKSPACE/native"
-            cp -r /tmp/native_backup "$GITHUB_WORKSPACE/native"
-          fi
-
-          # Use our pubspec.yaml with our dependencies
-          cp /tmp/pubspec_backup.yaml "$GITHUB_WORKSPACE/pubspec.yaml"
+          cache: true
 
       - name: Install dependencies
         run: flutter pub get
 
+      # Catch Dart errors before spending minutes on a Gradle build, and
+      # long before publishing a release that would not run.
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos
+
+      - name: Test
+        run: flutter test --exclude-tags golden
+
+      - name: Set up release keystore
+        id: keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/lessnet-release.jks"
+            echo "path=$RUNNER_TEMP/lessnet-release.jks" >> "$GITHUB_OUTPUT"
+            echo "Release keystore installed."
+          else
+            echo "path=" >> "$GITHUB_OUTPUT"
+            echo "::warning::No KEYSTORE_BASE64 secret set — the APK will be signed with the debug key and must not be published to users."
+          fi
+
       - name: Build APK
+        env:
+          KEYSTORE_PATH: ${{ steps.keystore.outputs.path }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: flutter build apk --release
 
       - uses: actions/upload-artifact@v4
@@ -163,15 +66,17 @@ jobs:
           name: app-release
           path: build/app/outputs/flutter-apk/app-release.apk
 
-      - name: Extract version from pubspec.yaml
+      - name: Read version from pubspec.yaml
         id: version
         run: |
-          VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //')
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          VERSION_NAME=$(echo "$VERSION" | cut -d'+' -f1)
-          echo "version_name=$VERSION_NAME" >> $GITHUB_OUTPUT
+          VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | tr -d ' ')
+          echo "version_name=${VERSION%%+*}" >> "$GITHUB_OUTPUT"
 
+      # Only publish a release from main, and only when the APK is
+      # signed with the real key — a debug-signed release cannot be
+      # upgraded and would strand every user who installs it.
       - name: Create GitHub Release with APK
+        if: github.ref == 'refs/heads/main' && steps.keystore.outputs.path != ''
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version.outputs.version_name }}
@@ -179,14 +84,12 @@ jobs:
           body: |
             ## LessNet v${{ steps.version.outputs.version_name }}
 
-            Chat BLE offline sin internet.
+            Comunicación offline por Bluetooth, Wi-Fi Direct y LAN.
 
             ### Como instalar
             1. Descarga el archivo APK
             2. Activa "Instalar desde fuentes desconocidas" en tu celular
             3. Instala el APK
-
-            La app se actualiza automaticamente si hay una nueva version.
           files: build/app/outputs/flutter-apk/app-release.apk
           draft: false
           prerelease: false

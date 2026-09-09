@@ -27,6 +27,15 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'dart:math';
 
+import 'core/identity.dart';
+import 'design/theme.dart';
+import 'design/tokens.dart';
+import 'net/mesh_router.dart';
+import 'net/ble_link.dart';
+import 'net/outbox.dart';
+import 'net/stack.dart';
+import 'ui/connect_hub.dart';
+
 // ─── UUIDs del servicio BLE de LessNet ───
 const String lessnetServiceUuid = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
 const String lessnetCharRxUuid = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
@@ -250,7 +259,32 @@ Future<void> stopForegroundService() async {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await LessNetNotifications.init();
+  // Identity must exist before the first frame: the theme, the chat
+  // threads and every outgoing packet are keyed to it.
+  await LnIdentity.instance.load();
+  await _startNetworkStack();
   runApp(const LessNetApp());
+}
+
+/// Boots the mesh stack: identity-addressed routing, a persistent
+/// outbox and chunked file transfer, all sharing the app's database.
+Future<void> _startNetworkStack() async {
+  try {
+    await LessNetStack.instance.start(
+      db: () async => MessageDB.db,
+      saveFile: (fileName, bytes) async {
+        final dir = await getApplicationDocumentsDirectory();
+        final path = '${dir.path}/$fileName';
+        await File(path).writeAsBytes(bytes);
+        return path;
+      },
+    );
+    LessNetStack.instance.externalLogger = AppLogger.log;
+  } catch (e) {
+    // A failure here must not stop the app launching: the legacy
+    // transport path still works without the new stack.
+    AppLogger.log('No se pudo iniciar el stack de red: $e');
+  }
 }
 
 // ─────────────────────────────────────────────
@@ -484,78 +518,40 @@ class _LessNetAppState extends State<LessNetApp> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'LessNet',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: const ColorScheme(
+    final identity = LnIdentity.instance;
+
+    return AnimatedBuilder(
+      animation: identity,
+      builder: (context, _) {
+        // Material You palettes generated from the accent colour the
+        // user picks in Profile.
+        //
+        // Wallpaper-based dynamic colour is deliberately NOT used: the
+        // dynamic_color plugin requires minSdk 24, which would drop
+        // every Android 5 and 6 device. For an app meant to work when
+        // the network is down, reach matters more than matching the
+        // wallpaper.
+        final seed = LnSeeds.byName(identity.seedName);
+        final light = ColorScheme.fromSeed(seedColor: seed);
+        final dark = ColorScheme.fromSeed(
+          seedColor: seed,
           brightness: Brightness.dark,
-          primary: Colors.white,
-          onPrimary: Colors.black,
-          secondary: Colors.grey,
-          onSecondary: Colors.black,
-          tertiary: Color(0xFF444444),
-          onTertiary: Colors.white,
-          error: Colors.redAccent,
-          onError: Colors.white,
-          surface: Color(0xFF0A0A0A),
-          onSurface: Colors.white,
-          surfaceVariant: Color(0xFF111111),
-          onSurfaceVariant: Color(0xFF666666),
-          outline: Color(0xFF2A2A2A),
-          outlineVariant: Color(0xFF1E1E1E),
-          shadow: Colors.black,
-          scrim: Colors.black,
-          inverseSurface: Color(0xFFE0E0E0),
-          onInverseSurface: Colors.black,
-          surfaceTint: Colors.transparent,
-        ),
-        scaffoldBackgroundColor: const Color(0xFF0A0A0A),
-        useMaterial3: true,
-        dividerColor: Colors.transparent,
-        dividerTheme: const DividerThemeData(
-          color: Colors.transparent,
-          thickness: 0,
-        ),
-        filledButtonTheme: FilledButtonThemeData(
-          style: FilledButton.styleFrom(
-            backgroundColor: Colors.white,
-            foregroundColor: Colors.black,
-          ),
-        ),
-        navigationBarTheme: NavigationBarThemeData(
-          backgroundColor: const Color(0xFF111111),
-          indicatorColor: const Color(0xFF262626), // was withOpacity(0.15) — yellow on AMOLED
-          iconTheme: WidgetStateProperty.all(
-            const IconThemeData(color: Colors.grey),
-          ),
-          labelTextStyle: WidgetStateProperty.all(
-            const TextStyle(color: Colors.grey, fontSize: 11),
-          ),
-        ),
-        // ─── KILL ALL DEFAULT UNDERLINES GLOBALLY ───
-        inputDecorationTheme: const InputDecorationTheme(
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.all(Radius.circular(12)),
-            borderSide: BorderSide.none,
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.all(Radius.circular(12)),
-            borderSide: BorderSide.none,
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.all(Radius.circular(12)),
-            borderSide: BorderSide.none,
-          ),
-          filled: true,
-          fillColor: Color(0xFF151515),
-        ),
-      ),
-      home: _needsPermissions == null
-          ? const _SplashScreen()
-          : _needsPermissions!
-              ? PermissionsGatePage(onAccepted: _onPermissionsAccepted)
-              : const HomePage(),
+        );
+
+        final Widget app = MaterialApp(
+              title: 'LessNet',
+              debugShowCheckedModeBanner: false,
+              theme: buildLessNetTheme(light),
+              darkTheme: buildLessNetTheme(dark),
+              themeMode: identity.themeMode,
+          home: _needsPermissions == null
+              ? const _SplashScreen()
+              : _needsPermissions!
+                  ? PermissionsGatePage(onAccepted: _onPermissionsAccepted)
+                  : const HomePage(),
+        );
+        return app;
+      },
     );
   }
 }
@@ -794,6 +790,35 @@ class BtService {
   bool _autoConnectEnabled = true;
   Timer? _autoScanTimer;
 
+  // ─── Links published to the mesh stack ───
+  // One BleLink per live BLE connection, so the router and the link
+  // manager can score Bluetooth against LAN and Wi-Fi Direct instead
+  // of every transport being broadcast to blindly.
+  final Map<String, BleLink> _bleLinks = <String, BleLink>{};
+
+  void _publishBleLink(String deviceId, String name, {required bool peripheral}) {
+    if (!LessNetStack.instance.isReady) return;
+    if (_bleLinks.containsKey(deviceId)) return;
+    final link = BleLink(
+      linkId: 'ble:$deviceId',
+      remoteName: name,
+      writer: (line) async {
+        await _sendRawMessage(line, deviceId: peripheral ? null : deviceId);
+        return true;
+      },
+    );
+    _bleLinks[deviceId] = link;
+    LessNetStack.instance.links.addLink(link);
+    unawaited(LessNetStack.instance.announce());
+  }
+
+  void _retireBleLink(String deviceId) {
+    final link = _bleLinks.remove(deviceId);
+    if (link == null) return;
+    link.markDown();
+    unawaited(LessNetStack.instance.links.removeLink(link.id));
+  }
+
   // ─── Mesh relay tracking ───
   final Map<String, DateTime> _meshSeen = {}; // content hash -> expiry time
   static const int _kMeshMaxHops = 5;
@@ -954,12 +979,14 @@ class BtService {
           _advertisingController.add(false);
           _connectionController.add(true);
           _statusController.add('Conectado: $_peripheralDeviceName');
+          _publishBleLink(_activeDeviceId, _peripheralDeviceName, peripheral: true);
           // Stop foreground service on connection, show connection notification
           try { await stopForegroundService(); } catch (_) {}
           try { await LessNetNotifications.showConnectionNotification(_peripheralDeviceName.isNotEmpty ? _peripheralDeviceName : 'Dispositivo'); } catch (_) {}
           break;
         case 'onDeviceDisconnected':
           _peripheralConnected = false;
+          _retireBleLink(_peripheralDeviceName.isNotEmpty ? _peripheralDeviceName : 'Dispositivo');
           _peripheralDeviceName = '';
           if (_activeDeviceId == _peripheralDeviceName || _activeDeviceId == 'Dispositivo') {
             _activeDeviceId = '';
@@ -1098,6 +1125,7 @@ class BtService {
       conn.rxChar = foundRx;
       conn.txChar = foundTx;
       _centralConnections[resolvedId] = conn;
+      _publishBleLink(resolvedId, conn.name, peripheral: false);
 
       // Set as active device
       _activeDeviceId = resolvedId;
@@ -1122,6 +1150,7 @@ class BtService {
       conn.connSub = device.connectionState.listen((state) {
         if (state == BluetoothConnectionState.disconnected) {
           _centralConnections.remove(deviceId);
+          _retireBleLink(deviceId);
           if (_activeDeviceId == deviceId) {
             _activeDeviceId = _centralConnections.keys.isNotEmpty
                 ? _centralConnections.keys.first
@@ -1321,7 +1350,20 @@ class BtService {
   }
 
   void _processReceivedText(String text) {
-    // ─── SOS PROTOCOL ───
+    // ─── LN1 PACKET PROTOCOL (nuevo) ───
+    // El router se encarga de deduplicar, decrementar el TTL y
+    // retransmitir. Si no es un paquete LN1 caemos al formato antiguo,
+    // para seguir hablando con versiones anteriores de la app.
+    if (LessNetStack.instance.isReady) {
+      final link = _bleLinks[_activeDeviceId];
+      final outcome = LessNetStack.instance.router.handleIncoming(
+        text,
+        link?.id ?? (_activeDeviceId.isEmpty ? 'ble' : 'ble:$_activeDeviceId'),
+      );
+      if (outcome != RouterOutcome.notAPacket) return;
+    }
+
+    // ─── SOS PROTOCOL (legado) ───
     AppLogger.log('Mensaje recibido de $_activeDeviceId (${text.length} chars): ${text.length > 80 ? "${text.substring(0, 80)}..." : text}');
     if (text.startsWith('[SOS:')) {
       AppLogger.log('SOS recibido: $text');
@@ -1619,8 +1661,10 @@ class BtService {
 
     // Fallback P2P: si hay conexión Wi-Fi Direct activa
     if (WifiDirectService().connected) {
-      WifiDirectService().sendMessage(message: text)
-          .catchError((e) => AppLogger.log('P2P send error: $e'));
+      WifiDirectService().sendMessage(message: text).catchError((Object e) {
+        AppLogger.log('P2P send error: $e');
+        return false;
+      });
     }
   }
 
@@ -1883,8 +1927,9 @@ class MessageDB {
     final path = await getDatabasesPath();
     return openDatabase(
       '$path/lessnet_messages.db',
-      version: 3,
+      version: 4,
       onCreate: (db, ver) async {
+        await Outbox.createTable(db);
         await db.execute('''
           CREATE TABLE messages (
             id TEXT PRIMARY KEY,
@@ -1905,6 +1950,15 @@ class MessageDB {
         }
         if (oldVersion < 3) {
           await db.execute('ALTER TABLE messages ADD COLUMN read INTEGER DEFAULT 0');
+        }
+        if (oldVersion < 4) {
+          await Outbox.createTable(db);
+          // Chat history is queried by conversation and ordered by time
+          // on every open; without this it was a full scan each time.
+          await db.execute(
+            'CREATE INDEX IF NOT EXISTS idx_messages_device_time '
+            'ON messages(deviceId, time)',
+          );
         }
       },
     );
@@ -2436,11 +2490,13 @@ class _HomePageState extends State<HomePage> {
         if (prefs.getBool('wifi_direct_enabled') ?? false) {
           WifiDirectService().initialize().then((ok) {
             if (ok) {
-              WifiDirectService().discoverPeers().catchError((e) {
+              WifiDirectService().discoverPeers().catchError((Object e) {
                 AppLogger.log('P2P discover error: $e');
+                return false;
               });
-              WifiDirectService().startP2pServer().catchError((e) {
+              WifiDirectService().startP2pServer().catchError((Object e) {
                 AppLogger.log('P2P server error: $e');
+                return false;
               });
             }
           }).catchError((e) {
@@ -2465,6 +2521,7 @@ class _HomePageState extends State<HomePage> {
           IndexedStack(
             index: _index,
             children: const [
+              ConnectHubPage(),
               ScanPage(),
               ChatListPage(),
               VaultHomePage(),
@@ -2472,7 +2529,7 @@ class _HomePageState extends State<HomePage> {
             ],
           ),
           // SOS FAB - always visible
-          if (_index != 3)
+          if (_index != 4)
             Positioned(
               right: 16,
               bottom: 90,
@@ -2513,10 +2570,14 @@ class _HomePageState extends State<HomePage> {
         ],
       ),
       bottomNavigationBar: NavigationBar(
-        backgroundColor: const Color(0xFF111111),
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),
         destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.hub_outlined),
+            selectedIcon: Icon(Icons.hub_rounded),
+            label: 'Red',
+          ),
           NavigationDestination(
             icon: Icon(Icons.bluetooth_searching),
             selectedIcon: Icon(Icons.bluetooth_connected),

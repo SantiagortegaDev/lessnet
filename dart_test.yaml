@@ -1,0 +1,6 @@
+tags:
+  golden:
+    # Rendered UI review artefacts. Excluded from the default run because
+    # font rasterisation differs between machines; regenerate with:
+    #   flutter test --update-goldens test/golden
+    skip: false

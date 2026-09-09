@@ -32,7 +32,9 @@
 </p>
 
 > [!NOTE]
-> Terminamos esto a las 11 de la noche el domingo por lo que tiene algunos bugs menores, funciones incompletas, y crasheos en algunos dispositivos. Igualmente la app funciona perfectamente y puedes [descargar la beta](https://github.com/SantiagortegaDev/lessnet/releases/)
+> Interfaz rediseñada con Material 3 (Material You), red mesh reescrita y
+> seis formas de conectar dispositivos. Puedes
+> [descargar la beta](https://github.com/SantiagortegaDev/lessnet/releases/).
 
 
 
@@ -66,6 +68,242 @@
 > Recuerda activar el Bluetooth para ser visible y poder conectarte a otros dispositivos, si no funciona intenta cerrar y volver a abrir la app o activar y desactivar el bluetooth
 
 [![Less net App Demo - YouTube](https://res.cloudinary.com/marcomontalbano/image/upload/v1779230459/video_to_markdown/images/youtube--Gn064fZsrx8-c05b58ac6eb4c4700831b2b3070cd403.jpg)](https://www.youtube.com/watch?v=Gn064fZsrx8 "Less net App Demo - YouTube")
+
+---
+
+## Conexión entre dispositivos
+
+LessNet ya no depende de una sola radio ni de una lista de direcciones MAC.
+Hay **seis formas de conectarse**, ordenadas en la app por lo que tardan de
+verdad en dejarte hablando:
+
+| Método | Tiempo típico | Cuándo conviene |
+|---|---|---|
+| **Escanear QR** | ~3 s | Lo más rápido. Un teléfono muestra, el otro apunta la cámara |
+| **Misma red Wi-Fi** | ~4 s | Si ya comparten router, es instantáneo y el más veloz |
+| **Cerca de mí** | ~6 s | Detecta por proximidad (RSSI) quién está a menos de ~10 m |
+| **Código de 6 dígitos** | ~8 s | Ambos escriben el mismo código. Se puede decir en voz alta |
+| **Wi-Fi Direct** | ~12 s | Sin router. Ideal para fotos y videos |
+| **Punto de acceso** | ~20 s | Cuando no hay red: un teléfono la crea para el resto |
+
+### El código de grupo lo une todo
+
+Un código como `K7M-2QX` no es solo un PIN: de él se **derivan** de forma
+determinista todos los parámetros de cada transporte, así que los dos
+teléfonos los calculan por separado y se encuentran sin negociar nada.
+
+```
+código ──┬─ etiqueta de servicio BLE   → el escaneo solo muestra tu grupo
+         ├─ nombre de servicio NSD      → descubrimiento en la LAN
+         ├─ SSID del hotspot            → LessNet-K7M2QX
+         ├─ contraseña del hotspot      → derivada, nunca viaja por el aire
+         └─ puerto TCP                  → ambos coinciden sin acordarlo
+```
+
+El alfabeto excluye `0 O 1 I L U`, para que el código se pueda gritar en un
+albergue sin que nadie lo confunda.
+
+### Selección automática del mejor medio
+
+Cada enlace se puntúa continuamente y el mejor gana, por destino:
+
+- **ancho de banda** del medio (comprimido logarítmicamente: el salto de BLE
+  a Wi-Fi pesa mucho más que LAN vs Wi-Fi Direct)
+- **calidad de señal** real (RSSI en BLE, porcentaje en Wi-Fi)
+- **saltos** hasta el destino (cada salto añade latencia y un punto de fallo)
+- **fiabilidad observada** (tasa de éxito y fallos recientes)
+- **consumo de batería**, solo como desempate
+- **histéresis** para el enlace en uso, para que la app no salte de radio
+  cada pocos segundos
+
+En `Red` puedes ver el puntaje de cada enlace y cuál está en uso, o forzar
+`Auto` / `Bluetooth` / `Wi-Fi` a mano.
+
+---
+
+## Red mesh
+
+El formato anterior (`[MESH:saltos:origen]`) tenía dos fallos que la hacían
+inservible con más de dos dispositivos:
+
+1. Al retransmitir un mensaje global se **reenvolvía con una cabecera nueva**,
+   reiniciando el contador de saltos a su máximo. El TTL nunca llegaba a cero
+   y los mensajes circulaban para siempre en cualquier topología con ciclos.
+2. La deduplicación hasheaba la trama completa **incluyendo el número de
+   saltos**, así que el mismo mensaje llegando por un camino de 2 y otro de 3
+   producía dos hashes distintos y se mostraba duplicado.
+
+El formato nuevo es una sola línea por paquete:
+
+```
+LN1|tipo|msgId|ttl|origen|destino|seq|cargaBase64
+```
+
+- `msgId` se genera **una sola vez en el origen** y ningún repetidor lo
+  reescribe. La deduplicación usa solo ese id.
+- El TTL **solo decrece**, nunca se reinicia.
+- Hay **un único punto** en el código que retransmite, y nunca devuelve el
+  paquete por el enlace del que llegó.
+- Los mensajes directos se enrutan por el **mejor enlace conocido** en vez de
+  inundar toda la malla.
+
+Está cubierto por tests que verifican, entre otros casos, que una topología
+en ciclo (A–B, B–C, C–A) no genera tormenta y que un mismo mensaje que llega
+por dos caminos distintos se entrega **una sola vez**.
+
+---
+
+## Mensajes que no se pierden
+
+Antes, enviar sin nadie conectado ejecutaba `if (!isConnected) return;` y el
+mensaje desaparecía sin aviso. Ahora todo mensaje se **persiste primero** en
+una cola en disco y se reintenta con espera creciente (2 s, 5 s, 15 s, 45 s,
+2 min, 5 min…) hasta que aparece un enlace.
+
+Cada burbuja muestra su estado real: `En cola`, `Enviando`, `Enviado`,
+`Entregado` (con acuse de recibo de verdad) o `Falló`.
+
+Como el reintento reenvía el paquete **idéntico**, con el mismo `msgId`, el
+receptor lo deduplica solo: reintentar siempre es seguro.
+
+---
+
+## Envío de archivos
+
+| | Antes | Ahora |
+|---|---|---|
+| Formato | Todo el archivo en **un** mensaje base64 | Trozos numerados con acuse |
+| Tamaño de trozo | Fijo de 200 bytes, ignorando el MTU | Del MTU real (BLE) o decenas de KB (Wi-Fi) |
+| Pérdida de un trozo | Se pierde la transferencia entera | Se piden **solo los que faltan** |
+| Límite | 2 MB siempre | 4 MB por BLE, 64 MB por Wi-Fi |
+| Verificación | CRC32 del total | CRC32 del total, y reintento si falla |
+
+---
+
+## Identidad y nombres
+
+Cada persona tiene un **id estable** que es el mismo por BLE, LAN, Wi-Fi
+Direct y hotspot, así que una conversación sigue a la persona y no a la radio.
+En `Perfil` se elige nombre, emoji de avatar, color de la app y tema
+claro/oscuro/automático.
+---
+
+## Conexion entre dispositivos
+
+LessNet ya no depende de una sola radio ni de una lista de direcciones MAC.
+Hay **seis formas de conectarse**, ordenadas en la app por lo que tardan de
+verdad en dejarte hablando:
+
+| Metodo | Tiempo tipico | Cuando conviene |
+|---|---|---|
+| **Escanear QR** | ~3 s | Lo mas rapido. Un telefono muestra, el otro apunta la camara |
+| **Misma red Wi-Fi** | ~4 s | Si ya comparten router, es instantaneo y el mas veloz |
+| **Cerca de mi** | ~6 s | Detecta por proximidad (RSSI) quien esta a menos de ~10 m |
+| **Codigo de 6 digitos** | ~8 s | Ambos escriben el mismo codigo. Se puede decir en voz alta |
+| **Wi-Fi Direct** | ~12 s | Sin router. Ideal para fotos y videos |
+| **Punto de acceso** | ~20 s | Cuando no hay red: un telefono la crea para el resto |
+
+### El codigo de grupo lo une todo
+
+Un codigo como `K7M-2QX` no es solo un PIN: de el se **derivan** de forma
+determinista todos los parametros de cada transporte, asi que los dos
+telefonos los calculan por separado y se encuentran sin negociar nada.
+
+```
+codigo --+- etiqueta de servicio BLE   -> el escaneo solo muestra tu grupo
+         +- nombre de servicio NSD      -> descubrimiento en la LAN
+         +- SSID del hotspot            -> LessNet-K7M2QX
+         +- contrasena del hotspot      -> derivada, nunca viaja por el aire
+         +- puerto TCP                  -> ambos coinciden sin acordarlo
+```
+
+El alfabeto excluye `0 O 1 I L U`, para que el codigo se pueda gritar en un
+albergue sin que nadie lo confunda.
+
+### Seleccion automatica del mejor medio
+
+Cada enlace se puntua continuamente y el mejor gana, por destino:
+
+- **ancho de banda** del medio (comprimido logaritmicamente: el salto de BLE
+  a Wi-Fi pesa mucho mas que LAN vs Wi-Fi Direct)
+- **calidad de senal** real (RSSI en BLE, porcentaje en Wi-Fi)
+- **saltos** hasta el destino (cada salto anade latencia y un punto de fallo)
+- **fiabilidad observada** (tasa de exito y fallos recientes)
+- **consumo de bateria**, solo como desempate
+- **histeresis** para el enlace en uso, para que la app no salte de radio
+  cada pocos segundos
+
+En `Red` puedes ver el puntaje de cada enlace y cual esta en uso, o forzar
+`Auto` / `Bluetooth` / `Wi-Fi` a mano.
+
+---
+
+## Red mesh
+
+El formato anterior (`[MESH:saltos:origen]`) tenia dos fallos que la hacian
+inservible con mas de dos dispositivos:
+
+1. Al retransmitir un mensaje global se **reenvolvia con una cabecera nueva**,
+   reiniciando el contador de saltos a su maximo. El TTL nunca llegaba a cero
+   y los mensajes circulaban para siempre en cualquier topologia con ciclos.
+2. La deduplicacion hasheaba la trama completa **incluyendo el numero de
+   saltos**, asi que el mismo mensaje llegando por un camino de 2 y otro de 3
+   producia dos hashes distintos y se mostraba duplicado.
+
+El formato nuevo es una sola linea por paquete:
+
+```
+LN1|tipo|msgId|ttl|origen|destino|seq|cargaBase64
+```
+
+- `msgId` se genera **una sola vez en el origen** y ningun repetidor lo
+  reescribe. La deduplicacion usa solo ese id.
+- El TTL **solo decrece**, nunca se reinicia.
+- Hay **un unico punto** en el codigo que retransmite, y nunca devuelve el
+  paquete por el enlace del que llego.
+- Los mensajes directos se enrutan por el **mejor enlace conocido** en vez de
+  inundar toda la malla.
+
+Esta cubierto por tests que verifican, entre otros casos, que una topologia
+en ciclo (A-B, B-C, C-A) no genera tormenta y que un mismo mensaje que llega
+por dos caminos distintos se entrega **una sola vez**.
+
+---
+
+## Mensajes que no se pierden
+
+Antes, enviar sin nadie conectado ejecutaba `if (!isConnected) return;` y el
+mensaje desaparecia sin aviso. Ahora todo mensaje se **persiste primero** en
+una cola en disco y se reintenta con espera creciente (2 s, 5 s, 15 s, 45 s,
+2 min, 5 min...) hasta que aparece un enlace.
+
+Cada burbuja muestra su estado real: `En cola`, `Enviando`, `Enviado`,
+`Entregado` (con acuse de recibo de verdad) o `Fallo`.
+
+Como el reintento reenvia el paquete **identico**, con el mismo `msgId`, el
+receptor lo deduplica solo: reintentar siempre es seguro.
+
+---
+
+## Envio de archivos
+
+| | Antes | Ahora |
+|---|---|---|
+| Formato | Todo el archivo en **un** mensaje base64 | Trozos numerados con acuse |
+| Tamano de trozo | Fijo de 200 bytes, ignorando el MTU | Del MTU real (BLE) o decenas de KB (Wi-Fi) |
+| Perdida de un trozo | Se pierde la transferencia entera | Se piden **solo los que faltan** |
+| Limite | 2 MB siempre | 4 MB por BLE, 64 MB por Wi-Fi |
+
+---
+
+## Identidad y nombres
+
+Cada persona tiene un **id estable** que es el mismo por BLE, LAN, Wi-Fi
+Direct y hotspot, asi que una conversacion sigue a la persona y no a la radio.
+En `Perfil` se elige nombre, emoji de avatar, color de la app y tema
+claro/oscuro/automatico.
+
+
 
 ---
 

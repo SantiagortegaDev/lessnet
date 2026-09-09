@@ -36,3 +36,24 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Release signing — never commit the keystore or its passwords
+android/key.properties
+*.jks
+*.keystore
+
+# Local tooling / scratch
+.env
+skills/
+download/
+upload/
+lessnet/
+lessnet-main/
+lessnet-repo/
+
+# Android build system
+android/.gradle/
+android/local.properties
+android/.cxx/
+android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java
+android/app/lessnet-release.jks
